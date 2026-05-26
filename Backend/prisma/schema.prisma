@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  customer
+  admin
+}
+
+enum ProductType {
+  simple
+  variant
+}
+
+enum ProductStatus {
+  active
+  draft
+}
+
+enum VariantStockStatus {
+  in_stock
+  out_of_stock
+}
+
+enum ReviewStatus {
+  pending
+  approved
+  rejected
+}
+
+model User {
+  id           String   @id @default(cuid())
+  fullName     String
+  email        String   @unique
+  phone        String   @default("")
+  passwordHash String?
+  role         UserRole @default(customer)
+  dateOfBirth  String   @default("")
+  profileNote  String   @default("")
+  provider     String?
+  providerId   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  addresses         Address[]
+  orders            Order[]
+  reviews           Review[]
+  wishlistItems     WishlistItem[]
+  notificationPrefs NotificationPrefs?
+}
+
+model Address {
+  id           String  @id @default(cuid())
+  userId       String
+  label        String
+  fullName     String
+  email        String
+  phone        String
+  addressLine1 String
+  addressLine2 String  @default("")
+  city         String
+  state        String
+  pincode      String
+  isDefault    Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+  id              String          @id @default(cuid())
+  catalogId       String          @unique
+  slug            String          @unique
+  name            String
+  productType     ProductType     @default(simple)
+  status          ProductStatus   @default(active)
+  tagline         String?
+  fullDescription String          @default("")
+  tag             String?
+  img             String
+  images          String[]        @default([])
+  packSize        String?
+  categoryId      String
+  categoryLabel   String
+  priceValue      Int
+  mrpValue        Int?
+  rating          Float           @default(4.7)
+  reviewCount     Int             @default(0)
+  packaging       String?
+  badge           String?
+  benefits        String[]
+  inStock         Boolean         @default(true)
+  featured        Boolean         @default(false)
+  isNew           Boolean         @default(false)
+  isBestSeller    Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  reviews         Review[]
+  variants        ProductVariant[]
+}
+
+model ProductVariant {
+  id            String             @id @default(cuid())
+  productId     String
+  sku           String             @unique
+  weight        String
+  priceValue    Int
+  mrpValue      Int?
+  stockQuantity Int                @default(0)
+  stockStatus   VariantStockStatus @default(in_stock)
+  img           String?
+  packaging     String?
+  isDefault     Boolean            @default(false)
+  sortOrder     Int                @default(0)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  product       Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reviews       Review[]
+
+  @@index([productId, sortOrder])
+  @@unique([productId, weight])
+}
+
+enum OrderStatus {
+  placed
+  confirmed
+  packed
+  shipped
+  out_for_delivery
+  delivered
+  cancelled
+}
+
+model Order {
+  id            String      @id
+  userId        String?
+  status        OrderStatus @default(placed)
+  subtotal      Int
+  shipping      Int
+  total         Int
+  gstAmount     Int?
+  gstLabel      String?
+  paymentMethod String
+  cancelReason  String?
+  trackingNote  String      @default("")
+  customer      Json
+  statusHistory Json        @default("[]")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items         OrderItem[]
+  reviews       Review[]
+}
+
+model OrderItem {
+  id          String @id @default(cuid())
+  orderId     String
+  productId   String?
+  variantId   String?
+  sku         String?
+  productSlug String
+  name        String
+  img         String
+  packSize    String?
+  priceValue  Int
+  mrpValue    Int?
+  quantity    Int
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  review      Review?
+}
+
+model Review {
+  id             String        @id @default(cuid())
+  userId         String
+  orderId        String
+  orderItemId    String        @unique
+  productId      String
+  variantId      String?
+  rating         Int
+  title          String        @default("")
+  comment        String
+  status         ReviewStatus  @default(pending)
+  moderationNote String?
+  submittedAt    DateTime      @default(now())
+  moderatedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order          Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem      OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant        ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([productId, status, submittedAt])
+  @@index([orderId])
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  userId     String
+  productId  String?
+  variantId  String?
+  sku        String?
+  slug       String
+  name       String
+  img        String
+  packSize   String   @default("")
+  priceValue Int
+  mrpValue   Int?
+  tagline    String?
+  addedAt    DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, variantId])
+}
+
+model Category {
+  id            String    @id
+  label         String
+  description   String    @default("")
+  image         String    @default("")
+  sortOrder     Int       @default(0)
+  isActive      Boolean   @default(true)
+  featuredPromo Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model BlogPost {
+  id        String   @id
+  title     String
+  excerpt   String
+  date      String
+  dateISO   String
+  category  String
+  readTime  String
+  author    String
+  featured  Boolean  @default(false)
+  img       String
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model CmsPage {
+  slug      String   @id
+  title     String
+  subtitle  String   @default("")
+  pageType  String   @default("content")
+  body      Json
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PaymentMethod {
+  id          String  @id
+  label       String
+  description String  @default("")
+  enabled     Boolean @default(true)
+  sortOrder   Int     @default(0)
+}
+
+model StoreSetting {
+  key       String @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model NotificationPrefs {
+  userId          String  @id
+  orderTracking   Boolean @default(true)
+  deliveryUpdates Boolean @default(true)
+  ratingReminders Boolean @default(true)
+  orderSms        Boolean @default(false)
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

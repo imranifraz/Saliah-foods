@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@theme {
+  --color-emerald-950: #0a1f18;
+  --color-emerald-900: #16312a;
+  --color-emerald-800: #1c5733;
+  --color-emerald-700: #188749;
+  --color-cream-50: #fffdf8;
+  --color-cream-100: #f7f4eb;
+  --color-cream-200: #ebe4d4;
+  --color-gold-300: #e8c99a;
+  --color-gold-400: #d4a574;
+  --color-gold-500: #b6814e;
+  --color-gold-600: #9a6b3f;
+  --color-marble: #f5f2ec;
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body: "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-dvh bg-cream-50 font-body text-emerald-950 antialiased;
+  }
+
+  ::selection {
+    @apply bg-emerald-800/20 text-emerald-900;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .shadow-luxury {
+    box-shadow:
+      0 4px 24px rgba(22, 49, 42, 0.06),
+      0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  }
+
+  .shadow-luxury-lg {
+    box-shadow:
+      0 24px 64px rgba(22, 49, 42, 0.12),
+      0 8px 24px rgba(22, 49, 42, 0.06);
+  }
+
+  .gradient-gold {
+    background: linear-gradient(135deg, #d4a574 0%, #b6814e 50%, #9a6b3f 100%);
+  }
+
+  .gradient-emerald {
+    background: linear-gradient(160deg, #0a1f18 0%, #16312a 45%, #1c5733 100%);
+  }
+
+  .admin-card {
+    @apply rounded-2xl border border-emerald-900/8 bg-cream-50;
+    box-shadow:
+      0 4px 24px rgba(22, 49, 42, 0.06),
+      0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  }
+
+  .admin-input {
+    @apply w-full rounded-xl border border-emerald-900/15 bg-white px-4 py-2.5 text-sm text-emerald-950 outline-none transition placeholder:text-emerald-900/35 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/15;
+  }
+
+  .admin-label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-emerald-900/55;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-emerald-900 px-5 py-2.5 text-sm font-medium text-cream-50 shadow-sm transition hover:bg-emerald-800 disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border border-emerald-900/15 bg-white px-5 py-2.5 text-sm font-medium text-emerald-900 transition hover:border-emerald-800/30 hover:bg-cream-100;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-900/5;
+  }
+
+  .gold-line {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-gold-400/60 to-transparent;
+  }
+}
