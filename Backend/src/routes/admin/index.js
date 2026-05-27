@@ -8,7 +8,10 @@ import userRoutes from "./users.js";
 import categoryRoutes from "./categories.js";
 import cmsRoutes from "./cms.js";
 import paymentRoutes from "./payments.js";
+import transactionRoutes from "./transactions.js";
+import analyticsRoutes from "./analytics.js";
 import reviewRoutes from "./reviews.js";
+import notificationRoutes from "./notifications.js";
 import { requireAdmin } from "../../middleware/admin.js";
 import { toSessionUser } from "../../lib/auth.js";
 
@@ -26,6 +29,9 @@ router.use("/users", userRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/cms", cmsRoutes);
 router.use("/payments", paymentRoutes);
+router.use("/transactions", transactionRoutes);
+router.use("/analytics", analyticsRoutes);
 router.use("/reviews", reviewRoutes);
+router.use("/notifications", notificationRoutes);
 
 export default router;

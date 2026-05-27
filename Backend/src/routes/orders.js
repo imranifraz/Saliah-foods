@@ -1,12 +1,16 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma.js";
+import { syncBestSellersFromSales } from "../lib/best-sellers.js";
 import { stockStatusFromQuantity, syncProductSummary } from "../lib/products.js";
+import { applyOrderCancellation, canCustomerCancel } from "../lib/orderCancel.js";
+import { refundOrderPayment } from "../lib/razorpayRefund.js";
+import { isRazorpayConfigured, isTestPaymentsAllowed } from "../lib/razorpay.js";
 import { formatReview } from "../lib/reviews.js";
+import { notifyNewOrder, notifyOrderCancelled } from "../lib/notifications.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
-const CANCELLABLE = new Set(["placed", "confirmed"]);
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
 const orderInclude = {
   items: {
@@ -15,10 +19,6 @@ const orderInclude = {
     },
   },
 };
-
-function isRazorpayConfigured() {
-  return Boolean(process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim());
-}
 
 function formatOrder(order) {
   return {
@@ -98,17 +98,12 @@ async function resolveVariant(tx, item) {
 
 function verifyRazorpayPaymentToken(token, userId, expectedAmount) {
   if (!token) {
-    if (!isRazorpayConfigured()) {
-      return {
-        gateway: "razorpay",
-        userId,
-        razorpayOrderId: null,
-        razorpayPaymentId: null,
-        amount: Number(expectedAmount ?? 0),
-        status: "pending_configuration",
-      };
+    if (isTestPaymentsAllowed()) {
+      throw new Error("Complete the test payment before placing your order");
     }
-
+    if (!isRazorpayConfigured()) {
+      throw new Error("Online payment is not available yet. Please try again later.");
+    }
     throw new Error("Online payment verification is required before placing the order");
   }
 
@@ -123,6 +118,10 @@ function verifyRazorpayPaymentToken(token, userId, expectedAmount) {
     throw new Error("Invalid payment verification for this user");
   }
 
+  if (payload.mode === "test" && !isTestPaymentsAllowed()) {
+    throw new Error("Test payments are disabled on the server");
+  }
+
   const paidAmount = Math.round(Number(payload.amount ?? 0) * 100);
   const orderAmount = Math.round(Number(expectedAmount ?? 0) * 100);
 
@@ -130,7 +129,11 @@ function verifyRazorpayPaymentToken(token, userId, expectedAmount) {
     throw new Error("Verified payment amount does not match the order total");
   }
 
-  return payload;
+  return {
+    ...payload,
+    status: payload.status ?? "paid",
+    mode: payload.mode ?? "live",
+  };
 }
 
 router.use(requireAuth);
@@ -247,10 +250,11 @@ router.post("/", async (req, res, next) => {
             paymentMethod: "razorpay",
             payment: {
               gateway: "razorpay",
+              mode: payment.mode ?? "live",
               razorpayOrderId: payment.razorpayOrderId,
               razorpayPaymentId: payment.razorpayPaymentId,
               verifiedAmount: payment.amount,
-              verifiedAt: payment.status === "pending_configuration" ? null : createdAt.toISOString(),
+              verifiedAt: createdAt.toISOString(),
               status: payment.status ?? "paid",
             },
           },
@@ -267,8 +271,11 @@ router.post("/", async (req, res, next) => {
         await syncProductSummary(tx, productId);
       }
 
+      await notifyNewOrder(tx, created);
       return created;
     });
+
+    await syncBestSellersFromSales(prisma);
 
     res.status(201).json({ ok: true, order: formatOrder(order) });
   } catch (err) {
@@ -283,47 +290,39 @@ router.patch("/:id/cancel", async (req, res, next) => {
       include: orderInclude,
     });
     if (!order) return res.status(404).json({ ok: false, error: "Order not found" });
-    if (!CANCELLABLE.has(order.status)) {
-      return res.status(400).json({ ok: false, error: "This order cannot be cancelled" });
+    if (!canCustomerCancel(order.status)) {
+      return res.status(400).json({
+        ok: false,
+        error: "This order can no longer be cancelled because it is already being prepared",
+      });
     }
 
-    const at = new Date().toISOString();
-    const reason = req.body.reason ?? "";
-    const history = Array.isArray(order.statusHistory) ? order.statusHistory : [];
+    const reason = String(req.body.reason ?? "").trim();
+    let refund = null;
+    try {
+      refund = await refundOrderPayment(order);
+    } catch (refundErr) {
+      return res.status(400).json({
+        ok: false,
+        error: refundErr.message ?? "Refund failed. Order was not cancelled.",
+      });
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        if (!item.variantId || !item.quantity) continue;
-
-        const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
-        if (!variant) continue;
-
-        const nextQuantity = variant.stockQuantity + item.quantity;
-        await tx.productVariant.update({
-          where: { id: variant.id },
-          data: {
-            stockQuantity: nextQuantity,
-            stockStatus: stockStatusFromQuantity(nextQuantity),
-          },
-        });
-
-        if (item.productId) {
-          await syncProductSummary(tx, item.productId);
-        }
-      }
-
-      return tx.order.update({
-        where: { id: order.id },
-        data: {
-          status: "cancelled",
-          cancelReason: reason,
-          statusHistory: [
-            ...history,
-            { status: "cancelled", at, note: reason || "Cancelled by customer" },
-          ],
-        },
+      const cancelled = await applyOrderCancellation(tx, order, {
+        reason,
+        cancelledBy: "customer",
+        refund,
+      });
+      const result = await tx.order.findUnique({
+        where: { id: cancelled.id },
         include: orderInclude,
       });
+      await notifyOrderCancelled(tx, result, order.status, { cancelledBy: "customer" });
+      return result;
     });
+
+    await syncBestSellersFromSales(prisma);
 
     res.json({ ok: true, order: formatOrder(updated) });
   } catch (err) {

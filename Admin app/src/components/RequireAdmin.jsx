@@ -7,8 +7,8 @@ export function RequireAdmin({ children }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-cream-50">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-emerald-900/15 border-t-emerald-800" />
+      <div className="admin-shell flex min-h-screen items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-gold-400" />
       </div>
     );
   }

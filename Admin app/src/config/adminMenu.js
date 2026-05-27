@@ -14,7 +14,7 @@ import {
 export const adminMenuGroups = [
   {
     label: "Overview",
-    items: [{ to: "/", label: "Dashboard", icon: IconDashboard, end: true }],
+    items: [{ to: "/", label: "Overview", icon: IconDashboard, end: true }],
   },
   {
     label: "Store Management",
@@ -23,6 +23,7 @@ export const adminMenuGroups = [
       { to: "/products", label: "Product Management", icon: IconProducts },
       { to: "/inventory", label: "Inventory Management", icon: IconPackage },
       { to: "/orders", label: "Order Management", icon: IconOrders },
+      { to: "/transactions", label: "Transactions", icon: IconPayment },
     ],
   },
   {

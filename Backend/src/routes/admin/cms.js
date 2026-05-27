@@ -1,9 +1,40 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Router } from "express";
+import multer from "multer";
 import { prisma } from "../../lib/prisma.js";
 import { requireAdmin } from "../../middleware/admin.js";
+import {
+  DEFAULT_HOME_CMS,
+  formatHomeCmsPage,
+  normalizeHomeCmsBody,
+} from "../../lib/home-cms.js";
 
 const router = Router();
 router.use(requireAdmin);
+
+const cmsUploadDir = path.resolve(process.cwd(), "uploads", "cms");
+fs.mkdirSync(cmsUploadDir, { recursive: true });
+
+const cmsUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, cmsUploadDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
+      const safeExt = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"].includes(ext)
+        ? ext
+        : ".jpg";
+      cb(null, `cms-${Date.now()}-${Math.round(Math.random() * 1e6)}${safeExt}`);
+    },
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype?.startsWith("image/")) {
+      return cb(new Error("Only image uploads are allowed"));
+    }
+    cb(null, true);
+  },
+});
 
 function slugify(text) {
   return text
@@ -40,6 +71,69 @@ function formatBlog(post) {
     updatedAt: post.updatedAt?.toISOString?.() ?? post.createdAt.toISOString(),
   };
 }
+
+// ——— Homepage CMS ———
+router.get("/home", async (_req, res, next) => {
+  try {
+    let page = await prisma.cmsPage.findUnique({ where: { slug: "homepage" } });
+    if (!page) {
+      page = await prisma.cmsPage.create({
+        data: {
+          slug: "homepage",
+          title: "Homepage",
+          subtitle: "Logo, hero, our story & testimonials",
+          pageType: "homepage",
+          body: DEFAULT_HOME_CMS,
+          published: true,
+        },
+      });
+    }
+    res.json({ ok: true, page: formatHomeCmsPage(page) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put("/home", async (req, res, next) => {
+  try {
+    const { title, subtitle, published, content } = req.body;
+    const body = normalizeHomeCmsBody(content ?? req.body.body ?? {});
+    const page = await prisma.cmsPage.upsert({
+      where: { slug: "homepage" },
+      create: {
+        slug: "homepage",
+        title: title ?? "Homepage",
+        subtitle: subtitle ?? "Logo, hero, our story & testimonials",
+        pageType: "homepage",
+        body,
+        published: published !== false,
+      },
+      update: {
+        title: title ?? undefined,
+        subtitle: subtitle ?? undefined,
+        body,
+        published: published !== undefined ? Boolean(published) : undefined,
+      },
+    });
+    res.json({ ok: true, page: formatHomeCmsPage(page) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/upload", cmsUpload.single("image"), (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ ok: false, error: "Image file is required" });
+    }
+    res.status(201).json({
+      ok: true,
+      url: `/uploads/cms/${req.file.filename}`,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ——— Web pages (CMS) ———
 router.get("/pages", async (_req, res, next) => {

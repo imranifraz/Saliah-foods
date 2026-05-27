@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./AuthContext";
+import { useNotifications } from "./NotificationsContext";
 import { isActiveOrder } from "../data/orders";
 import { cancelOrderApi, fetchOrdersApi } from "../services/orderApi.js";
 import { fetchMyReviewItemsApi, submitReviewApi } from "../services/reviewApi.js";
@@ -8,6 +9,7 @@ const OrdersContext = createContext(null);
 
 export function OrdersProvider({ children }) {
   const { user } = useAuth();
+  const { refresh: refreshNotifications } = useNotifications();
   const userId = user?.id ?? null;
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -56,10 +58,14 @@ export function OrdersProvider({ children }) {
     refreshReviewItems();
   }, [refreshReviewItems]);
 
-  const addOrder = useCallback((order) => {
-    setOrders((prev) => [order, ...prev.filter((entry) => entry.id !== order.id)]);
-    return order;
-  }, []);
+  const addOrder = useCallback(
+    (order) => {
+      setOrders((prev) => [order, ...prev.filter((entry) => entry.id !== order.id)]);
+      refreshNotifications();
+      return order;
+    },
+    [refreshNotifications]
+  );
 
   const cancelOrder = useCallback(
     async (orderId, reason = "") => {
@@ -70,12 +76,13 @@ export function OrdersProvider({ children }) {
         setOrders((prev) =>
           prev.map((order) => (order.id === orderId ? data.order : order))
         );
+        refreshNotifications();
         return { ok: true, order: data.order };
       } catch (err) {
         return { ok: false, error: err.message };
       }
     },
-    [userId]
+    [userId, refreshNotifications]
   );
 
   const submitReview = useCallback(

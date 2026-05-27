@@ -19,8 +19,8 @@ function inferPackaging(packSize) {
   return PACKAGING_MAP[packSize] ?? "Pouch";
 }
 
-function formatBadge(tag, reviewCount) {
-  if (reviewCount > 200) return "Bestseller";
+function formatBadge(tag, reviewCount, isBestSeller) {
+  if (isBestSeller) return "Bestseller";
   const map = {
     Premium: "Premium Quality",
     "Natural Sweetness": "Naturally Sweet",
@@ -113,7 +113,7 @@ export function normalizeApiProduct(raw) {
     packSize: defaultVariant?.packSize ?? raw.packSize ?? "",
     packaging,
     benefits,
-    badge: raw.badge ?? formatBadge(raw.tag, raw.reviewCount ?? 0),
+    badge: raw.badge ?? formatBadge(raw.tag, raw.reviewCount ?? 0, raw.isBestSeller),
     inStock: variants.length ? variants.some((variant) => variant.inStock) : raw.inStock !== false,
     featured: Boolean(raw.featured),
     isNew: Boolean(raw.isNew),
@@ -134,7 +134,10 @@ export function buildMenuCategories(categories, products) {
     description: cat.description ?? "",
     image: resolveMediaUrl(cat.image ?? ""),
     viewAllHref: `/products/${cat.id}`,
-    products: products.filter((p) => p.categoryId === cat.id),
+    products:
+      cat.id === "best-sellers"
+        ? products.filter((p) => p.isBestSeller)
+        : products.filter((p) => p.categoryId === cat.id),
     featuredPromo: cat.featuredPromo
       ? {
           ...cat.featuredPromo,

@@ -6,7 +6,7 @@ import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
 
 const PAGE_HINTS = {
-  homepage: "Hero, trust strip & featured sections",
+  homepage: "Logo, hero banners, our story & testimonials",
   "about-us": "Brand story, values & stats",
   faq: "FAQ categories and questions",
   "sourcing-quality": "Quality pillars & process",
@@ -59,7 +59,10 @@ export function CmsPagesPage() {
                     /{p.slug} · {p.published ? "Published" : "Draft"}
                   </p>
                 </div>
-                <Link to={`/cms/pages/${p.slug}`} className="btn-primary shrink-0 text-xs">
+                <Link
+                  to={p.slug === "homepage" ? "/cms/home" : `/cms/pages/${p.slug}`}
+                  className="btn-primary shrink-0 text-xs"
+                >
                   Edit
                 </Link>
               </div>

@@ -9,6 +9,7 @@ import { StatusBadge } from "../components/ui/StatusBadge.jsx";
 import { DataTable, DataRow, DataCell } from "../components/ui/DataTable.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
 import { IconOrders, IconPackage } from "../components/icons/AdminIcons.jsx";
+import { formatRefundAmount, getRefundDetails } from "../utils/paymentRefund.js";
 
 const STATUS_OPTIONS = [
   "all",
@@ -99,7 +100,7 @@ export function OrdersPage() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="admin-input w-auto min-w-[180px]"
+            className="admin-select w-auto min-w-[180px]"
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
@@ -130,26 +131,37 @@ export function OrdersPage() {
           <LoadingState label="Loading orders…" />
         ) : (
           <DataTable
-            columns={["Order ID", "Customer", "Category", "Status", "Total", "Date"]}
+            columns={["Order ID", "Customer", "Category", "Status", "Payment", "Total", "Date"]}
             emptyMessage="No orders found"
           >
-            {filteredOrders.map((o) => (
+            {filteredOrders.map((o) => {
+              const refund = getRefundDetails(o);
+              return (
               <DataRow key={o.id}>
                 <DataCell>
-                  <Link
-                    to={`/orders/${o.id}`}
-                    className="font-medium text-emerald-800 hover:text-emerald-700"
-                  >
+                  <Link to={`/orders/${o.id}`} className="admin-link">
                     {o.id}
                   </Link>
                 </DataCell>
                 <DataCell>{o.customer?.fullName ?? "—"}</DataCell>
-                <DataCell className="text-emerald-900/60">{getOrderCategorySummary(o)}</DataCell>
+                <DataCell className="admin-muted">{getOrderCategorySummary(o)}</DataCell>
                 <DataCell>
                   <StatusBadge status={o.status} />
                 </DataCell>
-                <DataCell className="font-medium">₹{o.total.toLocaleString("en-IN")}</DataCell>
-                <DataCell className="text-emerald-900/55">
+                <DataCell>
+                  {refund?.isRefunded ? (
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-rose-700">Refunded</p>
+                      <p className="text-sm font-medium">{formatRefundAmount(refund.amount)}</p>
+                    </div>
+                  ) : (
+                    <span className="text-sm capitalize admin-muted">
+                      {o.customer?.payment?.status ?? o.paymentMethod ?? "—"}
+                    </span>
+                  )}
+                </DataCell>
+                <DataCell className="font-medium text-cream-50">₹{o.total.toLocaleString("en-IN")}</DataCell>
+                <DataCell className="admin-muted">
                   {new Date(o.createdAt).toLocaleDateString("en-IN", {
                     day: "numeric",
                     month: "short",
@@ -157,7 +169,8 @@ export function OrdersPage() {
                   })}
                 </DataCell>
               </DataRow>
-            ))}
+            );
+            })}
           </DataTable>
         )}
       </AdminCard>

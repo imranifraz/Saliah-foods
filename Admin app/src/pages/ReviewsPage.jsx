@@ -14,9 +14,9 @@ const STATUS_TABS = [
 ];
 
 const STATUS_STYLES = {
-  pending: "bg-amber-50 text-amber-700",
-  approved: "bg-emerald-50 text-emerald-700",
-  rejected: "bg-rose-50 text-rose-700",
+  pending: "bg-[var(--admin-tab-active-bg)] text-[var(--admin-link)]",
+  approved: "bg-[var(--admin-badge-bg)] text-[var(--admin-badge-fg)]",
+  rejected: "bg-[var(--admin-danger-bg)] text-[var(--admin-danger)]",
 };
 
 function formatDateTime(iso) {
@@ -37,7 +37,7 @@ function StatusBadge({ status }) {
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${
-        STATUS_STYLES[status] ?? "bg-cream-100 text-emerald-900/65"
+        STATUS_STYLES[status] ?? "border border-[var(--admin-border)] bg-[var(--admin-hover)] text-[var(--admin-fg-muted)]"
       }`}
     >
       {status.replace(/_/g, " ")}

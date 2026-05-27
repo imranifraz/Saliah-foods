@@ -6,6 +6,8 @@ import { AdminFilterTabs } from "../components/ui/AdminFilterTabs.jsx";
 import { StatCard } from "../components/ui/StatCard.jsx";
 import { DataTable, DataRow, DataCell } from "../components/ui/DataTable.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import { resolveAdminMediaUrl } from "../lib/mediaUrl.js";
+import { ProductThumb } from "../components/ui/ProductThumb.jsx";
 import { IconPackage, IconProducts } from "../components/icons/AdminIcons.jsx";
 
 function createVariant(overrides = {}) {
@@ -35,7 +37,6 @@ function createEmptyForm(categoryId = "dates") {
     benefits: "Natural Energy",
     featured: false,
     isNew: false,
-    isBestSeller: false,
     existingImages: [],
     imageFiles: [],
     variants: [createVariant({ weight: "250g", packaging: "Pouch", isDefault: true })],
@@ -55,7 +56,6 @@ function mapProductToForm(product) {
     benefits: Array.isArray(product.benefits) ? product.benefits.join(", ") : "",
     featured: Boolean(product.featured),
     isNew: Boolean(product.isNew),
-    isBestSeller: Boolean(product.isBestSeller),
     existingImages: Array.isArray(product.images) ? product.images : product.img ? [product.img] : [],
     imageFiles: [],
     variants:
@@ -259,7 +259,6 @@ export function ProductsPage() {
       formData.append("benefits", form.benefits);
       formData.append("featured", String(form.featured));
       formData.append("isNew", String(form.isNew));
-      formData.append("isBestSeller", String(form.isBestSeller));
       formData.append("existingImages", JSON.stringify(form.existingImages));
 
       form.imageFiles.forEach((file) => {
@@ -401,10 +400,15 @@ export function ProductsPage() {
           <DataTable columns={["Product", "Category", "Type", "Price", "Stock", "Variants", ""]} emptyMessage="No products">
             {filteredProducts.map((product) => (
               <DataRow key={product.id}>
-                <DataCell className="font-medium">
-                  <div>
-                    <p>{product.name}</p>
-                    {product.packSize ? <p className="mt-1 text-xs text-emerald-900/45">{product.packSize}</p> : null}
+                <DataCell>
+                  <div className="flex items-center gap-3">
+                    <ProductThumb product={product} alt={product.name} />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-cream-50">{product.name}</p>
+                      {product.packSize ? (
+                        <p className="mt-0.5 text-xs text-cream-50/65">{product.packSize}</p>
+                      ) : null}
+                    </div>
                   </div>
                 </DataCell>
                 <DataCell className="text-emerald-900/70">{product.categoryLabel}</DataCell>
@@ -548,8 +552,11 @@ export function ProductsPage() {
                     value={form.badge}
                     onChange={(event) => setForm({ ...form, badge: event.target.value })}
                     className="admin-input"
-                    placeholder="Bestseller"
+                    placeholder="e.g. Premium Quality, New arrival"
                   />
+                  <p className="mt-1 text-xs text-cream-50/65">
+                    Optional label on the shop card. “Bestseller” is applied automatically from sales, not here.
+                  </p>
                 </label>
 
                 <label className="block sm:col-span-2">
@@ -583,14 +590,10 @@ export function ProductsPage() {
                       <input type="checkbox" checked={form.isNew} onChange={(event) => setForm({ ...form, isNew: event.target.checked })} />
                       New arrival
                     </label>
-                    <label className="inline-flex items-center gap-2 text-sm text-emerald-900/70">
-                      <input
-                        type="checkbox"
-                        checked={form.isBestSeller}
-                        onChange={(event) => setForm({ ...form, isBestSeller: event.target.checked })}
-                      />
-                      Best seller
-                    </label>
+                    <p className="w-full text-xs text-cream-50/70">
+                      <strong className="text-gold-400">Best seller</strong> is set automatically from real
+                      order sales (top products by units sold). It cannot be toggled manually.
+                    </p>
                   </div>
                 </div>
 
@@ -598,7 +601,13 @@ export function ProductsPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="admin-label">Product images</p>
-                      <p className="text-xs text-emerald-900/45">Upload one or more images. The first image becomes the cover.</p>
+                      <p className="text-xs text-cream-50/55">
+                        Upload packshots on a light background. First image = cover on the shop.
+                      </p>
+                      <p className="mt-2 text-xs leading-relaxed text-gold-400/90">
+                        Required for listing cards: <strong className="text-gold-300">1200×1200 px</strong> (1:1),
+                        PNG or JPG, light background, product centered (~75% of frame), max 5 MB each.
+                      </p>
                     </div>
                     <label className="btn-secondary cursor-pointer">
                       Upload images
@@ -612,7 +621,11 @@ export function ProductsPage() {
                       <div className="mt-2 grid gap-3 sm:grid-cols-3">
                         {form.existingImages.map((image) => (
                           <div key={image} className="overflow-hidden rounded-2xl border border-emerald-900/10 bg-cream-50/60 p-2">
-                            <img src={image} alt="" className="h-28 w-full rounded-xl object-cover" />
+                            <img
+                              src={resolveAdminMediaUrl(image)}
+                              alt=""
+                              className="h-28 w-full rounded-xl object-contain bg-white/5"
+                            />
                             <button type="button" className="mt-2 text-xs text-red-700" onClick={() => removeExistingImage(image)}>
                               Remove
                             </button>
@@ -628,7 +641,7 @@ export function ProductsPage() {
                       <div className="mt-2 grid gap-3 sm:grid-cols-3">
                         {imagePreviews.map((preview) => (
                           <div key={preview.url} className="overflow-hidden rounded-2xl border border-emerald-900/10 bg-cream-50/60 p-2">
-                            <img src={preview.url} alt="" className="h-28 w-full rounded-xl object-cover" />
+                            <img src={preview.url} alt="" className="h-28 w-full rounded-xl object-contain bg-white/5" />
                             <p className="mt-2 truncate text-xs text-emerald-900/55">{preview.file.name}</p>
                           </div>
                         ))}

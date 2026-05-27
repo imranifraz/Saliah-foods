@@ -3,21 +3,15 @@ import jwt from "jsonwebtoken";
 import Razorpay from "razorpay";
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import {
+  getRazorpayConfig,
+  isRazorpayConfigured,
+  isTestPaymentsAllowed,
+} from "../lib/razorpay.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
-
-function getRazorpayConfig() {
-  const keyId = process.env.RAZORPAY_KEY_ID?.trim();
-  const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
-
-  if (!keyId || !keySecret) {
-    throw new Error("Razorpay is not configured on the server");
-  }
-
-  return { keyId, keySecret };
-}
 
 function getRazorpayClient() {
   const { keyId, keySecret } = getRazorpayConfig();
@@ -27,8 +21,24 @@ function getRazorpayClient() {
   });
 }
 
-function isRazorpayConfigured() {
-  return Boolean(process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim());
+function buildVerificationToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "30m" });
+}
+
+function createTestPayment(userId, amount) {
+  const stamp = Date.now();
+  const razorpayOrderId = `order_test_${stamp}`;
+  const razorpayPaymentId = `pay_test_${crypto.randomBytes(6).toString("hex")}`;
+
+  return {
+    gateway: "razorpay",
+    mode: "test",
+    userId,
+    razorpayOrderId,
+    razorpayPaymentId,
+    amount: Number(amount),
+    status: "paid",
+  };
 }
 
 router.get("/methods", async (_req, res, next) => {
@@ -43,6 +53,39 @@ router.get("/methods", async (_req, res, next) => {
       methods,
       shipping: shipping?.value ?? { freeShippingThreshold: 999, shippingFee: 99 },
       razorpayConfigured: isRazorpayConfigured(),
+      testPaymentsAllowed: isTestPaymentsAllowed(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/test/verify", requireAuth, async (req, res, next) => {
+  try {
+    if (!isTestPaymentsAllowed()) {
+      return res.status(403).json({ ok: false, error: "Test payments are not available" });
+    }
+
+    const amount = Number(req.body.amount ?? 0);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ ok: false, error: "Valid payment amount is required" });
+    }
+
+    const payment = createTestPayment(req.user.id, amount);
+    const verificationToken = buildVerificationToken(payment);
+
+    res.json({
+      ok: true,
+      testMode: true,
+      verificationToken,
+      payment: {
+        gateway: payment.gateway,
+        mode: payment.mode,
+        razorpayOrderId: payment.razorpayOrderId,
+        razorpayPaymentId: payment.razorpayPaymentId,
+        amount: payment.amount,
+        status: payment.status,
+      },
     });
   } catch (err) {
     next(err);
@@ -96,26 +139,27 @@ router.post("/razorpay/verify", requireAuth, async (req, res, next) => {
 
     const client = getRazorpayClient();
     const razorpayOrder = await client.orders.fetch(razorpayOrderId);
-    const verificationToken = jwt.sign(
-      {
-        gateway: "razorpay",
-        userId: req.user.id,
-        razorpayOrderId,
-        razorpayPaymentId,
-        amount: Number(razorpayOrder.amount ?? 0) / 100,
-      },
-      JWT_SECRET,
-      { expiresIn: "30m" }
-    );
+    const payment = {
+      gateway: "razorpay",
+      mode: "live",
+      userId: req.user.id,
+      razorpayOrderId,
+      razorpayPaymentId,
+      amount: Number(razorpayOrder.amount ?? 0) / 100,
+      status: "paid",
+    };
+    const verificationToken = buildVerificationToken(payment);
 
     res.json({
       ok: true,
       verificationToken,
       payment: {
-        gateway: "razorpay",
-        razorpayOrderId,
-        razorpayPaymentId,
-        amount: Number(razorpayOrder.amount ?? 0) / 100,
+        gateway: payment.gateway,
+        mode: payment.mode,
+        razorpayOrderId: payment.razorpayOrderId,
+        razorpayPaymentId: payment.razorpayPaymentId,
+        amount: payment.amount,
+        status: payment.status,
       },
     });
   } catch (err) {

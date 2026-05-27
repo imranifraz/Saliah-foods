@@ -1,31 +1,32 @@
 export function AdminFilterTabs({ items, value, onChange }) {
   return (
-    <div className="mb-5 overflow-x-auto">
-      <div className="inline-flex min-w-full gap-2 rounded-2xl border border-emerald-900/8 bg-white/85 p-2">
-        {items.map((item) => {
-          const active = item.value === value;
-
-          return (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => onChange(item.value)}
-              className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition ${
-                active
-                  ? "bg-emerald-900 text-white shadow-sm"
-                  : "text-emerald-900/65 hover:bg-cream-100"
-              }`}
-            >
-              {item.label}
-              {item.count != null ? (
-                <span className={`ml-2 text-xs ${active ? "text-white/80" : "text-emerald-900/40"}`}>
-                  {item.count}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+    <div className="mb-6 flex flex-wrap gap-2">
+      {items.map((item) => {
+        const isActive = value === item.value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={`rounded-lg border px-4 py-2 text-sm font-semibold transition ${
+              isActive
+                ? "border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] text-[var(--admin-tab-active-fg)]"
+                : "border-[var(--admin-border)] bg-[var(--admin-surface-2)] text-[var(--admin-tab-fg)] hover:bg-[var(--admin-hover)]"
+            }`}
+          >
+            {item.label}
+            {item.count != null ? (
+              <span
+                className={`ml-2 text-xs font-bold ${
+                  isActive ? "opacity-90" : "text-[var(--admin-fg-faint)]"
+                }`}
+              >
+                {item.count}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }

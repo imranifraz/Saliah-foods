@@ -6,24 +6,27 @@ import { OrdersProvider } from "../../context/OrdersContext";
 import { ProfileProvider } from "../../context/ProfileContext";
 import { WishlistProvider } from "../../context/WishlistContext";
 import { CatalogProvider } from "../../context/CatalogContext.jsx";
+import { HomeContentProvider } from "../../context/HomeContentContext.jsx";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
 export function AppProviders({ children }) {
   const tree = (
-    <CatalogProvider>
+    <HomeContentProvider>
+      <CatalogProvider>
       <AuthProvider>
-        <OrdersProvider>
-          <WishlistProvider>
-            <NotificationsProvider>
+        <NotificationsProvider>
+          <OrdersProvider>
+            <WishlistProvider>
               <CartProvider>
                 <ProfileProvider>{children}</ProfileProvider>
               </CartProvider>
-            </NotificationsProvider>
-          </WishlistProvider>
-        </OrdersProvider>
+            </WishlistProvider>
+          </OrdersProvider>
+        </NotificationsProvider>
       </AuthProvider>
     </CatalogProvider>
+    </HomeContentProvider>
   );
 
   if (googleClientId) {

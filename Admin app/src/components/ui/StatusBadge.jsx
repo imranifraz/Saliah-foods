@@ -1,19 +1,21 @@
 const STYLES = {
-  placed: "bg-cream-200 text-emerald-900",
-  confirmed: "bg-emerald-800/12 text-emerald-800",
-  packed: "bg-gold-300/40 text-gold-600",
-  shipped: "bg-emerald-700/15 text-emerald-700",
-  out_for_delivery: "bg-emerald-700/20 text-emerald-800",
-  delivered: "bg-emerald-900 text-cream-50",
-  cancelled: "bg-red-50 text-red-700",
+  placed: "border-[var(--admin-border-strong)] bg-[var(--admin-hover)] text-[var(--admin-fg-muted)]",
+  confirmed: "border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] text-[var(--admin-tab-active-fg)]",
+  packed: "border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] text-[var(--admin-link)]",
+  shipped: "border-[var(--admin-success-bg)] bg-[var(--admin-success-bg)] text-[var(--admin-success)]",
+  out_for_delivery: "border-[var(--admin-success-bg)] bg-[var(--admin-success-bg)] text-[var(--admin-success)]",
+  delivered: "border-[var(--admin-success-bg)] bg-[var(--admin-badge-bg)] text-[var(--admin-badge-fg)]",
+  cancelled: "border-[color-mix(in_srgb,var(--admin-danger)_40%,transparent)] bg-[var(--admin-danger-bg)] text-[var(--admin-danger)]",
 };
 
 export function StatusBadge({ status }) {
-  const label = status?.replace(/_/g, " ") ?? "—";
-  const style = STYLES[status] ?? "bg-cream-100 text-emerald-900/70";
+  const label = status?.replace(/_/g, " ").toUpperCase() ?? "—";
+  const style = STYLES[status] ?? STYLES.placed;
 
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${style}`}>
+    <span
+      className={`inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold tracking-wide ${style}`}
+    >
       {label}
     </span>
   );

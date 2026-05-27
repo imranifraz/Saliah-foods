@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { formatReview, syncProductReviewAggregates } from "../../lib/reviews.js";
+import { notifyReviewModerated } from "../../lib/notifications.js";
 import { requireAdmin } from "../../middleware/admin.js";
 
 const router = Router();
@@ -158,6 +159,10 @@ router.patch("/:id", async (req, res, next) => {
       });
 
       await syncProductReviewAggregates(tx, existing.productId);
+      if (status !== existing.status && status !== "pending") {
+        const productName = updated.orderItem?.name ?? updated.product?.name ?? "a product";
+        await notifyReviewModerated(tx, updated, productName);
+      }
       return updated;
     });
 

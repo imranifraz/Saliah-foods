@@ -1,61 +1,27 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { PageMeta } from "../components/pages/PageMeta";
-import { ProductCard } from "../components/ui/ProductCard";
 import { ProductDetailGallery } from "../components/products/ProductDetailGallery";
-import { ProductDetailFixedPackSize } from "../components/products/ProductDetailFixedPackSize";
-import { ProductDetailPackSelector } from "../components/products/ProductDetailPackSelector";
+import { ProductDetailPurchasePanel } from "../components/products/ProductDetailPurchasePanel";
+import { ProductDetailReviewsSection } from "../components/products/ProductDetailReviewsSection";
+import { ProductDetailRelatedSection } from "../components/products/ProductDetailRelatedSection";
 import { ProductDetailStickyBar } from "../components/products/ProductDetailStickyBar";
-import { ProductPrice } from "../components/ui/ProductPrice";
 import { WishlistButton } from "../components/account/WishlistButton";
 import { useCart } from "../context/CartContext";
 import { useCatalog } from "../context/CatalogContext.jsx";
-import { getProductDetailPath } from "../data/productCatalog";
 import {
   getDefaultPackId,
   getFixedPackSizeLabel,
   getPremiumPackOptions,
   getProductDescription,
   getProductGallery,
-  PDP_HIGHLIGHTS,
   requiresPackSelection,
 } from "../data/productDetail";
 
-function StarRating({ rating = 4.8 }) {
-  const full = Math.floor(rating);
-  const half = rating - full >= 0.5;
-
-  return (
-    <div className="flex items-center gap-0.5" aria-hidden>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <svg
-          key={i}
-          className={`h-3.5 w-3.5 ${i < full ? "text-gold-500" : i === full && half ? "text-gold-400" : "text-cream-200"}`}
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-        </svg>
-      ))}
-    </div>
-  );
-}
-
-function formatReviewDate(iso) {
-  try {
-    return new Date(iso).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return "";
-  }
-}
-
 export function ProductDetailPage() {
   const { productSlug } = useParams();
+  const navigate = useNavigate();
   const reduce = useReducedMotion();
   const { addItem } = useCart();
   const { loading: catalogLoading, getProductBySlug, getRelatedProducts } = useCatalog();
@@ -123,7 +89,6 @@ export function ProductDetailPage() {
 
   const rating = product.rating ?? 4.8;
   const reviewCount = product.reviewCount ?? 0;
-  const approvedReviews = Array.isArray(product.approvedReviews) ? product.approvedReviews : [];
   const categoryHref = `/products/${product.categoryId}`;
   const description = getProductDescription(product);
 
@@ -162,14 +127,8 @@ export function ProductDetailPage() {
     tagline: product.tagline ?? "",
   };
 
-  const handleAddToCart = () => {
-    if (isOutOfStock) return;
-    if (needsPackSelection && !selectedPackId) {
-      setPackError("Please select a pack size to continue.");
-      return;
-    }
-    setPackError("");
-    addItem({
+  function buildCartLine() {
+    return {
       productId: product.id,
       variantId: selectedVariant?.variantId ?? selectedVariant?.id ?? product.defaultVariantId ?? null,
       sku: selectedVariant?.sku ?? null,
@@ -178,7 +137,28 @@ export function ProductDetailPage() {
       img: selectedVariant?.img || product.img,
       ...linePricing,
       packSize: displayPackSize ?? "",
-    });
+    };
+  }
+
+  function validatePurchase() {
+    if (isOutOfStock) return false;
+    if (needsPackSelection && !selectedPackId) {
+      setPackError("Please select a pack size to continue.");
+      return false;
+    }
+    setPackError("");
+    return true;
+  }
+
+  const handleAddToCart = () => {
+    if (!validatePurchase()) return;
+    addItem(buildCartLine());
+  };
+
+  const handleBuyNow = () => {
+    if (!validatePurchase()) return;
+    addItem(buildCartLine());
+    navigate("/checkout");
   };
 
   return (
@@ -228,59 +208,28 @@ export function ProductDetailPage() {
                 <p className="mt-2 font-body text-[15px] leading-relaxed text-emerald-900/52">{product.tagline}</p>
               ) : null}
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <StarRating rating={rating} />
-                <span className="font-body text-sm font-medium text-emerald-900/70">{rating.toFixed(1)}</span>
-                {reviewCount > 0 ? (
-                  <span className="font-body text-sm text-emerald-900/35">({reviewCount} reviews)</span>
-                ) : null}
-              </div>
-
-              {needsPackSelection ? (
-                <ProductDetailPackSelector
-                  options={packOptions}
-                  value={selectedPackId}
-                  onChange={(id) => {
-                    setSelectedPackId(id);
-                    setPackError("");
-                  }}
-                  error={packError}
-                />
-              ) : (
-                <ProductDetailFixedPackSize label={fixedPackSize} />
-              )}
-
-              <div className="mt-5 flex flex-wrap items-end gap-4">
-                <motion.div
-                  key={selectedVariant?.id ?? selectedPackId ?? product.slug}
-                  initial={reduce ? false : { opacity: 0, y: 4 }}
-                  animate={reduce ? undefined : { opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ProductPrice
-                    priceValue={displayPriceValue}
-                    mrpValue={displayMrpValue}
-                    price={displayPrice}
-                    mrp={linePricing.mrp}
-                    discountPercent={linePricing.discountPercent}
-                    size="xl"
-                  />
-                </motion.div>
-                {displayPackSize ? (
-                  <span className="font-body text-[11px] uppercase tracking-[0.16em] text-emerald-900/35">
-                    {displayPackSize}
-                  </span>
-                ) : null}
-                <span
-                  className={`rounded-full px-3 py-1 font-body text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                    isOutOfStock
-                      ? "bg-red-50 text-red-700"
-                      : "bg-emerald-900/8 text-emerald-800"
-                  }`}
-                >
-                  {isOutOfStock ? "Out of stock" : "In stock"}
-                </span>
-              </div>
+              <ProductDetailPurchasePanel
+                rating={rating}
+                reviewCount={reviewCount}
+                needsPackSelection={needsPackSelection}
+                packOptions={packOptions}
+                selectedPackId={selectedPackId}
+                onPackChange={(id) => {
+                  setSelectedPackId(id);
+                  setPackError("");
+                }}
+                packError={packError}
+                fixedPackSize={fixedPackSize}
+                displayPriceValue={displayPriceValue}
+                displayMrpValue={displayMrpValue}
+                displayPrice={displayPrice}
+                displayMrp={linePricing.mrp}
+                priceKey={selectedVariant?.id ?? selectedPackId ?? product.slug}
+                isOutOfStock={isOutOfStock}
+                onAddToCart={handleAddToCart}
+                onBuyNow={handleBuyNow}
+                ctaRef={ctaRef}
+              />
 
               {product.benefits?.length ? (
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -295,139 +244,23 @@ export function ProductDetailPage() {
                 </div>
               ) : null}
 
-              <div ref={ctaRef} className="mt-7 flex flex-col gap-2.5 sm:flex-row sm:items-stretch">
-                <motion.button
-                  type="button"
-                  className={`pdp-btn-primary inline-flex min-h-[50px] flex-1 items-center justify-center rounded-full px-8 py-3.5 font-body text-[11px] font-semibold uppercase tracking-[0.2em] text-white ${
-                    isOutOfStock ? "cursor-not-allowed opacity-50" : ""
-                  }`}
-                  whileHover={reduce ? undefined : { y: -2 }}
-                  whileTap={reduce ? undefined : { scale: 0.985 }}
-                  onClick={handleAddToCart}
-                  disabled={isOutOfStock}
-                >
-                  {isOutOfStock ? "Out of stock" : "Add to cart"}
-                </motion.button>
-                <motion.button
-                  type="button"
-                  className={`pdp-btn-ghost inline-flex min-h-[50px] flex-1 items-center justify-center rounded-full px-8 py-3.5 font-body text-[11px] font-medium uppercase tracking-[0.15em] text-emerald-900/42 ${
-                    isOutOfStock ? "cursor-not-allowed opacity-50" : ""
-                  }`}
-                  whileHover={reduce ? undefined : { y: -1 }}
-                  whileTap={reduce ? undefined : { scale: 0.99 }}
-                  onClick={handleAddToCart}
-                  disabled={isOutOfStock}
-                >
-                  {isOutOfStock ? "Unavailable" : "Buy now"}
-                </motion.button>
-              </div>
-
               <p className="mt-6 font-body text-[13px] leading-relaxed text-emerald-900/48">{description}</p>
-
-              <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-                {PDP_HIGHLIGHTS.map((item) => (
-                  <li
-                    key={item.label}
-                    className="flex items-center gap-2.5 rounded-xl border border-cream-200/60 bg-white/50 px-3.5 py-2.5 font-body text-[12px] text-emerald-900/55"
-                  >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-500/70" aria-hidden />
-                    {item.label}
-                  </li>
-                ))}
-              </ul>
-
-              {approvedReviews.length > 0 ? (
-                <section className="mt-8 rounded-[28px] border border-cream-200/70 bg-white/75 p-5 sm:p-6">
-                  <div className="flex flex-wrap items-end justify-between gap-3 border-b border-cream-200/70 pb-4">
-                    <div>
-                      <p className="font-display text-xl text-emerald-900">Customer reviews</p>
-                      <p className="mt-1 font-body text-sm text-emerald-900/45">
-                        Approved reviews from delivered purchases only.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StarRating rating={rating} />
-                      <span className="font-body text-sm font-medium text-emerald-900/70">
-                        {rating.toFixed(1)} · {reviewCount} review{reviewCount === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 space-y-4">
-                    {approvedReviews.map((review) => (
-                      <article
-                        key={review.id}
-                        className="rounded-2xl border border-cream-200/70 bg-cream-50/80 px-4 py-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <p className="font-body text-sm font-semibold text-emerald-900">
-                              {review.customerName}
-                            </p>
-                            <p className="mt-0.5 font-body text-xs text-emerald-900/40">
-                              {formatReviewDate(review.submittedAt)}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <StarRating rating={review.rating} />
-                            <span className="font-body text-sm font-medium text-emerald-900/65">
-                              {review.rating.toFixed(1)}
-                            </span>
-                          </div>
-                        </div>
-                        {review.title ? (
-                          <p className="mt-3 font-body text-sm font-semibold text-emerald-900">
-                            {review.title}
-                          </p>
-                        ) : null}
-                        <p className="mt-2 font-body text-sm leading-relaxed text-emerald-900/60">
-                          {review.comment}
-                        </p>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
             </motion.div>
           </div>
 
-          {related.length > 0 ? (
-            <section className="mt-14 md:mt-16" aria-labelledby="related-products-title">
-              <div className="mb-6 flex items-end justify-between gap-4 border-b border-cream-200/50 pb-4">
-                <h2 id="related-products-title" className="font-display text-xl font-medium text-emerald-900 md:text-[1.35rem]">
-                  You may also like
-                </h2>
-                <Link
-                  to={categoryHref}
-                  className="font-body text-[10px] uppercase tracking-[0.18em] text-emerald-800/50 transition-colors hover:text-emerald-900"
-                >
-                  View collection
-                </Link>
-              </div>
-              <ul className="pdp-related-grid grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4 lg:gap-6" role="list">
-                {related.map((item, i) => (
-                  <motion.li
-                    key={item.catalogId}
-                    className="flex min-w-0"
-                    initial={reduce ? false : { opacity: 0, y: 12 }}
-                    whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: "-30px" }}
-                    transition={{ duration: 0.4, delay: i * 0.05 }}
-                  >
-                    <ProductCard
-                      product={item}
-                      index={i}
-                      variant="pdp-related"
-                      showPackSize
-                      showTagline={false}
-                      detailHref={getProductDetailPath(item)}
-                      className="w-full"
-                    />
-                  </motion.li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+          <section className="pdp-bottom-stack mt-14 md:mt-16" aria-label="Reviews and recommendations">
+            <div className="pdp-bottom-stack__reviews" id="pdp-reviews">
+              <ProductDetailReviewsSection
+                productSlug={product.slug}
+                fallbackRating={rating}
+                fallbackCount={reviewCount}
+              />
+            </div>
+
+            {related.length > 0 ? (
+              <ProductDetailRelatedSection products={related} />
+            ) : null}
+          </section>
         </div>
       </div>
 

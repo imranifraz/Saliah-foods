@@ -17,6 +17,8 @@ import {
   AccountTextarea,
 } from "./AccountUI";
 import { downloadOrderInvoice, getOrderStatusBadge, getPaymentStatusLabel } from "./accountUtils";
+import { RefundDetailsPanel } from "./RefundDetailsPanel.jsx";
+import { formatRefundAmount, getRefundDetails } from "../../utils/paymentRefund.js";
 
 function OrderThumbnails({ items }) {
   const shown = items.slice(0, 4);
@@ -265,6 +267,7 @@ function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpe
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const statusBadge = getOrderStatusBadge(order.status);
   const paymentLabel = getPaymentStatusLabel(order);
+  const refund = getRefundDetails(order);
   const paymentMethodLabel =
     order.paymentMethod === "razorpay"
       ? "Razorpay"
@@ -290,11 +293,22 @@ function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpe
         </div>
         <div className="flex flex-col items-end gap-2">
           <AccountStatusBadge label={statusBadge.label} className={statusBadge.className} />
-          <span className="font-body text-[10px] uppercase tracking-[0.12em] text-emerald-900/40">
+          <span
+            className={`font-body text-[10px] uppercase tracking-[0.12em] ${
+              refund?.isRefunded ? "font-semibold text-rose-700" : "text-emerald-900/40"
+            }`}
+          >
             {paymentLabel}
           </span>
+          {refund?.isRefunded ? (
+            <span className="font-body text-xs font-medium text-rose-700/90">
+              {formatRefundAmount(refund.amount)} refunded
+            </span>
+          ) : null}
         </div>
       </div>
+
+      {refund ? <RefundDetailsPanel order={order} /> : null}
 
       <div className="account-order-card__body">
         <ul className="space-y-2">
@@ -380,6 +394,34 @@ function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpe
                   </p>
                   <p className="mt-1 font-body text-sm text-emerald-900/65">{paymentLabel}</p>
                 </div>
+                {refund ? (
+                  <>
+                    <div>
+                      <p className="font-body text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-900/35">
+                        Refund amount
+                      </p>
+                      <p className="mt-1 font-display text-base text-rose-800">
+                        {formatRefundAmount(refund.amount)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-body text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-900/35">
+                        Refunded on
+                      </p>
+                      <p className="mt-1 font-body text-sm text-emerald-900/65">
+                        {refund.refundedAt
+                          ? new Date(refund.refundedAt).toLocaleString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })
+                          : "—"}
+                      </p>
+                    </div>
+                  </>
+                ) : null}
                 {order.customer ? (
                   <div>
                     <p className="font-body text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-900/35">

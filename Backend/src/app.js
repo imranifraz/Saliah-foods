@@ -14,6 +14,7 @@ import notificationRoutes from "./routes/notifications.js";
 import reviewRoutes from "./routes/reviews.js";
 import adminRoutes from "./routes/admin/index.js";
 import { errorHandler, notFound } from "./middleware/error.js";
+import { customerPublicAssetsDir } from "./lib/paths.js";
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use(
 );
 app.use(express.json());
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
+app.use("/assets", express.static(customerPublicAssetsDir()));
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "saliah-dates-api" });

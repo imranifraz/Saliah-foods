@@ -3,11 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#16312a" />
+    <meta name="theme-color" content="#0b1118" />
+    <script>
+      try {
+        var t = localStorage.getItem("saliah-admin-theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.adminTheme = t;
+      } catch (e) {}
+    </script>
     <link rel="icon" type="image/png" href="/application-logo.png" />
     <title>Saliah Foods — Admin</title>
-    <script type="module" crossorigin src="/assets/index-CpAoSL79.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DsddDHts.css">
+    <script type="module" crossorigin src="/assets/index-C4Q1gWCn.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-aKnFsJoA.css">
   </head>
   <body>
     <div id="root"></div>

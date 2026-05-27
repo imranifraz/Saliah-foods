@@ -120,6 +120,9 @@ export function CatalogProvider({ children }) {
     (categoryId) => {
       if (!catalog) return [];
       if (categoryId === "all") return catalog.products;
+      if (categoryId === "best-sellers") {
+        return catalog.products.filter((p) => p.isBestSeller);
+      }
       return catalog.products.filter((p) => p.categoryId === categoryId);
     },
     [catalog]
@@ -131,11 +134,12 @@ export function CatalogProvider({ children }) {
   );
 
   const getRelatedProducts = useCallback(
-    (product, limit = 4) => {
+    (product, limit) => {
       if (!catalog || !product) return [];
-      return catalog.products
-        .filter((p) => p.categoryId === product.categoryId && p.slug !== product.slug)
-        .slice(0, limit);
+      const related = catalog.products.filter(
+        (p) => p.categoryId === product.categoryId && p.slug !== product.slug
+      );
+      return limit != null ? related.slice(0, limit) : related;
     },
     [catalog]
   );

@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { syncBestSellersFromSales } from "../src/lib/best-sellers.js";
 import { stockStatusFromQuantity, syncProductSummary } from "../src/lib/products.js";
 
 const prisma = new PrismaClient();
@@ -12,25 +13,25 @@ function slugify(name) {
 }
 
 const products = [
-  { name: "Kimia Dates", tagline: "Soft & Juicy", tag: "Soft", img: "/assets/kimia-dates.png", packSize: "1kg", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1299, reviewCount: 248, isBestSeller: true },
-  { name: "Ajwa Dates", tagline: "Rich & Premium", tag: "Premium", img: "/assets/ajwa-dates.png", packSize: "1kg", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1899, reviewCount: 312, isBestSeller: true },
-  { name: "Safawi Dates", tagline: "Dark & Chewy", tag: "Premium", img: "/assets/safawi-dates.png", packSize: "1kg", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1149, reviewCount: 189 },
-  { name: "Zahidi Dates", tagline: "Mildly Sweet", tag: "Natural Sweetness", img: "/assets/zahidi-dates.png", packSize: "250g", categoryId: "dates", categoryLabel: "Dates", priceValue: 299, reviewCount: 156 },
-  { name: "Seedless Dates", tagline: "Easy Everyday Snacking", tag: "Seedless", img: "/assets/seedless-dates.png", packSize: "300g", categoryId: "dates", categoryLabel: "Dates", priceValue: 349, reviewCount: 203, isBestSeller: true },
-  { name: "Desert Royal Dates", tagline: "Naturally Sweet", tag: "Everyday Snack", img: "/assets/desert-royal-dates.png", packSize: "250g", categoryId: "dates", categoryLabel: "Dates", priceValue: 279, reviewCount: 174 },
-  { name: "Medjool Gift Box", tagline: "Luxury gifting assortment", tag: "Premium", img: "/assets/kimia-dates.png", packSize: "Gift Box", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1699, reviewCount: 94 },
-  { name: "Mabroom Dates", tagline: "Long, chewy & richly sweet", tag: "Premium", img: "/assets/zahidi-dates.png", packSize: "500g", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 899, reviewCount: 67 },
-  { name: "Khajoor Family Pack", tagline: "Three everyday pouches for sharing", tag: "Natural Sweetness", img: "/assets/seedless-dates.png", packSize: "3 × 250g", categoryId: "dates", categoryLabel: "Dates", priceValue: 799, reviewCount: 112 },
-  { name: "Date Syrup", tagline: "Natural sweetener for drinks, desserts, and breakfast", img: "/assets/date-syrup.png", packSize: "400g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 449, reviewCount: 142 },
-  { name: "Amla Candy", tagline: "Tangy traditional snack for everyday munching", img: "/assets/amla-candy.png", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 199, reviewCount: 98 },
-  { name: "Rose Gulkand", tagline: "Aromatic preserve with a traditional taste", img: "/assets/rose-gulkand.png", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 349, reviewCount: 121 },
-  { name: "Dry Fruit with Honey", tagline: "Rich natural blend for wellness and gifting", img: "/assets/dry-fruit-with-honey.png", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 599, reviewCount: 87 },
-  { name: "Fig & Honey Delight", tagline: "Sweet, rich, and wholesome treat", img: "/assets/fig-honey-delight.png", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 549, reviewCount: 76 },
-  { name: "Mixed Fruit Jam", tagline: "Family-friendly spread for breakfast", img: "/assets/mixed-fruit-jam.png", packSize: "100g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 149, reviewCount: 134 },
-  { name: "Ajwa Seed Powder", tagline: "Fine-ground premium ajwa for daily wellness", tag: "Premium", img: "/assets/amla-candy.png", packSize: "200g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 549, reviewCount: 58, isNew: true },
-  { name: "Traditional Health Mix", tagline: "Wholesome blend for morning nourishment", tag: "Organic", img: "/assets/dry-fruit-with-honey.png", packSize: "400g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 449, reviewCount: 73 },
-  { name: "Saffron Infused Dates", tagline: "Royal dates with delicate saffron notes", tag: "Premium", img: "/assets/kimia-dates.png", packSize: "Gift Box", categoryId: "best-sellers", categoryLabel: "Best Sellers", priceValue: 999, reviewCount: 41 },
-  { name: "Organic Date Bites", tagline: "Soft bite-sized dates for kids & travel", tag: "No Added Sugar", img: "/assets/desert-royal-dates.png", packSize: "300g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 379, reviewCount: 86, isNew: true },
+  { name: "Kimia Dates", tagline: "Soft & Juicy", tag: "Soft", img: "/assets/kimia-dates.webp", packSize: "1kg", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1299, reviewCount: 248 },
+  { name: "Ajwa Dates", tagline: "Rich & Premium", tag: "Premium", img: "/assets/ajwa-dates.webp", packSize: "1kg", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1899, reviewCount: 312 },
+  { name: "Safawi Dates", tagline: "Dark & Chewy", tag: "Premium", img: "/assets/safawi-dates.webp", packSize: "1kg", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1149, reviewCount: 189 },
+  { name: "Zahidi Dates", tagline: "Mildly Sweet", tag: "Natural Sweetness", img: "/assets/zahidi-dates.webp", packSize: "250g", categoryId: "dates", categoryLabel: "Dates", priceValue: 299, reviewCount: 156 },
+  { name: "Seedless Dates", tagline: "Easy Everyday Snacking", tag: "Seedless", img: "/assets/seedless-dates.webp", packSize: "300g", categoryId: "dates", categoryLabel: "Dates", priceValue: 349, reviewCount: 203 },
+  { name: "Desert Royal Dates", tagline: "Naturally Sweet", tag: "Everyday Snack", img: "/assets/desert-royal-dates.webp", packSize: "250g", categoryId: "dates", categoryLabel: "Dates", priceValue: 279, reviewCount: 174 },
+  { name: "Medjool Gift Box", tagline: "Luxury gifting assortment", tag: "Premium", img: "/assets/kimia-dates.webp", packSize: "Gift Box", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1699, reviewCount: 94 },
+  { name: "Mabroom Dates", tagline: "Long, chewy & richly sweet", tag: "Premium", img: "/assets/zahidi-dates.webp", packSize: "500g", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 899, reviewCount: 67 },
+  { name: "Khajoor Family Pack", tagline: "Three everyday pouches for sharing", tag: "Natural Sweetness", img: "/assets/seedless-dates.webp", packSize: "3 × 250g", categoryId: "dates", categoryLabel: "Dates", priceValue: 799, reviewCount: 112 },
+  { name: "Date Syrup", tagline: "Natural sweetener for drinks, desserts, and breakfast", img: "/assets/date-syrup.webp", packSize: "400g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 449, reviewCount: 142 },
+  { name: "Amla Candy", tagline: "Tangy traditional snack for everyday munching", img: "/assets/amla-candy.webp", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 199, reviewCount: 98 },
+  { name: "Rose Gulkand", tagline: "Aromatic preserve with a traditional taste", img: "/assets/rose-gulkand.webp", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 349, reviewCount: 121 },
+  { name: "Dry Fruit with Honey", tagline: "Rich natural blend for wellness and gifting", img: "/assets/dry-fruit-with-honey.webp", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 599, reviewCount: 87 },
+  { name: "Fig & Honey Delight", tagline: "Sweet, rich, and wholesome treat", img: "/assets/fig-honey-delight.webp", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 549, reviewCount: 76 },
+  { name: "Mixed Fruit Jam", tagline: "Family-friendly spread for breakfast", img: "/assets/mixed-fruit-jam.webp", packSize: "100g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 149, reviewCount: 134 },
+  { name: "Ajwa Seed Powder", tagline: "Fine-ground premium ajwa for daily wellness", tag: "Premium", img: "/assets/amla-candy.webp", packSize: "200g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 549, reviewCount: 58, isNew: true },
+  { name: "Traditional Health Mix", tagline: "Wholesome blend for morning nourishment", tag: "Organic", img: "/assets/dry-fruit-with-honey.webp", packSize: "400g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 449, reviewCount: 73 },
+  { name: "Saffron Infused Dates", tagline: "Royal dates with delicate saffron notes", tag: "Premium", img: "/assets/kimia-dates.webp", packSize: "Gift Box", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 999, reviewCount: 41 },
+  { name: "Organic Date Bites", tagline: "Soft bite-sized dates for kids & travel", tag: "No Added Sugar", img: "/assets/desert-royal-dates.webp", packSize: "300g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 379, reviewCount: 86, isNew: true },
 ];
 
 const blogPosts = [
@@ -44,7 +45,7 @@ const blogPosts = [
     readTime: "6 min read",
     author: "Saliah Editorial",
     featured: true,
-    img: "/assets/kimia-dates.png",
+    img: "/assets/kimia-dates.webp",
     content: [
       { type: "p", text: "Kimia dates are prized for their velvety texture and gentle sweetness — never cloying, always satisfying." },
     ],
@@ -59,7 +60,7 @@ const blogPosts = [
     readTime: "5 min read",
     author: "Saliah Editorial",
     featured: false,
-    img: "/assets/date-syrup.png",
+    img: "/assets/date-syrup.webp",
     content: [{ type: "p", text: "Date syrup — silan — is one of the oldest sweeteners in the world." }],
   },
   {
@@ -72,7 +73,7 @@ const blogPosts = [
     readTime: "7 min read",
     author: "Saliah Editorial",
     featured: false,
-    img: "/assets/rose-gulkand.png",
+    img: "/assets/rose-gulkand.webp",
     content: [{ type: "p", text: "Some foods endure because they answer a human need with grace." }],
   },
   {
@@ -85,7 +86,7 @@ const blogPosts = [
     readTime: "6 min read",
     author: "Saliah Editorial",
     featured: false,
-    img: "/assets/ajwa-dates.png",
+    img: "/assets/ajwa-dates.webp",
     content: [{ type: "p", text: "Ajwa dates carry centuries of reverence." }],
   },
   {
@@ -98,7 +99,7 @@ const blogPosts = [
     readTime: "8 min read",
     author: "Saliah Editorial",
     featured: false,
-    img: "/assets/desert-royal-dates.png",
+    img: "/assets/desert-royal-dates.webp",
     content: [{ type: "p", text: "Not all dates are created equal." }],
   },
   {
@@ -111,7 +112,7 @@ const blogPosts = [
     readTime: "5 min read",
     author: "Saliah Editorial",
     featured: false,
-    img: "/assets/dry-fruit-with-honey.png",
+    img: "/assets/dry-fruit-with-honey.webp",
     content: [{ type: "p", text: "Honey and dates share a language of warmth." }],
   },
 ];
@@ -137,13 +138,13 @@ async function main() {
       id: "premium-dates",
       label: "Premium Dates",
       description: "Soft, rich, and gift-worthy varieties",
-      image: "/assets/kimia-dates.png",
+      image: "/assets/kimia-dates.webp",
       sortOrder: 2,
       featuredPromo: {
         title: "Premium Medjool Collection",
         subtitle: "Naturally Sweet • Imported",
         cta: "Explore Collection",
-        image: "/assets/kimia-dates.png",
+        image: "/assets/kimia-dates.webp",
       },
     },
     {
@@ -156,8 +157,8 @@ async function main() {
     {
       id: "best-sellers",
       label: "Best Sellers",
-      description: "Customer favourites across our range",
-      image: "/assets/ajwa-dates.png",
+      description: "Top products by units sold — updated automatically from orders",
+      image: "/assets/ajwa-dates.webp",
       sortOrder: 4,
     },
   ];
@@ -197,7 +198,6 @@ async function main() {
         benefits: ["Natural Energy"],
         featured: index < 2,
         isNew: p.isNew ?? false,
-        isBestSeller: p.isBestSeller ?? false,
       },
       update: {
         name: p.name,
@@ -218,7 +218,6 @@ async function main() {
         benefits: ["Natural Energy"],
         featured: index < 2,
         isNew: p.isNew ?? false,
-        isBestSeller: p.isBestSeller ?? false,
       },
     });
 
@@ -281,17 +280,64 @@ async function main() {
     {
       slug: "homepage",
       title: "Homepage",
-      subtitle: "Hero, categories & trust strip",
+      subtitle: "Logo, hero banners, our story & testimonials",
       pageType: "homepage",
       body: {
-        heroTitle: "Premium Dates & Natural Wellness Foods",
-        heroSubtitle: "Naturally sweet essentials from Saliah Foods — delivered across India.",
-        trustStrip: [
-          { icon: "box", title: "Freshly Packed", text: "Sealed with care for every order" },
-          { icon: "leaf", title: "Natural Ingredients", text: "Thoughtfully selected everyday foods" },
-          { icon: "shield", title: "Secure Checkout", text: "Safe and simple online shopping" },
-          { icon: "delivery", title: "Delivery Across India", text: "Nationwide dispatch on select ranges" },
-        ],
+        siteLogo: "/assets/application-logo.png",
+        hero: {
+          title: "Premium Dates & Natural Wellness Foods",
+          subtitle:
+            "Discover carefully selected dates, date-based products, traditional wellness foods, and naturally sweet everyday essentials from Saliah Foods.",
+          primaryCta: { label: "Shop Premium Dates", href: "#premium-dates" },
+          secondaryCta: { label: "Explore Wellness Foods", href: "#wellness-products" },
+          trustLine: ["Freshly Packed", "Natural Ingredients", "Secure Checkout"],
+          banners: [
+            {
+              id: "hero-1",
+              image: "/assets/hero-banner.png",
+              alt: "Saliah Foods premium dates with nuts, figs, and grapes on marble",
+            },
+          ],
+        },
+        story: {
+          eyebrow: "Our story",
+          title: "Rooted in Dates. Built on Natural Goodness.",
+          body:
+            "Saliah Foods brings together premium dates, natural sweeteners, and traditional wellness foods selected for freshness, taste, and everyday nourishment. Our journey is built around quality sourcing, careful selection, and a commitment to bringing naturally good food to every home.",
+          image: "/assets/brand-legacy.png",
+          imageAlt: "Saliah Foods premium dates, honey blends, and wellness products",
+          ctaLabel: "Read Our Story",
+          ctaHref: "/our-legacy",
+        },
+        testimonials: {
+          eyebrow: "Testimonials",
+          title: "Loved by Families Across India",
+          subtitle:
+            "What our customers say about Saliah dates, wellness foods, and natural everyday essentials.",
+          items: [
+            {
+              id: "t1",
+              quote:
+                "The Kimia dates are incredibly soft and fresh. Packaging feels premium — perfect for gifting and everyday snacking at home.",
+              name: "Ananya R.",
+              role: "Mumbai",
+            },
+            {
+              id: "t2",
+              quote:
+                "We use Saliah date syrup daily in our kitchen. Natural sweetness without compromise — our whole family loves it.",
+              name: "Karthik M.",
+              role: "Bengaluru",
+            },
+            {
+              id: "t3",
+              quote:
+                "Rose gulkand and amla candy remind me of home. Quality is consistent and delivery was neatly packed every time.",
+              name: "Priya S.",
+              role: "Hyderabad",
+            },
+          ],
+        },
       },
     },
     {
@@ -417,6 +463,9 @@ async function main() {
     },
     update: { role: "admin", passwordHash },
   });
+
+  const bestSellerSync = await syncBestSellersFromSales(prisma);
+  console.log(`Best sellers synced from sales: ${bestSellerSync.count} product(s).`);
 
   console.log(
     `Seeded ${products.length} products, ${blogPosts.length} posts, ${categories.length} categories, ${cmsPages.length} CMS pages.`

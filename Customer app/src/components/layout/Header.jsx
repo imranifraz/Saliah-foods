@@ -5,6 +5,8 @@ import { mainNav } from "../../data/navigation";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { useWishlist } from "../../context/WishlistContext";
+import { useHomeContent } from "../../context/HomeContentContext.jsx";
+import { resolveMediaUrl } from "../../lib/api.js";
 
 import { MobileProductMegaMenu } from "./ProductMegaMenu";
 
@@ -23,6 +25,7 @@ export function Header() {
   const { totalCount, openCart, closeCart } = useCart();
   const { isAuthenticated } = useAuth();
   const { count: wishlistCount } = useWishlist();
+  const { content: homeContent } = useHomeContent();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -101,7 +104,7 @@ export function Header() {
             aria-label="Saliah Foods home"
           >
             <img
-              src="/assets/application-logo.png"
+              src={resolveMediaUrl(homeContent.siteLogo) || "/assets/application-logo.png"}
               alt="Saliah Foods"
               className="block h-8 w-auto translate-y-[1px] rounded-lg sm:h-9 sm:translate-y-[1px] md:h-10 md:translate-y-[2px] lg:h-11 xl:h-12"
               width={595}

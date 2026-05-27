@@ -52,6 +52,12 @@ model User {
   reviews           Review[]
   wishlistItems     WishlistItem[]
   notificationPrefs NotificationPrefs?
+  notifications     Notification[]
+}
+
+enum NotificationAudience {
+  customer
+  admin
 }
 
 model Address {
@@ -280,4 +286,25 @@ model NotificationPrefs {
   ratingReminders Boolean @default(true)
   orderSms        Boolean @default(false)
   user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id          String               @id @default(cuid())
+  audience    NotificationAudience
+  userId      String?
+  type        String
+  category    String
+  title       String
+  message     String
+  orderId     String?
+  actionLabel String?
+  actionHref  String?
+  dedupeKey   String?              @unique
+  readAt      DateTime?
+  dismissedAt DateTime?
+  createdAt   DateTime             @default(now())
+  user        User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([audience, userId, createdAt])
+  @@index([audience, createdAt])
 }

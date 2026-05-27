@@ -5,6 +5,11 @@ import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { StatusBadge } from "../components/ui/StatusBadge.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import {
+  formatPaymentDateTime,
+  formatRefundAmount,
+  getRefundDetails,
+} from "../utils/paymentRefund.js";
 
 const STATUSES = [
   "placed",
@@ -21,6 +26,7 @@ export function OrderDetailPage() {
   const [order, setOrder] = useState(null);
   const [status, setStatus] = useState("");
   const [trackingNote, setTrackingNote] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -30,6 +36,7 @@ export function OrderDetailPage() {
         setOrder(d.order);
         setStatus(d.order.status);
         setTrackingNote(d.order.trackingNote ?? "");
+        setCancelReason(d.order.cancelReason ?? "");
       })
       .catch((e) => setError(e.message));
   }, [id]);
@@ -41,7 +48,7 @@ export function OrderDetailPage() {
     try {
       const d = await apiFetch(`/api/admin/orders/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status, trackingNote }),
+        body: JSON.stringify({ status, trackingNote, cancelReason }),
       });
       setOrder(d.order);
       setStatus(d.order.status);
@@ -59,6 +66,8 @@ export function OrderDetailPage() {
   }
 
   const c = order.customer ?? {};
+  const payment = c.payment ?? {};
+  const refund = getRefundDetails(order);
   const paymentMethodLabel =
     order.paymentMethod === "razorpay"
       ? "Razorpay"
@@ -100,6 +109,71 @@ export function OrderDetailPage() {
           </dl>
         </AdminCard>
 
+        <AdminCard title="Payment & refund">
+          <div className="space-y-6 text-sm">
+            <div>
+              <p className="admin-label mb-3">Payment</p>
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs text-emerald-900/50">Status</dt>
+                  <dd className="mt-1 font-medium capitalize text-emerald-900">
+                    {payment.status ?? (payment.razorpayPaymentId ? "paid" : "—")}
+                    {payment.mode === "test" ? " (test)" : ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-emerald-900/50">Amount paid</dt>
+                  <dd className="mt-1 font-medium">
+                    {formatRefundAmount(payment.verifiedAmount ?? order.total)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-emerald-900/50">Paid on</dt>
+                  <dd className="mt-1">{formatPaymentDateTime(payment.verifiedAt ?? order.createdAt)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-emerald-900/50">Payment ID</dt>
+                  <dd className="mt-1 break-all font-mono text-xs">{payment.razorpayPaymentId ?? "—"}</dd>
+                </div>
+              </dl>
+            </div>
+
+            {refund ? (
+              <div className="rounded-xl border border-rose-200/80 bg-rose-50/50 p-4">
+                <p className="admin-label mb-3 text-rose-900/70">Refund</p>
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs text-rose-900/55">Refund status</dt>
+                    <dd className="mt-1 font-semibold text-rose-800">{refund.statusLabel}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-rose-900/55">Refund amount</dt>
+                    <dd className="mt-1 font-display text-lg text-rose-900">
+                      {formatRefundAmount(refund.amount)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-rose-900/55">Refunded on</dt>
+                    <dd className="mt-1 font-medium text-rose-900/85">
+                      {formatPaymentDateTime(refund.refundedAt)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-rose-900/55">Refund reference</dt>
+                    <dd className="mt-1 break-all font-mono text-xs text-rose-900/75">
+                      {refund.refundId ?? "—"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ) : order.status === "cancelled" ? (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Order cancelled — no refund record on file for this payment.
+              </p>
+            ) : null}
+          </div>
+        </AdminCard>
+
         <AdminCard title="Update order">
           <form onSubmit={handleSave} className="space-y-5">
             <label className="block">
@@ -116,6 +190,18 @@ export function OrderDetailPage() {
                 ))}
               </select>
             </label>
+            {status === "cancelled" ? (
+              <label className="block">
+                <span className="admin-label">Cancellation reason</span>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={2}
+                  className="admin-input resize-none"
+                  placeholder="Optional reason shown on the order"
+                />
+              </label>
+            ) : null}
             <label className="block">
               <span className="admin-label">Tracking note</span>
               <textarea
@@ -125,6 +211,12 @@ export function OrderDetailPage() {
                 className="admin-input resize-none"
               />
             </label>
+            {status === "cancelled" && order.status !== "cancelled" ? (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Saving will cancel this order and restore inventory. Customer refunds are issued
+                when the customer cancels before packed.
+              </p>
+            ) : null}
             {error && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
             )}

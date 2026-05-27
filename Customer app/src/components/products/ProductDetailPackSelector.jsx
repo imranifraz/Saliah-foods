@@ -1,8 +1,16 @@
-export function ProductDetailPackSelector({ options, value, onChange, error }) {
+export function ProductDetailPackSelector({ options, value, onChange, error, variant = "cards" }) {
+  const isPills = variant === "pills";
+
   return (
-    <div className="mt-5">
+    <div className={isPills ? "pdp-pack-selector pdp-pack-selector--pills" : "mt-5"}>
       <div className="flex items-baseline gap-1.5">
-        <p className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-emerald-900/55">
+        <p
+          className={
+            isPills
+              ? "pdp-pack-selector__label"
+              : "font-body text-[11px] font-medium uppercase tracking-[0.16em] text-emerald-900/55"
+          }
+        >
           Select pack size
         </p>
         <span className="font-body text-[11px] text-gold-600" aria-hidden>
@@ -11,10 +19,36 @@ export function ProductDetailPackSelector({ options, value, onChange, error }) {
         <span className="sr-only">Required</span>
       </div>
 
-      <div className="mt-2.5 flex flex-wrap gap-2" role="radiogroup" aria-label="Pack size">
+      <div
+        className={isPills ? "pdp-pack-selector__pills" : "mt-2.5 flex flex-wrap gap-2"}
+        role="radiogroup"
+        aria-label="Pack size"
+      >
         {options.map((option) => {
           const selected = value === option.id;
           const disabled = option.inStock === false;
+
+          if (isPills) {
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={`${option.label}${disabled ? ", out of stock" : ""}`}
+                className={`pdp-pack-pill ${selected ? "pdp-pack-pill--active" : ""} ${
+                  disabled ? "pdp-pack-pill--disabled" : ""
+                }`}
+                onClick={() => {
+                  if (!disabled) onChange(option.id);
+                }}
+                disabled={disabled}
+              >
+                {option.label}
+              </button>
+            );
+          }
+
           return (
             <button
               key={option.id}

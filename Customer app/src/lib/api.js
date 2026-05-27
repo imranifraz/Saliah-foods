@@ -12,7 +12,7 @@ export const AUTH_TOKEN_KEY = "saliah-token";
 
 export function resolveMediaUrl(path) {
   if (!path) return path;
-  const value = String(path);
+  let value = String(path).trim();
 
   if (
     value.startsWith("http://") ||
@@ -20,10 +20,23 @@ export function resolveMediaUrl(path) {
     value.startsWith("data:") ||
     value.startsWith("blob:")
   ) {
-    return value;
+    try {
+      const { pathname } = new URL(value);
+      value = pathname || value;
+    } catch {
+      return value;
+    }
   }
 
-  if (value.startsWith("/uploads/")) {
+  if (!value.startsWith("/")) {
+    value = value.startsWith("uploads/") || value.startsWith("assets/") ? `/${value}` : `/${value}`;
+  }
+
+  if (value.startsWith("/assets/") && /\.png$/i.test(value)) {
+    value = value.replace(/\.png$/i, ".webp");
+  }
+
+  if (value.startsWith("/uploads/") || value.startsWith("/assets/")) {
     return API_BASE ? `${API_BASE}${value}` : value;
   }
 

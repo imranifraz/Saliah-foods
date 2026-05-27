@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../../lib/prisma.js";
+import { syncBestSellersFromSales } from "../../lib/best-sellers.js";
+import { applyOrderCancellation, canAdminCancel } from "../../lib/orderCancel.js";
+import { notifyOrderCancelled, notifyOrderStatusChange } from "../../lib/notifications.js";
 import { requireAdmin } from "../../middleware/admin.js";
 
 const router = Router();
@@ -106,29 +109,87 @@ router.patch("/:id", async (req, res, next) => {
     });
     if (!order) return res.status(404).json({ ok: false, error: "Order not found" });
 
-    const { status, trackingNote } = req.body;
+    const { status, trackingNote, cancelReason } = req.body;
+    const nextStatus = status !== undefined ? String(status) : order.status;
+
+    if (status !== undefined && !STATUSES.has(nextStatus)) {
+      return res.status(400).json({ ok: false, error: "Invalid order status" });
+    }
+
+    if (nextStatus === "cancelled" && order.status !== "cancelled") {
+      if (!canAdminCancel(order.status)) {
+        return res.status(400).json({
+          ok: false,
+          error: "Orders can only be cancelled before they are packed",
+        });
+      }
+
+      const reason = String(cancelReason ?? "").trim();
+      const previousStatus = order.status;
+      const updated = await prisma.$transaction(async (tx) => {
+        await applyOrderCancellation(tx, order, {
+          reason,
+          cancelledBy: "admin",
+          note: reason || "Cancelled by admin",
+        });
+
+        const data = {};
+        if (trackingNote !== undefined) {
+          data.trackingNote = String(trackingNote);
+        }
+
+        let result;
+        if (Object.keys(data).length > 0) {
+          result = await tx.order.update({
+            where: { id: order.id },
+            data,
+            include: { items: true },
+          });
+        } else {
+          result = await tx.order.findUnique({
+            where: { id: order.id },
+            include: { items: true },
+          });
+        }
+
+        await notifyOrderCancelled(tx, result, previousStatus, { cancelledBy: "admin" });
+        return result;
+      });
+
+      await syncBestSellersFromSales(prisma);
+
+      const productsById = await loadProductsById([updated]);
+      return res.json({ ok: true, order: formatOrder(updated, productsById) });
+    }
+
     const data = {};
     const history = Array.isArray(order.statusHistory) ? [...order.statusHistory] : [];
 
-    if (status !== undefined) {
-      if (!STATUSES.has(status)) {
-        return res.status(400).json({ ok: false, error: "Invalid order status" });
-      }
-      data.status = status;
-      if (status !== order.status) {
-        history.push({ status, at: new Date().toISOString(), note: "Updated by admin" });
-        data.statusHistory = history;
-      }
+    if (status !== undefined && nextStatus !== order.status) {
+      data.status = nextStatus;
+      history.push({
+        status: nextStatus,
+        at: new Date().toISOString(),
+        note: "Updated by admin",
+      });
+      data.statusHistory = history;
     }
 
     if (trackingNote !== undefined) {
       data.trackingNote = String(trackingNote);
     }
 
-    const updated = await prisma.order.update({
-      where: { id: order.id },
-      data,
-      include: { items: true },
+    const previousStatus = order.status;
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.order.update({
+        where: { id: order.id },
+        data,
+        include: { items: true },
+      });
+      if (data.status && data.status !== previousStatus) {
+        await notifyOrderStatusChange(tx, result, previousStatus);
+      }
+      return result;
     });
 
     const productsById = await loadProductsById([updated]);

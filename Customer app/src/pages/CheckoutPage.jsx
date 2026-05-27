@@ -22,6 +22,7 @@ import {
   fetchPaymentMethodsApi,
   loadRazorpayCheckout,
   verifyRazorpayPaymentApi,
+  verifyTestPaymentApi,
 } from "../services/paymentApi.js";
 
 export function CheckoutPage() {
@@ -41,6 +42,7 @@ export function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
   const [razorpayConfigured, setRazorpayConfigured] = useState(true);
+  const [testPaymentsAllowed, setTestPaymentsAllowed] = useState(false);
 
   useEffect(() => {
     if (addresses.length > 0) {
@@ -63,7 +65,10 @@ export function CheckoutPage() {
 
   useEffect(() => {
     fetchPaymentMethodsApi()
-      .then((data) => setRazorpayConfigured(data.razorpayConfigured !== false))
+      .then((data) => {
+        setRazorpayConfigured(data.razorpayConfigured !== false);
+        setTestPaymentsAllowed(data.testPaymentsAllowed === true);
+      })
       .catch(() => {});
   }, []);
 
@@ -146,7 +151,10 @@ export function CheckoutPage() {
       const pricing = calcOrderBreakdown(subtotal, shipping);
       let paymentVerificationToken = null;
 
-      if (razorpayConfigured) {
+      if (testPaymentsAllowed) {
+        const paymentVerification = await verifyTestPaymentApi({ amount: pricing.total });
+        paymentVerificationToken = paymentVerification.verificationToken;
+      } else if (razorpayConfigured) {
         await loadRazorpayCheckout();
         const razorpayData = await createRazorpayOrderApi({
           amount: pricing.total,
@@ -250,7 +258,9 @@ export function CheckoutPage() {
             <p className="mt-2 font-body text-sm text-emerald-900/45">
               {razorpayConfigured
                 ? "Select a saved address or add a new one, then complete your online payment."
-                : "Select a saved address or add a new one. Payment is temporarily marked pending until Razorpay is configured."}
+                : testPaymentsAllowed
+                  ? "Select a saved address or add a new one, then complete a test online payment."
+                  : "Online payment is not available yet."}
             </p>
           </motion.header>
 
@@ -276,7 +286,9 @@ export function CheckoutPage() {
                   <p className="mt-1 font-body text-[12px] leading-relaxed text-emerald-900/45">
                     {razorpayConfigured
                       ? "Pay securely using UPI, cards, net banking, or wallets. Cash on delivery is not available."
-                      : "Gateway keys are not added yet. You can still place the order now and keep payment pending temporarily."}
+                      : testPaymentsAllowed
+                        ? "Razorpay keys are not added yet. Test mode simulates a successful online payment for development."
+                        : "Payment gateway is not configured yet."}
                   </p>
                 </div>
               </section>
@@ -293,18 +305,18 @@ export function CheckoutPage() {
 
               <motion.button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || (!razorpayConfigured && !testPaymentsAllowed)}
                 className="pdp-btn-primary w-full rounded-full py-4 font-body text-[11px] font-semibold uppercase tracking-[0.2em] text-white disabled:opacity-60 sm:w-auto sm:px-12"
                 whileHover={reduce || submitting ? undefined : { y: -2 }}
                 whileTap={reduce || submitting ? undefined : { scale: 0.985 }}
               >
                 {submitting
-                  ? razorpayConfigured
-                    ? "Processing payment…"
-                    : "Placing order…"
+                  ? "Processing payment…"
                   : razorpayConfigured
                     ? "Pay with Razorpay"
-                    : "Place order"}
+                    : testPaymentsAllowed
+                      ? "Pay online (test)"
+                      : "Payment unavailable"}
               </motion.button>
             </div>
 

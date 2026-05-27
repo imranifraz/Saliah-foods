@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
@@ -7,6 +7,7 @@ import { LoadingState } from "../components/ui/LoadingState.jsx";
 
 export function CmsPageEditPage() {
   const { slug } = useParams();
+  if (slug === "homepage") return <Navigate to="/cms/home" replace />;
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [published, setPublished] = useState(true);

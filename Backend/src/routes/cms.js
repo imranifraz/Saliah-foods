@@ -1,7 +1,22 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { formatHomeCmsPage } from "../lib/home-cms.js";
 
 const router = Router();
+
+router.get("/home", async (_req, res, next) => {
+  try {
+    const page = await prisma.cmsPage.findFirst({
+      where: { slug: "homepage", published: true },
+    });
+    if (!page) {
+      return res.json({ ok: true, page: formatHomeCmsPage(null) });
+    }
+    res.json({ ok: true, page: formatHomeCmsPage(page) });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get("/pages", async (_req, res, next) => {
   try {

@@ -10,6 +10,7 @@ export function OrderSuccessPopup({ order, onClose }) {
   const { customer } = order;
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const paymentPending = customer?.payment?.status === "pending_configuration";
+  const testPayment = customer?.payment?.mode === "test";
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -88,6 +89,10 @@ export function OrderSuccessPopup({ order, onClose }) {
             {paymentPending ? (
               <p className="order-success-popup__gst">
                 Order placed successfully. Payment is pending until Razorpay keys are configured.
+              </p>
+            ) : testPayment ? (
+              <p className="order-success-popup__gst">
+                Test payment recorded successfully. {GST_LABEL} included · Confirmation sent to {customer.email}
               </p>
             ) : order.gstAmount != null ? (
               <p className="order-success-popup__gst">

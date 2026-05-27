@@ -24,8 +24,17 @@ export function formatReview(review) {
   };
 }
 
+export function maskCustomerName(fullName) {
+  const parts = String(fullName ?? "Customer").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "Verified customer";
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+}
+
 export function formatApprovedProductReview(review) {
   if (!review) return null;
+
+  const fullName = review.user?.fullName ?? "Verified customer";
 
   return {
     id: review.id,
@@ -33,7 +42,32 @@ export function formatApprovedProductReview(review) {
     title: review.title ?? "",
     comment: review.comment ?? "",
     submittedAt: toIso(review.submittedAt),
-    customerName: review.user?.fullName ?? "Verified customer",
+    customerName: maskCustomerName(fullName),
+  };
+}
+
+export function buildReviewSummary(reviews) {
+  const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  let total = 0;
+  let sum = 0;
+
+  for (const review of reviews) {
+    const star = Math.min(5, Math.max(1, Math.round(Number(review.rating) || 0)));
+    distribution[star] += 1;
+    total += 1;
+    sum += Number(review.rating) || 0;
+  }
+
+  const average = total > 0 ? Math.round((sum / total) * 10) / 10 : 0;
+
+  return {
+    average,
+    count: total,
+    distribution: [5, 4, 3, 2, 1].map((star) => ({
+      star,
+      count: distribution[star],
+      percent: total > 0 ? Math.round((distribution[star] / total) * 100) : 0,
+    })),
   };
 }
 

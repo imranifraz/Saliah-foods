@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { formatReview, formatReviewableOrderItem } from "../lib/reviews.js";
+import { notifyReviewSubmitted } from "../lib/notifications.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -85,6 +86,7 @@ router.post("/", async (req, res, next) => {
     }
 
     const submittedAt = new Date();
+    const isResubmit = Boolean(orderItem.review);
     const saved = await prisma.$transaction(async (tx) => {
       if (orderItem.review) {
         return tx.review.update({
@@ -101,7 +103,7 @@ router.post("/", async (req, res, next) => {
         });
       }
 
-      return tx.review.create({
+      const created = await tx.review.create({
         data: {
           userId: req.user.id,
           orderId: orderItem.orderId,
@@ -114,7 +116,13 @@ router.post("/", async (req, res, next) => {
           submittedAt,
         },
       });
+      await notifyReviewSubmitted(tx, created, orderItem.name);
+      return created;
     });
+
+    if (isResubmit && saved.status === "pending") {
+      await notifyReviewSubmitted(prisma, saved, orderItem.name, { resubmit: true });
+    }
 
     res.status(201).json({ ok: true, review: formatReview(saved) });
   } catch (err) {

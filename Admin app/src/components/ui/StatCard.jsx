@@ -1,8 +1,15 @@
 const ACCENTS = {
-  emerald: "from-emerald-800/12 to-emerald-900/5 border-emerald-800/15",
-  gold: "from-gold-400/20 to-gold-500/5 border-gold-500/25",
-  cream: "from-cream-200/80 to-cream-100 border-cream-200",
-  marble: "from-marble to-cream-100 border-emerald-900/10",
+  emerald: "border-[var(--admin-border)] from-[var(--admin-success-bg)] to-transparent",
+  gold: "border-[var(--admin-tab-active-border)] from-[var(--admin-tab-active-bg)] to-transparent",
+  cream: "border-[var(--admin-border)] from-[var(--admin-hover)] to-transparent",
+  marble: "border-[var(--admin-border)] from-[var(--admin-hover)] to-transparent",
+};
+
+const ICON_STYLES = {
+  emerald: "bg-[var(--admin-success-bg)] text-[var(--admin-success)]",
+  gold: "bg-[var(--admin-tab-active-bg)] text-[var(--admin-link)]",
+  cream: "bg-[var(--admin-hover)] text-[var(--admin-fg)]",
+  marble: "bg-[var(--admin-hover)] text-[var(--admin-fg-muted)]",
 };
 
 export function StatCard({ label, value, hint, accent = "emerald", icon }) {
@@ -12,15 +19,19 @@ export function StatCard({ label, value, hint, accent = "emerald", icon }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-900/50">{label}</p>
-          <p className="mt-2 font-display text-3xl font-medium text-emerald-900">{value}</p>
-          {hint && <p className="mt-1 text-xs text-emerald-900/45">{hint}</p>}
+          <p className="admin-caption">{label}</p>
+          <p className="mt-2 font-display text-3xl font-semibold tracking-tight text-[var(--admin-fg)]">
+            {value}
+          </p>
+          {hint ? <p className="admin-muted mt-1.5 text-xs">{hint}</p> : null}
         </div>
-        {icon && (
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-900/8 text-emerald-800">
+        {icon ? (
+          <span
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${ICON_STYLES[accent] ?? ICON_STYLES.emerald}`}
+          >
             {icon}
           </span>
-        )}
+        ) : null}
       </div>
     </div>
   );

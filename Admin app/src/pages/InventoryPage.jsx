@@ -7,6 +7,7 @@ import { AdminFilterTabs } from "../components/ui/AdminFilterTabs.jsx";
 import { StatCard } from "../components/ui/StatCard.jsx";
 import { DataTable, DataRow, DataCell } from "../components/ui/DataTable.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import { ProductThumb } from "../components/ui/ProductThumb.jsx";
 import { IconPackage, IconProducts } from "../components/icons/AdminIcons.jsx";
 
 const STOCK_FILTERS = [
@@ -180,18 +181,22 @@ export function InventoryPage() {
               <DataRow key={item.id}>
                 <DataCell className="font-mono text-xs">{item.sku}</DataCell>
                 <DataCell>
-                  <div>
-                    <Link
-                      to={`/products`}
-                      className="font-medium text-emerald-800 hover:text-emerald-700"
-                    >
-                      {item.product.name}
-                    </Link>
-                    {item.isDefault ? (
-                      <p className="mt-1 text-xs uppercase tracking-[0.14em] text-gold-700/80">
-                        Default variant
-                      </p>
-                    ) : null}
+                  <div className="flex items-center gap-3">
+                    <ProductThumb
+                      src={item.product.img}
+                      product={item.product}
+                      alt={item.product.name}
+                    />
+                    <div className="min-w-0">
+                      <Link to="/products" className="font-semibold text-gold-400 hover:text-gold-300">
+                        {item.product.name}
+                      </Link>
+                      {item.isDefault ? (
+                        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gold-400/80">
+                          Default variant
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 </DataCell>
                 <DataCell>{item.weight}</DataCell>

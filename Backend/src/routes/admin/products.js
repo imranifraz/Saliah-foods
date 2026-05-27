@@ -4,6 +4,7 @@ import multer from "multer";
 import { Router } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { formatProduct } from "../../lib/product-response.js";
+import { syncBestSellersFromSales } from "../../lib/best-sellers.js";
 import {
   buildProductSummary,
   generateVariantSku,
@@ -34,6 +35,15 @@ const upload = multer({
 });
 
 router.use(requireAdmin);
+
+router.post("/sync-best-sellers", async (_req, res, next) => {
+  try {
+    const result = await syncBestSellersFromSales(prisma);
+    res.json({ ok: true, message: "Best sellers updated from order sales", ...result });
+  } catch (err) {
+    next(err);
+  }
+});
 
 function parseBoolean(value, fallback = false) {
   if (typeof value === "boolean") return value;
@@ -304,7 +314,6 @@ async function parseProductPayload(req, existingProduct = null) {
       inStock: summary.inStock,
       featured: parseBoolean(req.body.featured, existingProduct?.featured ?? false),
       isNew: parseBoolean(req.body.isNew, existingProduct?.isNew ?? false),
-      isBestSeller: parseBoolean(req.body.isBestSeller, existingProduct?.isBestSeller ?? false),
     },
     variants,
   };

@@ -1,11 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNotifications } from "../../context/NotificationsContext";
-import { useOrders } from "../../context/OrdersContext";
 import {
   NOTIFICATION_CATEGORIES,
   NOTIFICATION_OPTIONS,
-  buildOrderNotificationFeed,
   formatNotificationTime,
 } from "../../data/notifications";
 import {
@@ -22,6 +20,24 @@ function NotificationIcon({ type }) {
       <span className={`${base} bg-gold-500/12 text-gold-600`} aria-hidden>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 7.1-1.01L12 2z" />
+        </svg>
+      </span>
+    );
+  }
+  if (type === "review_approved" || type === "review_rejected") {
+    return (
+      <span className={`${base} bg-emerald-800/10 text-emerald-800`} aria-hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 7.1-1.01L12 2z" />
+        </svg>
+      </span>
+    );
+  }
+  if (type === "order_cancelled") {
+    return (
+      <span className={`${base} bg-red-500/10 text-red-700`} aria-hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M6 18L18 6M6 6l12 12" />
         </svg>
       </span>
     );
@@ -45,17 +61,14 @@ function NotificationIcon({ type }) {
 }
 
 export function AccountNotificationsSection() {
-  const { prefs, updatePref, markAsRead, markAllRead, clearAll, isRead, isDismissed } = useNotifications();
-  const { orders } = useOrders();
+  const { prefs, feed: allFeed, updatePref, markAsRead, markAllRead, clearAll, isRead, loading } =
+    useNotifications();
   const [category, setCategory] = useState("all");
 
-  const allFeed = useMemo(() => buildOrderNotificationFeed(orders, prefs), [orders, prefs]);
-
   const feed = useMemo(() => {
-    const visible = allFeed.filter((item) => !isDismissed(item.id));
-    if (category === "all") return visible;
-    return visible.filter((item) => item.category === category);
-  }, [allFeed, category, isDismissed]);
+    if (category === "all") return allFeed;
+    return allFeed.filter((item) => item.category === category);
+  }, [allFeed, category]);
 
   const unreadCount = feed.filter((item) => !isRead(item.id)).length;
 
@@ -101,7 +114,9 @@ export function AccountNotificationsSection() {
           ))}
         </div>
 
-        {feed.length === 0 ? (
+        {loading && feed.length === 0 ? (
+          <p className="mt-6 text-center font-body text-sm text-emerald-900/45">Loading notifications…</p>
+        ) : feed.length === 0 ? (
           <div className="mt-6">
             <AccountEmptyState
               title="All caught up"

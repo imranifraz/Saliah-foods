@@ -1,8 +1,11 @@
 import { Link } from "react-router-dom";
 import { mainNav } from "../../data/navigation";
+import { useHomeContent } from "../../context/HomeContentContext.jsx";
+import { resolveMediaUrl } from "../../lib/api.js";
 
 export function Footer() {
   const year = new Date().getFullYear();
+  const { content: homeContent } = useHomeContent();
 
   return (
     <footer className="overflow-x-clip border-t border-emerald-900/8 bg-emerald-950 pt-14 pb-8 text-cream-50 sm:pt-16 md:pt-20 md:pb-10">
@@ -10,7 +13,7 @@ export function Footer() {
         <div className="grid gap-10 sm:gap-12 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
             <img
-              src="/assets/application-logo.png"
+              src={resolveMediaUrl(homeContent.siteLogo) || "/assets/application-logo.png"}
               alt="Saliah Foods"
               className="h-12 w-auto rounded-xl sm:h-14 md:h-16 lg:h-[4.5rem]"
               width={595}

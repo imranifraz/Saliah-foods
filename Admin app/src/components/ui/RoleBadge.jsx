@@ -2,13 +2,13 @@ export function RoleBadge({ role }) {
   const isAdmin = role === "admin";
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+      className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
         isAdmin
-          ? "bg-gold-300/50 text-gold-600"
-          : "bg-emerald-800/10 text-emerald-800"
+          ? "border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] text-[var(--admin-tab-active-fg)]"
+          : "border-[var(--admin-border)] bg-[var(--admin-hover)] text-[var(--admin-fg-muted)]"
       }`}
     >
-      {role ?? "customer"}
+      {role}
     </span>
   );
 }

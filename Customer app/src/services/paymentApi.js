@@ -45,3 +45,10 @@ export async function verifyRazorpayPaymentApi(body) {
 export async function fetchPaymentMethodsApi() {
   return apiFetch("/api/payments/methods");
 }
+
+export async function verifyTestPaymentApi(body) {
+  return apiFetch("/api/payments/test/verify", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}

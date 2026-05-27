@@ -46,6 +46,19 @@ export function getOrderStatusBadge(status) {
 
 export function getPaymentStatusLabel(order) {
   if (order.customer?.payment?.status === "pending_configuration") return "Payment pending";
+  if (order.customer?.payment?.status === "refunded") {
+    const amount =
+      order.customer.payment.refundAmount ??
+      order.customer.payment.verifiedAmount ??
+      order.total;
+    return `Refunded · ₹${Number(amount).toLocaleString("en-IN")}`;
+  }
+  if (order.customer?.payment?.status === "cancelled" && order.status === "cancelled") {
+    return "Cancelled — refund pending";
+  }
+  if (order.customer?.payment?.mode === "test" && order.status !== "cancelled") {
+    return "Paid online (test)";
+  }
   if (order.status === "cancelled") {
     return order.paymentMethod === "razorpay" ? "Refund initiated" : "Refunded";
   }
