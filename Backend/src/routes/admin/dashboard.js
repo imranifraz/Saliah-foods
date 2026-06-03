@@ -10,7 +10,12 @@ router.get("/", async (_req, res, next) => {
     const [orderCount, productCount, customerCount, pendingOrders] = await Promise.all([
       prisma.order.count(),
       prisma.product.count(),
-      prisma.user.count({ where: { role: "customer" } }),
+      prisma.user.count({
+        where: {
+          role: "customer",
+          orders: { some: { status: { not: "cancelled" } } },
+        },
+      }),
       prisma.order.count({
         where: { status: { in: ["placed", "confirmed", "packed", "shipped", "out_for_delivery"] } },
       }),

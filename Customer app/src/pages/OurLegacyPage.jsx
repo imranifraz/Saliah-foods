@@ -1,6 +1,7 @@
 import { PageMeta } from "../components/pages/PageMeta";
 import { Reveal } from "../components/ui/Reveal";
 import { OptimizedImage } from "../components/ui/OptimizedImage";
+import { resolveMediaUrl } from "../lib/api.js";
 
 const legacyHighlights = [
   {
@@ -138,12 +139,12 @@ export function OurLegacyPage() {
                 ))}
 
                 <div className="mt-8">
-                  <img
-                    src="/assets/our-legacy-signature-user-2.png"
+                  <OptimizedImage
+                    src={resolveMediaUrl("/assets/signature.webp")}
                     alt="Signature of S. Nizamuddeen"
+                    pictureClassName="inline-block"
                     className="h-10 w-auto opacity-90 sm:h-12"
                     loading="lazy"
-                    decoding="async"
                   />
                   <div className="mt-3 flex items-center gap-2">
                     <p className="font-body text-sm font-semibold text-emerald-900">Nizamuddeen</p>

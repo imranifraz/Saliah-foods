@@ -229,7 +229,12 @@ export function DashboardPage() {
           icon={<IconPackage />}
         />
         <KpiCard label="SKUs in Stock" value={stats.productCount} icon={<IconProducts />} />
-        <KpiCard label="Unique Customers" value={stats.customerCount} icon={<IconUsers />} />
+        <KpiCard
+          label="Customers with orders"
+          value={stats.customerCount}
+          hint="Registered accounts with at least one completed sale"
+          icon={<IconUsers />}
+        />
       </div>
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.55fr_1fr]">

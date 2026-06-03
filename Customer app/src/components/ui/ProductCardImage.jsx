@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from "../../lib/api.js";
 import { inferImageProfile } from "../../data/productImagery.js";
 import {
   PRODUCT_CARD_IMAGE_ASPECT,
@@ -91,7 +92,7 @@ export function ProductCardImage({ product, badge, size = "listing", className =
       <div className="product-card-image-canvas" aria-hidden={false}>
         <div className="product-card-image-safe">
           <OptimizedImage
-            src={product.img}
+            src={resolveMediaUrl(product.img)}
             alt={product.name}
             pictureClassName="product-card-image-picture"
             className={`product-card-image__img ${imageClass}`}
