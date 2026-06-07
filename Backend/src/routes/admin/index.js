@@ -5,6 +5,7 @@ import orderRoutes from "./orders.js";
 import productRoutes from "./products.js";
 import inventoryRoutes from "./inventory.js";
 import userRoutes from "./users.js";
+import adminAccountRoutes from "./admins.js";
 import categoryRoutes from "./categories.js";
 import cmsRoutes from "./cms.js";
 import paymentRoutes from "./payments.js";
@@ -12,20 +13,22 @@ import transactionRoutes from "./transactions.js";
 import analyticsRoutes from "./analytics.js";
 import reviewRoutes from "./reviews.js";
 import notificationRoutes from "./notifications.js";
+import searchRoutes from "./search.js";
 import { requireAdmin } from "../../middleware/admin.js";
-import { toSessionUser } from "../../lib/auth.js";
+import { toAdminSession } from "../../lib/auth.js";
 
 const router = Router();
 
 router.use("/auth", authRoutes);
 router.get("/me", requireAdmin, (req, res) => {
-  res.json({ ok: true, user: toSessionUser(req.user) });
+  res.json({ ok: true, user: toAdminSession(req.admin) });
 });
 router.use("/dashboard", dashboardRoutes);
 router.use("/orders", orderRoutes);
 router.use("/products", productRoutes);
 router.use("/inventory", inventoryRoutes);
 router.use("/users", userRoutes);
+router.use("/admins", adminAccountRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/cms", cmsRoutes);
 router.use("/payments", paymentRoutes);
@@ -33,5 +36,6 @@ router.use("/transactions", transactionRoutes);
 router.use("/analytics", analyticsRoutes);
 router.use("/reviews", reviewRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/search", searchRoutes);
 
 export default router;

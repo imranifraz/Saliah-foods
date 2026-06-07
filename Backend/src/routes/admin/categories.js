@@ -23,26 +23,116 @@ function formatCategory(c) {
     isActive: c.isActive,
     featuredPromo: c.featuredPromo,
     productCount: c.productCount ?? 0,
+    variantCount: c.variantCount ?? 0,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };
 }
 
-router.get("/", async (_req, res, next) => {
+async function getCountsForCategory(categoryId) {
+  const [productCount, variantCount] = await Promise.all([
+    prisma.product.count({ where: { categoryId } }),
+    prisma.productVariant.count({ where: { product: { categoryId } } }),
+  ]);
+  return { productCount, variantCount };
+}
+
+async function buildCategoryCountMaps() {
+  const products = await prisma.product.findMany({
+    select: { categoryId: true, _count: { select: { variants: true } } },
+  });
+  const productCountMap = {};
+  const variantCountMap = {};
+  for (const product of products) {
+    productCountMap[product.categoryId] = (productCountMap[product.categoryId] ?? 0) + 1;
+    variantCountMap[product.categoryId] =
+      (variantCountMap[product.categoryId] ?? 0) + product._count.variants;
+  }
+  return { productCountMap, variantCountMap };
+}
+
+function hasFeaturedPromo(category) {
+  const promo = category.featuredPromo;
+  return Boolean(promo && typeof promo === "object" && (promo.title || promo.image));
+}
+
+router.get("/", async (req, res, next) => {
   try {
-    const categories = await prisma.category.findMany({
-      orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
-    });
-    const counts = await prisma.product.groupBy({
-      by: ["categoryId"],
-      _count: { _all: true },
-    });
-    const countMap = Object.fromEntries(counts.map((c) => [c.categoryId, c._count._all]));
+    const q = String(req.query.q ?? "").trim();
+    const status = String(req.query.status ?? "all");
+    const promo = String(req.query.promo ?? "all");
+    const sort = String(req.query.sort ?? "sortOrder");
+    const direction = req.query.direction === "desc" ? "desc" : "asc";
+    const all = req.query.all === "true" || req.query.page == null;
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 25));
+
+    const where = {};
+    if (status === "active") where.isActive = true;
+    if (status === "inactive") where.isActive = false;
+    if (q) {
+      where.OR = [
+        { label: { contains: q, mode: "insensitive" } },
+        { id: { contains: q, mode: "insensitive" } },
+        { description: { contains: q, mode: "insensitive" } },
+      ];
+    }
+
+    const dbOrderBy =
+      sort === "label"
+        ? [{ label: direction }]
+        : sort === "updatedAt"
+          ? [{ updatedAt: direction }]
+          : sort === "createdAt"
+            ? [{ createdAt: direction }]
+            : [{ sortOrder: direction }, { label: "asc" }];
+
+    const categories = await prisma.category.findMany({ where, orderBy: dbOrderBy });
+    const { productCountMap, variantCountMap } = await buildCategoryCountMaps();
+
+    let list = categories.map((c) =>
+      formatCategory({
+        ...c,
+        productCount: productCountMap[c.id] ?? 0,
+        variantCount: variantCountMap[c.id] ?? 0,
+      })
+    );
+
+    if (promo === "featured") {
+      list = list.filter((c) => hasFeaturedPromo(c));
+    } else if (promo === "none") {
+      list = list.filter((c) => !hasFeaturedPromo(c));
+    }
+
+    if (sort === "productCount") {
+      list.sort((a, b) => {
+        const cmp = (a.productCount ?? 0) - (b.productCount ?? 0);
+        return direction === "asc" ? cmp : -cmp;
+      });
+    }
+
+    const summary = {
+      total: list.length,
+      active: list.filter((c) => c.isActive).length,
+      inactive: list.filter((c) => !c.isActive).length,
+      linkedProducts: list.reduce((sum, c) => sum + Number(c.productCount ?? 0), 0),
+      linkedVariants: list.reduce((sum, c) => sum + Number(c.variantCount ?? 0), 0),
+      featured: list.filter((c) => hasFeaturedPromo(c)).length,
+    };
+
+    const total = list.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = all ? 1 : Math.min(page, totalPages);
+    const paginated = all ? list : list.slice((safePage - 1) * pageSize, safePage * pageSize);
+
     res.json({
       ok: true,
-      categories: categories.map((c) =>
-        formatCategory({ ...c, productCount: countMap[c.id] ?? 0 })
-      ),
+      categories: paginated,
+      total,
+      page: safePage,
+      pageSize: all ? total : pageSize,
+      totalPages: all ? 1 : totalPages,
+      summary,
     });
   } catch (err) {
     next(err);
@@ -76,13 +166,47 @@ router.post("/", async (req, res, next) => {
   }
 });
 
+router.post("/:id/duplicate", async (req, res, next) => {
+  try {
+    const source = await prisma.category.findUnique({ where: { id: req.params.id } });
+    if (!source) return res.status(404).json({ ok: false, error: "Category not found" });
+
+    let newId = `${source.id}-copy`;
+    let counter = 2;
+    while (await prisma.category.findUnique({ where: { id: newId } })) {
+      newId = `${source.id}-copy-${counter}`;
+      counter += 1;
+    }
+
+    const maxSort = await prisma.category.aggregate({ _max: { sortOrder: true } });
+    const category = await prisma.category.create({
+      data: {
+        id: newId,
+        label: `${source.label} (Copy)`,
+        description: source.description,
+        image: source.image,
+        sortOrder: (maxSort._max.sortOrder ?? source.sortOrder) + 1,
+        isActive: false,
+        featuredPromo: source.featuredPromo,
+      },
+    });
+
+    res.status(201).json({ ok: true, category: formatCategory({ ...category, productCount: 0 }) });
+  } catch (err) {
+    if (err.code === "P2002") {
+      return res.status(409).json({ ok: false, error: "Category URL slug already exists" });
+    }
+    next(err);
+  }
+});
+
 router.get("/:id", async (req, res, next) => {
   try {
     const category = await prisma.category.findUnique({ where: { id: req.params.id } });
     if (!category) return res.status(404).json({ ok: false, error: "Category not found" });
 
-    const productCount = await prisma.product.count({ where: { categoryId: category.id } });
-    res.json({ ok: true, category: formatCategory({ ...category, productCount }) });
+    const { productCount, variantCount } = await getCountsForCategory(category.id);
+    res.json({ ok: true, category: formatCategory({ ...category, productCount, variantCount }) });
   } catch (err) {
     next(err);
   }
@@ -180,8 +304,8 @@ router.patch("/:id", async (req, res, next) => {
       });
     });
 
-    const productCount = await prisma.product.count({ where: { categoryId: category.id } });
-    res.json({ ok: true, category: formatCategory({ ...category, productCount }) });
+    const { productCount, variantCount } = await getCountsForCategory(category.id);
+    res.json({ ok: true, category: formatCategory({ ...category, productCount, variantCount }) });
   } catch (err) {
     if (err.status === 409) {
       return res.status(409).json({ ok: false, error: err.message });

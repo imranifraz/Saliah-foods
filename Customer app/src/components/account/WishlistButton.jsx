@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWishlist } from "../../context/WishlistContext";
 
@@ -20,17 +21,25 @@ function IconHeart({ filled }) {
 export function WishlistButton({ product, className = "", size = "md" }) {
   const navigate = useNavigate();
   const { isInWishlist, toggleWishlist } = useWishlist();
+  const [busy, setBusy] = useState(false);
   const saved = isInWishlist(product);
 
   const sizeClass =
     size === "sm" ? "h-8 w-8" : size === "lg" ? "h-11 w-11" : "h-9 w-9";
 
-  const handleClick = (e) => {
+  const handleClick = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const result = toggleWishlist(product);
-    if (result.needsAuth) {
-      navigate("/login", { state: { from: window.location.pathname } });
+    if (busy) return;
+
+    setBusy(true);
+    try {
+      const result = await toggleWishlist(product);
+      if (result.needsAuth) {
+        navigate("/login", { state: { from: window.location.pathname } });
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -40,6 +49,8 @@ export function WishlistButton({ product, className = "", size = "md" }) {
       className={`inline-flex ${sizeClass} shrink-0 items-center justify-center rounded-full border border-cream-200/90 bg-white/95 text-emerald-900/45 shadow-sm transition-colors hover:border-gold-400/40 hover:text-gold-600 ${saved ? "border-gold-400/50 text-gold-600" : ""} ${className}`}
       aria-label={saved ? "Remove from wishlist" : "Add to wishlist"}
       aria-pressed={saved}
+      aria-busy={busy}
+      disabled={busy}
       onClick={handleClick}
     >
       <IconHeart filled={saved} />

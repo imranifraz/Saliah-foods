@@ -1,9 +1,8 @@
 export function PageHeader({ title, subtitle, action }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
       <div>
-        <p className="admin-caption text-[var(--admin-link)]">Admin Console</p>
-        <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight text-[var(--admin-fg)]">
+        <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--admin-fg)]">
           {title}
         </h1>
         {subtitle ? (

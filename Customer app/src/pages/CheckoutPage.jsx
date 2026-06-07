@@ -12,6 +12,7 @@ import { useProfile } from "../context/ProfileContext";
 import { addressToCheckoutCustomer } from "../data/profile";
 import {
   getEmptyCheckoutForm,
+  getDefaultShippingSettings,
   getShippingFee,
   validateCheckoutForm,
 } from "../data/checkout";
@@ -31,7 +32,7 @@ export function CheckoutPage() {
   const { user } = useAuth();
   const { items, subtotal, clearCart, closeCart } = useCart();
   const { addOrder } = useOrders();
-  const { addresses, defaultAddress, addAddress } = useProfile();
+  const { addresses, defaultAddress, addAddress, loading: addressesLoading } = useProfile();
 
   const [addressMode, setAddressMode] = useState("new");
   const [selectedAddressId, setSelectedAddressId] = useState(null);
@@ -43,8 +44,11 @@ export function CheckoutPage() {
   const [completedOrder, setCompletedOrder] = useState(null);
   const [razorpayConfigured, setRazorpayConfigured] = useState(true);
   const [testPaymentsAllowed, setTestPaymentsAllowed] = useState(false);
+  const [shippingSettings, setShippingSettings] = useState(getDefaultShippingSettings);
 
   useEffect(() => {
+    if (addressesLoading) return;
+
     if (addresses.length > 0) {
       setAddressMode("saved");
       setSelectedAddressId(defaultAddress?.id ?? addresses[0]?.id ?? null);
@@ -61,13 +65,21 @@ export function CheckoutPage() {
         phone: user.phone,
       }));
     }
-  }, [addresses, defaultAddress, user]);
+  }, [addresses, defaultAddress, user, addressesLoading]);
 
   useEffect(() => {
     fetchPaymentMethodsApi()
       .then((data) => {
         setRazorpayConfigured(data.razorpayConfigured !== false);
         setTestPaymentsAllowed(data.testPaymentsAllowed === true);
+        if (data.shipping) {
+          setShippingSettings({
+            freeShippingThreshold: Number(
+              data.shipping.freeShippingThreshold ?? getDefaultShippingSettings().freeShippingThreshold
+            ),
+            shippingFee: Number(data.shipping.shippingFee ?? getDefaultShippingSettings().shippingFee),
+          });
+        }
       })
       .catch(() => {});
   }, []);
@@ -129,17 +141,26 @@ export function CheckoutPage() {
       };
 
       if (saveNewToProfile) {
-        addAddress({
-          label: newForm.addressLabel.trim(),
-          fullName: customer.fullName,
-          email: customer.email,
-          phone: customer.phone,
-          addressLine1: customer.addressLine1,
-          addressLine2: customer.addressLine2,
-          city: customer.city,
-          state: customer.state,
-          pincode: customer.pincode,
-        });
+        try {
+          await addAddress({
+            label: newForm.addressLabel.trim(),
+            fullName: customer.fullName,
+            email: customer.email,
+            phone: customer.phone,
+            addressLine1: customer.addressLine1,
+            addressLine2: customer.addressLine2,
+            city: customer.city,
+            state: customer.state,
+            pincode: customer.pincode,
+          });
+        } catch (err) {
+          setErrors((prev) => ({
+            ...prev,
+            submit: err.message ?? "Could not save address to your profile",
+          }));
+          setSubmitting(false);
+          return;
+        }
       }
     }
 
@@ -147,7 +168,7 @@ export function CheckoutPage() {
     setErrors((prev) => ({ ...prev, submit: undefined }));
 
     try {
-      const shipping = getShippingFee(subtotal);
+      const shipping = getShippingFee(subtotal, shippingSettings);
       const pricing = calcOrderBreakdown(subtotal, shipping);
       let paymentVerificationToken = null;
 
@@ -268,6 +289,7 @@ export function CheckoutPage() {
             <div className="space-y-6">
               <CheckoutAddressSection
                 savedAddresses={addresses}
+                addressesLoading={addressesLoading}
                 addressMode={addressMode}
                 onAddressModeChange={setAddressMode}
                 selectedAddressId={selectedAddressId}
@@ -294,7 +316,12 @@ export function CheckoutPage() {
               </section>
 
               <div className="lg:hidden">
-                <CheckoutOrderSummary items={items} subtotal={subtotal} compact />
+                <CheckoutOrderSummary
+                  items={items}
+                  subtotal={subtotal}
+                  shippingSettings={shippingSettings}
+                  compact
+                />
               </div>
 
               {errors.submit ? (
@@ -321,7 +348,11 @@ export function CheckoutPage() {
             </div>
 
             <aside className="hidden lg:block lg:sticky lg:top-[calc(var(--site-header)+1.5rem)]">
-              <CheckoutOrderSummary items={items} subtotal={subtotal} />
+              <CheckoutOrderSummary
+                items={items}
+                subtotal={subtotal}
+                shippingSettings={shippingSettings}
+              />
             </aside>
           </form>
         </div>

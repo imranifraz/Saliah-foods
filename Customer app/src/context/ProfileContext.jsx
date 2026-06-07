@@ -1,94 +1,105 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./AuthContext";
+import { loadProfileAddresses } from "../data/profile";
 import {
-  createAddressId,
-  loadProfileAddresses,
-  saveProfileAddresses,
-} from "../data/profile";
+  createAddressApi,
+  deleteAddressApi,
+  fetchAddressesApi,
+  setDefaultAddressApi,
+  updateAddressApi,
+} from "../services/addressApi.js";
 
 const ProfileContext = createContext(null);
 
 export function ProfileProvider({ children }) {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const userId = user?.id ?? null;
   const [addresses, setAddresses] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const persistAddresses = useCallback(
-    (next) => {
-      if (userId) saveProfileAddresses(userId, next);
+  const refreshAddresses = useCallback(async () => {
+    if (!userId) {
+      setAddresses([]);
+      setError("");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await fetchAddressesApi();
+      setAddresses(Array.isArray(data.addresses) ? data.addresses : []);
+    } catch (err) {
+      setAddresses(loadProfileAddresses(userId));
+      setError(err.message ?? "Could not load saved addresses");
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    refreshAddresses();
+  }, [authReady, refreshAddresses]);
+
+  const addAddress = useCallback(
+    async (address) => {
+      if (!userId) throw new Error("Sign in to save addresses");
+
+      try {
+        const data = await createAddressApi(address);
+        await refreshAddresses();
+        return data.address;
+      } catch (err) {
+        throw new Error(err.message ?? "Could not save address");
+      }
+    },
+    [userId, refreshAddresses]
+  );
+
+  const setDefaultAddress = useCallback(
+    async (id) => {
+      if (!userId) throw new Error("Sign in to manage addresses");
+
+      try {
+        const data = await setDefaultAddressApi(id);
+        setAddresses(Array.isArray(data.addresses) ? data.addresses : []);
+      } catch (err) {
+        throw new Error(err.message ?? "Could not update default address");
+      }
     },
     [userId]
   );
 
-  useEffect(() => {
-    if (userId) {
-      setAddresses(loadProfileAddresses(userId));
-    } else {
-      setAddresses([]);
-    }
-  }, [userId]);
-
-  const addAddress = useCallback(
-    (address) => {
-      const entry = {
-        ...address,
-        id: createAddressId(),
-        isDefault: false,
-      };
-
-      setAddresses((prev) => {
-        const next = [...prev, entry];
-        if (next.length === 1) {
-          next[0] = { ...next[0], isDefault: true };
-        }
-        persistAddresses(next);
-        return next;
-      });
-
-      return entry;
-    },
-    [persistAddresses]
-  );
-
-  const setDefaultAddress = useCallback(
-    (id) => {
-      setAddresses((prev) => {
-        const next = prev.map((address) => ({
-          ...address,
-          isDefault: address.id === id,
-        }));
-        persistAddresses(next);
-        return next;
-      });
-    },
-    [persistAddresses]
-  );
-
   const removeAddress = useCallback(
-    (id) => {
-      setAddresses((prev) => {
-        const next = prev.filter((address) => address.id !== id);
-        if (next.length && !next.some((address) => address.isDefault)) {
-          next[0] = { ...next[0], isDefault: true };
-        }
-        persistAddresses(next);
-        return next;
-      });
+    async (id) => {
+      if (!userId) throw new Error("Sign in to manage addresses");
+
+      try {
+        const data = await deleteAddressApi(id);
+        setAddresses(Array.isArray(data.addresses) ? data.addresses : []);
+      } catch (err) {
+        throw new Error(err.message ?? "Could not delete address");
+      }
     },
-    [persistAddresses]
+    [userId]
   );
 
   const updateAddress = useCallback(
-    (id, updates) => {
-      setAddresses((prev) => {
-        const next = prev.map((address) =>
-          address.id === id ? { ...address, ...updates } : address
-        );
-        persistAddresses(next);
-        return next;
-      });
+    async (id, updates) => {
+      if (!userId) throw new Error("Sign in to manage addresses");
+
+      try {
+        await updateAddressApi(id, updates);
+        await refreshAddresses();
+      } catch (err) {
+        throw new Error(err.message ?? "Could not update address");
+      }
     },
-    [persistAddresses]
+    [userId, refreshAddresses]
   );
 
   const defaultAddress = useMemo(
@@ -100,12 +111,25 @@ export function ProfileProvider({ children }) {
     () => ({
       addresses,
       defaultAddress,
+      loading,
+      error,
+      refreshAddresses,
       addAddress,
       setDefaultAddress,
       removeAddress,
       updateAddress,
     }),
-    [addresses, defaultAddress, addAddress, setDefaultAddress, removeAddress, updateAddress]
+    [
+      addresses,
+      defaultAddress,
+      loading,
+      error,
+      refreshAddresses,
+      addAddress,
+      setDefaultAddress,
+      removeAddress,
+      updateAddress,
+    ]
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

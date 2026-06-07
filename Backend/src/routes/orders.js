@@ -2,7 +2,8 @@ import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma.js";
 import { syncBestSellersFromSales } from "../lib/best-sellers.js";
-import { stockStatusFromQuantity, syncProductSummary } from "../lib/products.js";
+import { getAvailableQuantity } from "../lib/inventoryConstants.js";
+import { reserveVariantStock } from "../lib/inventoryStock.js";
 import { applyOrderCancellation, canCustomerCancel } from "../lib/orderCancel.js";
 import { refundOrderPayment } from "../lib/razorpayRefund.js";
 import { isRazorpayConfigured, isTestPaymentsAllowed } from "../lib/razorpay.js";
@@ -195,6 +196,7 @@ router.post("/", async (req, res, next) => {
     const createdAt = new Date();
     const order = await prisma.$transaction(async (tx) => {
       const resolvedItems = [];
+      const orderId = generateOrderId();
 
       for (const item of items) {
         const variant = await resolveVariant(tx, item);
@@ -207,18 +209,10 @@ router.post("/", async (req, res, next) => {
           throw new Error(`Invalid quantity for ${variant.product.name}`);
         }
 
-        if (variant.stockQuantity < quantity) {
+        const available = getAvailableQuantity(variant);
+        if (available < quantity) {
           throw new Error(`${variant.product.name} (${variant.weight}) is out of stock`);
         }
-
-        const nextQuantity = Math.max(0, variant.stockQuantity - quantity);
-        await tx.productVariant.update({
-          where: { id: variant.id },
-          data: {
-            stockQuantity: nextQuantity,
-            stockStatus: stockStatusFromQuantity(nextQuantity),
-          },
-        });
 
         resolvedItems.push({
           productId: variant.product.id,
@@ -234,9 +228,13 @@ router.post("/", async (req, res, next) => {
         });
       }
 
+      for (const item of resolvedItems) {
+        await reserveVariantStock(tx, item.variantId, item.quantity, orderId);
+      }
+
       const created = await tx.order.create({
         data: {
-          id: generateOrderId(),
+          id: orderId,
           userId: req.user.id,
           status: "placed",
           subtotal,
@@ -265,11 +263,6 @@ router.post("/", async (req, res, next) => {
         },
         include: orderInclude,
       });
-
-      const touchedProductIds = [...new Set(resolvedItems.map((item) => item.productId).filter(Boolean))];
-      for (const productId of touchedProductIds) {
-        await syncProductSummary(tx, productId);
-      }
 
       await notifyNewOrder(tx, created);
       return created;

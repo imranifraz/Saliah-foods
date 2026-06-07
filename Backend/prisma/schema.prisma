@@ -7,11 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  customer
-  admin
-}
-
 enum ProductType {
   simple
   variant
@@ -33,13 +28,27 @@ enum ReviewStatus {
   rejected
 }
 
+model Admin {
+  id           String   @id @default(cuid())
+  fullName     String
+  email        String   @unique
+  phone        String   @default("")
+  passwordHash String
+  tokenVersion Int      @default(0)
+  profileNote  String   @default("")
+  avatarUrl    String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens AdminRefreshToken[]
+}
+
 model User {
   id           String   @id @default(cuid())
   fullName     String
   email        String   @unique
   phone        String   @default("")
   passwordHash String?
-  role         UserRole @default(customer)
   dateOfBirth  String   @default("")
   profileNote  String   @default("")
   provider     String?
@@ -53,6 +62,31 @@ model User {
   wishlistItems     WishlistItem[]
   notificationPrefs NotificationPrefs?
   notifications     Notification[]
+}
+
+model AdminRefreshToken {
+  id         String   @id @default(cuid())
+  adminId    String
+  tokenHash  String   @unique
+  rememberMe Boolean  @default(false)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  admin      Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+}
+
+model PasswordResetOtp {
+  id        String    @id @default(cuid())
+  email     String
+  purpose   String
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email, purpose, createdAt])
 }
 
 enum NotificationAudience {
@@ -111,25 +145,49 @@ model Product {
 }
 
 model ProductVariant {
-  id            String             @id @default(cuid())
-  productId     String
-  sku           String             @unique
-  weight        String
-  priceValue    Int
-  mrpValue      Int?
-  stockQuantity Int                @default(0)
-  stockStatus   VariantStockStatus @default(in_stock)
-  img           String?
-  packaging     String?
-  isDefault     Boolean            @default(false)
-  sortOrder     Int                @default(0)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  product       Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
-  reviews       Review[]
+  id               String             @id @default(cuid())
+  productId        String
+  sku              String             @unique
+  weight           String
+  priceValue       Int
+  mrpValue         Int?
+  stockQuantity    Int                @default(0)
+  reservedQuantity Int                @default(0)
+  stockStatus      VariantStockStatus @default(in_stock)
+  img              String?
+  packaging        String?
+  isDefault        Boolean            @default(false)
+  sortOrder        Int                @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  product          Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reviews          Review[]
+  stockAdjustments StockAdjustment[]
 
   @@index([productId, sortOrder])
   @@unique([productId, weight])
+}
+
+model StockAdjustment {
+  id               String         @id @default(cuid())
+  variantId        String
+  sku              String
+  productId        String
+  previousStock    Int
+  newStock         Int
+  previousReserved Int
+  newReserved      Int
+  source           String
+  adminId          String?
+  adminName        String?
+  adminEmail       String?
+  orderId          String?
+  note             String         @default("")
+  createdAt        DateTime       @default(now())
+  variant          ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId, createdAt])
+  @@index([createdAt])
 }
 
 enum OrderStatus {

@@ -35,4 +35,4 @@ Open http://localhost:5174
 - Email: `admin@saliahfoods.com`
 - Password: `admin123`
 
-Override via `ADMIN_EMAIL` and `ADMIN_PASSWORD` in Backend `.env` before seeding.
+These credentials are created by `npm run seed` in the Backend (dev only). Change the admin password after first login in production.

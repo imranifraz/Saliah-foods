@@ -24,19 +24,23 @@ function IconMoon() {
   );
 }
 
-export function AdminThemeToggle({ className = "" }) {
-  const { theme, toggleTheme, isDark } = useAdminTheme();
+export function AdminThemeToggle({ className = "", iconOnly = false }) {
+  const { toggleTheme, isDark } = useAdminTheme();
+
+  const buttonClass = iconOnly
+    ? `rounded-lg p-2 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)] ${className}`
+    : `admin-theme-toggle inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] transition ${className}`;
 
   return (
     <button
       type="button"
       onClick={toggleTheme}
-      className={`admin-theme-toggle inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] transition ${className}`}
+      className={buttonClass}
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
       title={isDark ? "Light mode" : "Dark mode"}
     >
       {isDark ? <IconSun /> : <IconMoon />}
-      <span className="hidden sm:inline">{isDark ? "Light" : "Dark"}</span>
+      {iconOnly ? null : <span className="hidden sm:inline">{isDark ? "Light" : "Dark"}</span>}
     </button>
   );
 }

@@ -1,11 +1,13 @@
 import { formatINR, calcOrderBreakdown, GST_LABEL } from "../../data/pricing";
-import { getShippingFee, FREE_SHIPPING_THRESHOLD } from "../../data/checkout";
+import { getShippingFee, getDefaultShippingSettings } from "../../data/checkout";
 import { OptimizedImage } from "../ui/OptimizedImage";
 import { ProductPrice } from "../ui/ProductPrice";
 
-export function CheckoutOrderSummary({ items, subtotal, compact = false }) {
-  const shipping = getShippingFee(subtotal);
+export function CheckoutOrderSummary({ items, subtotal, shippingSettings, compact = false }) {
+  const settings = shippingSettings ?? getDefaultShippingSettings();
+  const shipping = getShippingFee(subtotal, settings);
   const breakdown = calcOrderBreakdown(subtotal, shipping);
+  const freeShippingThreshold = settings.freeShippingThreshold;
 
   return (
     <div
@@ -66,7 +68,7 @@ export function CheckoutOrderSummary({ items, subtotal, compact = false }) {
         </div>
         {shipping > 0 ? (
           <p className="font-body text-[11px] text-emerald-900/35">
-            Free shipping on orders above {formatINR(FREE_SHIPPING_THRESHOLD)}
+            Free shipping on orders above {formatINR(freeShippingThreshold)}
           </p>
         ) : null}
         <div className="flex justify-between border-t border-cream-200/60 pt-3 font-display text-lg text-emerald-900">

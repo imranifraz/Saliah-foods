@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
@@ -68,7 +69,19 @@ function ReviewStars({ rating }) {
   );
 }
 
+function matchesProductQuery(review, query) {
+  const term = query.trim().toLowerCase();
+  if (!term) return true;
+
+  const name = String(review.product?.name ?? review.orderItem?.name ?? "").toLowerCase();
+  const slug = String(review.product?.slug ?? "").toLowerCase();
+
+  return name.includes(term) || slug.includes(term);
+}
+
 export function ReviewsPage() {
+  const [searchParams] = useSearchParams();
+  const productQuery = searchParams.get("q") ?? "";
   const [status, setStatus] = useState("pending");
   const [reviews, setReviews] = useState([]);
   const [selectedReviewId, setSelectedReviewId] = useState(null);
@@ -97,10 +110,21 @@ export function ReviewsPage() {
     load();
   }, [status]);
 
-  const selectedReview = useMemo(
-    () => reviews.find((review) => review.id === selectedReviewId) ?? null,
-    [reviews, selectedReviewId]
+  const filteredReviews = useMemo(
+    () => reviews.filter((review) => matchesProductQuery(review, productQuery)),
+    [reviews, productQuery]
   );
+
+  const selectedReview = useMemo(
+    () => filteredReviews.find((review) => review.id === selectedReviewId) ?? null,
+    [filteredReviews, selectedReviewId]
+  );
+
+  useEffect(() => {
+    setSelectedReviewId((current) =>
+      filteredReviews.some((review) => review.id === current) ? current : filteredReviews[0]?.id ?? null
+    );
+  }, [filteredReviews]);
 
   useEffect(() => {
     setModerationNote(selectedReview?.moderationNote ?? "");
@@ -155,6 +179,12 @@ export function ReviewsPage() {
 
       <AdminFilterTabs items={STATUS_TABS} value={status} onChange={setStatus} />
 
+      {productQuery.trim() ? (
+        <p className="mb-4 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-4 py-3 text-sm text-[var(--admin-fg)]">
+          Showing reviews matching <strong>{productQuery.trim()}</strong>
+        </p>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
         <AdminCard title="Customer reviews">
           {loading ? (
@@ -162,9 +192,9 @@ export function ReviewsPage() {
           ) : (
             <DataTable
               columns={["Customer", "Product", "Rating", "Status", "Submitted", ""]}
-              emptyMessage="No reviews in this view"
+              emptyMessage={productQuery.trim() ? "No reviews match this product filter" : "No reviews in this view"}
             >
-              {reviews.map((review) => (
+              {filteredReviews.map((review) => (
                 <DataRow
                   key={review.id}
                   className={selectedReviewId === review.id ? "bg-cream-100/50" : ""}

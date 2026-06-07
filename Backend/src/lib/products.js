@@ -32,7 +32,9 @@ export function stockStatusFromQuantity(quantity) {
 }
 
 export function isVariantInStock(variant) {
-  return stockStatusFromQuantity(variant?.stockQuantity ?? 0) === "in_stock";
+  const stock = Number(variant?.stockQuantity ?? 0);
+  const reserved = Number(variant?.reservedQuantity ?? 0);
+  return stockStatusFromQuantity(Math.max(0, stock - reserved)) === "in_stock";
 }
 
 export function pickDefaultVariant(variants) {

@@ -9,6 +9,7 @@ const labelClass = "font-body text-[11px] font-medium uppercase tracking-[0.14em
 
 export function CheckoutAddressSection({
   savedAddresses,
+  addressesLoading = false,
   addressMode,
   onAddressModeChange,
   selectedAddressId,
@@ -20,6 +21,15 @@ export function CheckoutAddressSection({
   errors = {},
 }) {
   const hasSavedAddresses = savedAddresses.length > 0;
+
+  if (addressesLoading && !hasSavedAddresses) {
+    return (
+      <section className="rounded-2xl border border-cream-200/80 bg-white/90 p-5 md:p-6">
+        <h2 className="font-display text-lg text-emerald-900">Delivery address</h2>
+        <p className="mt-4 font-body text-sm text-emerald-900/50">Loading saved addresses…</p>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-2xl border border-cream-200/80 bg-white/90 p-5 md:p-6">

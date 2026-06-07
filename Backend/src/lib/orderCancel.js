@@ -1,4 +1,4 @@
-import { stockStatusFromQuantity, syncProductSummary } from "./products.js";
+import { releaseOrderInventory } from "./inventoryStock.js";
 
 export const CUSTOMER_CANCELLABLE = new Set(["placed", "confirmed"]);
 
@@ -42,25 +42,7 @@ export function buildCancelledCustomer(customer, { reason = "", cancelledBy = "s
 }
 
 export async function restoreOrderInventory(tx, order) {
-  for (const item of order.items) {
-    if (!item.variantId || !item.quantity) continue;
-
-    const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
-    if (!variant) continue;
-
-    const nextQuantity = variant.stockQuantity + item.quantity;
-    await tx.productVariant.update({
-      where: { id: variant.id },
-      data: {
-        stockQuantity: nextQuantity,
-        stockStatus: stockStatusFromQuantity(nextQuantity),
-      },
-    });
-
-    if (item.productId) {
-      await syncProductSummary(tx, item.productId);
-    }
-  }
+  await releaseOrderInventory(tx, order);
 }
 
 export async function applyOrderCancellation(

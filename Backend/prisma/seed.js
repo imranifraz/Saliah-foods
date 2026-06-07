@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { syncBestSellersFromSales } from "../src/lib/best-sellers.js";
 import { stockStatusFromQuantity, syncProductSummary } from "../src/lib/products.js";
+import { productUploadUrl, syncSeedProductImages } from "../src/lib/seedProductImages.js";
 
 const prisma = new PrismaClient();
 
@@ -12,26 +13,237 @@ function slugify(name) {
     .replace(/(^-|-$)/g, "");
 }
 
+/**
+ * Seed catalog products.
+ * - imageFile: packshot in Backend/seed-assets/products (synced to uploads/products on seed)
+ * - priceValue: selling price (GST-inclusive)
+ * - mrpValue: MRP / cost price (required). When equal to priceValue there is no discount.
+ */
 const products = [
-  { name: "Kimia Dates", tagline: "Soft & Juicy", tag: "Soft", img: "/assets/kimia-dates.webp", packSize: "1kg", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1299, reviewCount: 248 },
-  { name: "Ajwa Dates", tagline: "Rich & Premium", tag: "Premium", img: "/assets/ajwa-dates.webp", packSize: "1kg", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1899, reviewCount: 312 },
-  { name: "Safawi Dates", tagline: "Dark & Chewy", tag: "Premium", img: "/assets/safawi-dates.webp", packSize: "1kg", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1149, reviewCount: 189 },
-  { name: "Zahidi Dates", tagline: "Mildly Sweet", tag: "Natural Sweetness", img: "/assets/zahidi-dates.webp", packSize: "250g", categoryId: "dates", categoryLabel: "Dates", priceValue: 299, reviewCount: 156 },
-  { name: "Seedless Dates", tagline: "Easy Everyday Snacking", tag: "Seedless", img: "/assets/seedless-dates.webp", packSize: "300g", categoryId: "dates", categoryLabel: "Dates", priceValue: 349, reviewCount: 203 },
-  { name: "Desert Royal Dates", tagline: "Naturally Sweet", tag: "Everyday Snack", img: "/assets/desert-royal-dates.webp", packSize: "250g", categoryId: "dates", categoryLabel: "Dates", priceValue: 279, reviewCount: 174 },
-  { name: "Medjool Gift Box", tagline: "Luxury gifting assortment", tag: "Premium", img: "/assets/kimia-dates.webp", packSize: "Gift Box", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 1699, reviewCount: 94 },
-  { name: "Mabroom Dates", tagline: "Long, chewy & richly sweet", tag: "Premium", img: "/assets/zahidi-dates.webp", packSize: "500g", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 899, reviewCount: 67 },
-  { name: "Khajoor Family Pack", tagline: "Three everyday pouches for sharing", tag: "Natural Sweetness", img: "/assets/seedless-dates.webp", packSize: "3 × 250g", categoryId: "dates", categoryLabel: "Dates", priceValue: 799, reviewCount: 112 },
-  { name: "Date Syrup", tagline: "Natural sweetener for drinks, desserts, and breakfast", img: "/assets/date-syrup.webp", packSize: "400g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 449, reviewCount: 142 },
-  { name: "Amla Candy", tagline: "Tangy traditional snack for everyday munching", img: "/assets/amla-candy.webp", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 199, reviewCount: 98 },
-  { name: "Rose Gulkand", tagline: "Aromatic preserve with a traditional taste", img: "/assets/rose-gulkand.webp", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 349, reviewCount: 121 },
-  { name: "Dry Fruit with Honey", tagline: "Rich natural blend for wellness and gifting", img: "/assets/dry-fruit-with-honey.webp", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 599, reviewCount: 87 },
-  { name: "Fig & Honey Delight", tagline: "Sweet, rich, and wholesome treat", img: "/assets/fig-honey-delight.webp", packSize: "250g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 549, reviewCount: 76 },
-  { name: "Mixed Fruit Jam", tagline: "Family-friendly spread for breakfast", img: "/assets/mixed-fruit-jam.webp", packSize: "100g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 149, reviewCount: 134 },
-  { name: "Ajwa Seed Powder", tagline: "Fine-ground premium ajwa for daily wellness", tag: "Premium", img: "/assets/amla-candy.webp", packSize: "200g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 549, reviewCount: 58, isNew: true },
-  { name: "Traditional Health Mix", tagline: "Wholesome blend for morning nourishment", tag: "Organic", img: "/assets/dry-fruit-with-honey.webp", packSize: "400g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 449, reviewCount: 73 },
-  { name: "Saffron Infused Dates", tagline: "Royal dates with delicate saffron notes", tag: "Premium", img: "/assets/kimia-dates.webp", packSize: "Gift Box", categoryId: "premium-dates", categoryLabel: "Premium Dates", priceValue: 999, reviewCount: 41 },
-  { name: "Organic Date Bites", tagline: "Soft bite-sized dates for kids & travel", tag: "No Added Sugar", img: "/assets/desert-royal-dates.webp", packSize: "300g", categoryId: "wellness-traditional", categoryLabel: "Wellness & Traditional", priceValue: 379, reviewCount: 86, isNew: true },
+  {
+    name: "Kimia Dates",
+    tagline: "Soft & Juicy",
+    tag: "Soft",
+    imageFile: "kimia-dates.webp",
+    packSize: "1kg",
+    categoryId: "premium-dates",
+    categoryLabel: "Premium Dates",
+    priceValue: 1299,
+    mrpValue: 1499,
+    reviewCount: 248,
+  },
+  {
+    name: "Ajwa Dates",
+    tagline: "Rich & Premium",
+    tag: "Premium",
+    imageFile: "ajwa-dates.webp",
+    packSize: "1kg",
+    categoryId: "premium-dates",
+    categoryLabel: "Premium Dates",
+    priceValue: 1899,
+    mrpValue: 2199,
+    reviewCount: 312,
+  },
+  {
+    name: "Safawi Dates",
+    tagline: "Dark & Chewy",
+    tag: "Premium",
+    imageFile: "safawi-dates.webp",
+    packSize: "1kg",
+    categoryId: "premium-dates",
+    categoryLabel: "Premium Dates",
+    priceValue: 1149,
+    mrpValue: 1299,
+    reviewCount: 189,
+  },
+  {
+    name: "Zahidi Dates",
+    tagline: "Mildly Sweet",
+    tag: "Natural Sweetness",
+    imageFile: "zahidi-dates.webp",
+    packSize: "250g",
+    categoryId: "dates",
+    categoryLabel: "Dates",
+    priceValue: 299,
+    mrpValue: 299,
+    reviewCount: 156,
+  },
+  {
+    name: "Seedless Dates",
+    tagline: "Easy Everyday Snacking",
+    tag: "Seedless",
+    imageFile: "seedless-dates.webp",
+    packSize: "300g",
+    categoryId: "dates",
+    categoryLabel: "Dates",
+    priceValue: 349,
+    mrpValue: 399,
+    reviewCount: 203,
+  },
+  {
+    name: "Desert Royal Dates",
+    tagline: "Naturally Sweet",
+    tag: "Everyday Snack",
+    imageFile: "desert-royal-dates.webp",
+    packSize: "250g",
+    categoryId: "dates",
+    categoryLabel: "Dates",
+    priceValue: 279,
+    mrpValue: 279,
+    reviewCount: 174,
+  },
+  {
+    name: "Medjool Gift Box",
+    tagline: "Luxury gifting assortment",
+    tag: "Premium",
+    imageFile: "kimia-dates.webp",
+    packSize: "Gift Box",
+    categoryId: "premium-dates",
+    categoryLabel: "Premium Dates",
+    priceValue: 1699,
+    mrpValue: 1999,
+    reviewCount: 94,
+  },
+  {
+    name: "Mabroom Dates",
+    tagline: "Long, chewy & richly sweet",
+    tag: "Premium",
+    imageFile: "zahidi-dates.webp",
+    packSize: "500g",
+    categoryId: "premium-dates",
+    categoryLabel: "Premium Dates",
+    priceValue: 899,
+    mrpValue: 999,
+    reviewCount: 67,
+  },
+  {
+    name: "Khajoor Family Pack",
+    tagline: "Three everyday pouches for sharing",
+    tag: "Natural Sweetness",
+    imageFile: "seedless-dates.webp",
+    packSize: "3 × 250g",
+    categoryId: "dates",
+    categoryLabel: "Dates",
+    priceValue: 799,
+    mrpValue: 849,
+    reviewCount: 112,
+  },
+  {
+    name: "Date Syrup",
+    tagline: "Natural sweetener for drinks, desserts, and breakfast",
+    imageFile: "date-syrup.webp",
+    packSize: "400g",
+    categoryId: "wellness-traditional",
+    categoryLabel: "Wellness & Traditional",
+    priceValue: 449,
+    mrpValue: 499,
+    reviewCount: 142,
+  },
+  {
+    name: "Amla Candy",
+    tagline: "Tangy traditional snack for everyday munching",
+    imageFile: "amla-candy.webp",
+    packSize: "250g",
+    categoryId: "wellness-traditional",
+    categoryLabel: "Wellness & Traditional",
+    priceValue: 199,
+    mrpValue: 199,
+    reviewCount: 98,
+  },
+  {
+    name: "Rose Gulkand",
+    tagline: "Aromatic preserve with a traditional taste",
+    imageFile: "rose-gulkand.webp",
+    packSize: "250g",
+    categoryId: "wellness-traditional",
+    categoryLabel: "Wellness & Traditional",
+    priceValue: 349,
+    mrpValue: 399,
+    reviewCount: 121,
+  },
+  {
+    name: "Dry Fruit with Honey",
+    tagline: "Rich natural blend for wellness and gifting",
+    imageFile: "dry-fruit-with-honey.webp",
+    packSize: "250g",
+    categoryId: "wellness-traditional",
+    categoryLabel: "Wellness & Traditional",
+    priceValue: 599,
+    mrpValue: 649,
+    reviewCount: 87,
+  },
+  {
+    name: "Fig & Honey Delight",
+    tagline: "Sweet, rich, and wholesome treat",
+    imageFile: "fig-honey-delight.webp",
+    packSize: "250g",
+    categoryId: "wellness-traditional",
+    categoryLabel: "Wellness & Traditional",
+    priceValue: 549,
+    mrpValue: 549,
+    reviewCount: 76,
+  },
+  {
+    name: "Mixed Fruit Jam",
+    tagline: "Family-friendly spread for breakfast",
+    imageFile: "mixed-fruit-jam.webp",
+    packSize: "100g",
+    categoryId: "wellness-traditional",
+    categoryLabel: "Wellness & Traditional",
+    priceValue: 149,
+    mrpValue: 149,
+    reviewCount: 134,
+  },
+  {
+    name: "Ajwa Seed Powder",
+    tagline: "Fine-ground premium ajwa for daily wellness",
+    tag: "Premium",
+    imageFile: "amla-candy.webp",
+    packSize: "200g",
+    categoryId: "wellness-traditional",
+    categoryLabel: "Wellness & Traditional",
+    priceValue: 549,
+    mrpValue: 599,
+    reviewCount: 58,
+    isNew: true,
+  },
+  {
+    name: "Traditional Health Mix",
+    tagline: "Wholesome blend for morning nourishment",
+    tag: "Organic",
+    imageFile: "dry-fruit-with-honey.webp",
+    packSize: "400g",
+    categoryId: "wellness-traditional",
+    categoryLabel: "Wellness & Traditional",
+    priceValue: 449,
+    mrpValue: 449,
+    reviewCount: 73,
+  },
+  {
+    name: "Saffron Infused Dates",
+    tagline: "Royal dates with delicate saffron notes",
+    tag: "Premium",
+    imageFile: "kimia-dates.webp",
+    packSize: "Gift Box",
+    categoryId: "premium-dates",
+    categoryLabel: "Premium Dates",
+    priceValue: 999,
+    mrpValue: 1199,
+    reviewCount: 41,
+  },
+  {
+    name: "Organic Date Bites",
+    tagline: "Soft bite-sized dates for kids & travel",
+    tag: "No Added Sugar",
+    imageFile: "desert-royal-dates.webp",
+    packSize: "300g",
+    categoryId: "wellness-traditional",
+    categoryLabel: "Wellness & Traditional",
+    priceValue: 379,
+    mrpValue: 429,
+    reviewCount: 86,
+    isNew: true,
+  },
 ];
 
 const blogPosts = [
@@ -120,18 +332,28 @@ const blogPosts = [
 async function main() {
   console.log("Seeding database...");
 
+  const imageSync = syncSeedProductImages();
+  console.log(
+    `Product images synced (${imageSync.copied} copied, ${imageSync.skipped} unchanged) from ${imageSync.sourceDir}`
+  );
+  if (imageSync.missing > 0) {
+    throw new Error(
+      `${imageSync.missing} seed product image(s) missing. Run: npm run db:sync-seed-images after copying packshots to Backend/seed-assets/products/`
+    );
+  }
+
   const categories = [
     {
       id: "dates",
       label: "Dates",
       description: "Everyday snacking and family favourites",
-      image: "/assets/premium-dates-category.png",
+      image: "/assets/premium-dates-category.webp",
       sortOrder: 1,
       featuredPromo: {
         title: "Everyday Date Collection",
         subtitle: "Naturally Sweet • Family Packs",
         cta: "Explore Collection",
-        image: "/assets/premium-dates-category.png",
+        image: "/assets/premium-dates-category.webp",
       },
     },
     {
@@ -151,7 +373,7 @@ async function main() {
       id: "wellness-traditional",
       label: "Wellness & Traditional",
       description: "Natural foods for daily wellness",
-      image: "/assets/wellness-foods-category.png",
+      image: "/assets/wellness-foods-category.webp",
       sortOrder: 3,
     },
     {
@@ -174,6 +396,17 @@ async function main() {
   for (const [index, p] of products.entries()) {
     const slug = slugify(p.name);
     const catalogId = `${p.categoryId}-${slug}`;
+    const img = productUploadUrl(p.imageFile);
+    const mrpValue = p.mrpValue;
+    const priceValue = p.priceValue;
+
+    if (!mrpValue || mrpValue <= 0) {
+      throw new Error(`${p.name}: mrpValue is required`);
+    }
+    if (priceValue > mrpValue) {
+      throw new Error(`${p.name}: selling price cannot exceed MRP`);
+    }
+
     const product = await prisma.product.upsert({
       where: { catalogId },
       create: {
@@ -185,13 +418,13 @@ async function main() {
         tagline: p.tagline,
         fullDescription: "",
         tag: p.tag ?? null,
-        img: p.img,
-        images: [p.img],
+        img,
+        images: [img],
         packSize: p.packSize ?? null,
         categoryId: p.categoryId,
         categoryLabel: p.categoryLabel,
-        priceValue: p.priceValue,
-        mrpValue: p.mrpValue ?? null,
+        priceValue,
+        mrpValue,
         rating: 4.7 + (index % 3) * 0.1,
         reviewCount: p.reviewCount ?? 0,
         packaging: p.packSize?.includes("Gift Box") ? "Gift Box" : "Pouch",
@@ -206,13 +439,13 @@ async function main() {
         tagline: p.tagline,
         fullDescription: "",
         tag: p.tag ?? null,
-        img: p.img,
-        images: [p.img],
+        img,
+        images: [img],
         packSize: p.packSize ?? null,
         categoryId: p.categoryId,
         categoryLabel: p.categoryLabel,
-        priceValue: p.priceValue,
-        mrpValue: p.mrpValue ?? null,
+        priceValue,
+        mrpValue,
         reviewCount: p.reviewCount ?? 0,
         packaging: p.packSize?.includes("Gift Box") ? "Gift Box" : "Pouch",
         benefits: ["Natural Energy"],
@@ -233,22 +466,22 @@ async function main() {
         productId: product.id,
         sku: catalogId,
         weight: p.packSize ?? "Default",
-        priceValue: p.priceValue,
-        mrpValue: p.mrpValue ?? null,
+        priceValue,
+        mrpValue,
         stockQuantity,
         stockStatus: stockStatusFromQuantity(stockQuantity),
-        img: p.img,
+        img,
         packaging: p.packSize?.includes("Gift Box") ? "Gift Box" : "Pouch",
         isDefault: true,
         sortOrder: 0,
       },
       update: {
         sku: catalogId,
-        priceValue: p.priceValue,
-        mrpValue: p.mrpValue ?? null,
+        priceValue,
+        mrpValue,
         stockQuantity,
         stockStatus: stockStatusFromQuantity(stockQuantity),
-        img: p.img,
+        img,
         packaging: p.packSize?.includes("Gift Box") ? "Gift Box" : "Pouch",
         isDefault: true,
         sortOrder: 0,
@@ -283,7 +516,7 @@ async function main() {
       subtitle: "Logo, hero banners, our story & testimonials",
       pageType: "homepage",
       body: {
-        siteLogo: "/assets/application-logo.png",
+        siteLogo: "/assets/application-logo.webp",
         hero: {
           title: "Premium Dates & Natural Wellness Foods",
           subtitle:
@@ -294,7 +527,7 @@ async function main() {
           banners: [
             {
               id: "hero-1",
-              image: "/assets/hero-banner.png",
+              image: "/assets/hero-banner.webp",
               alt: "Saliah Foods premium dates with nuts, figs, and grapes on marble",
             },
           ],
@@ -304,7 +537,7 @@ async function main() {
           title: "Rooted in Dates. Built on Natural Goodness.",
           body:
             "Saliah Foods brings together premium dates, natural sweeteners, and traditional wellness foods selected for freshness, taste, and everyday nourishment. Our journey is built around quality sourcing, careful selection, and a commitment to bringing naturally good food to every home.",
-          image: "/assets/brand-legacy.png",
+          image: "/assets/brand-legacy.webp",
           imageAlt: "Saliah Foods premium dates, honey blends, and wellness products",
           ctaLabel: "Read Our Story",
           ctaHref: "/our-legacy",
@@ -447,21 +680,19 @@ async function main() {
     update: { value: { codEnabled: true } },
   });
 
-  const adminEmail = (process.env.ADMIN_EMAIL ?? "admin@saliahfoods.com").trim().toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "admin123";
+  const adminEmail = "admin@saliahfoods.com";
+  const adminPassword = "admin123";
   const passwordHash = await bcrypt.hash(adminPassword, 10);
 
-  await prisma.user.upsert({
+  await prisma.admin.upsert({
     where: { email: adminEmail },
     create: {
       fullName: "Saliah Admin",
       email: adminEmail,
       phone: "9999999999",
       passwordHash,
-      role: "admin",
-      provider: "local",
     },
-    update: { role: "admin", passwordHash },
+    update: { passwordHash },
   });
 
   const bestSellerSync = await syncBestSellersFromSales(prisma);

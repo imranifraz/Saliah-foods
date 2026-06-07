@@ -52,7 +52,398 @@
     @apply h-px w-full bg-gradient-to-r from-transparent via-gold-400/60 to-transparent;
   }
 
-  /* ——— Theme tokens ——— */
+  /* ——— Admin login page ——— */
+  .admin-shell.admin-login-page {
+    overflow-x: clip;
+  }
+
+  .admin-shell .admin-login-page__theme-toggle {
+    backdrop-filter: blur(10px);
+  }
+
+  .admin-shell[data-admin-theme="light"] .admin-login-page__theme-toggle {
+    background-color: rgb(255 253 248 / 0.92);
+  }
+
+  .admin-shell[data-admin-theme="dark"] .admin-login-page__theme-toggle,
+  .admin-shell:not([data-admin-theme="light"]) .admin-login-page__theme-toggle {
+    background-color: rgb(18 26 36 / 0.88);
+  }
+
+  /* Brand panel — always white text */
+  .admin-shell .admin-login-brand,
+  .admin-shell .admin-login-brand h1,
+  .admin-shell .admin-login-brand h2,
+  .admin-shell .admin-login-brand h3,
+  .admin-shell .admin-login-brand h4,
+  .admin-shell .admin-login-brand p,
+  .admin-shell .admin-login-brand span {
+    color: #ffffff;
+  }
+
+  .admin-shell[data-admin-theme="light"] .admin-login-brand,
+  .admin-shell[data-admin-theme="light"] .admin-login-brand h1,
+  .admin-shell[data-admin-theme="light"] .admin-login-brand h2,
+  .admin-shell[data-admin-theme="light"] .admin-login-brand h3,
+  .admin-shell[data-admin-theme="light"] .admin-login-brand h4,
+  .admin-shell[data-admin-theme="light"] .admin-login-brand p,
+  .admin-shell[data-admin-theme="light"] .admin-login-brand span {
+    color: #ffffff;
+  }
+
+  .admin-shell .admin-login-brand__photo {
+    object-position: 58% 38%;
+    transform: scale(1.02);
+  }
+
+  .admin-shell .admin-login-brand__overlay {
+    background:
+      linear-gradient(108deg, rgb(10 31 24 / 0.92) 0%, rgb(10 31 24 / 0.78) 38%, rgb(22 49 42 / 0.45) 72%, rgb(28 87 51 / 0.35) 100%),
+      linear-gradient(0deg, rgb(10 31 24 / 0.55) 0%, transparent 42%);
+  }
+
+  .admin-shell .admin-login-brand__sheen {
+    background: radial-gradient(
+      ellipse 90% 60% at 12% 8%,
+      rgb(255 253 248 / 0.07),
+      transparent 55%
+    );
+  }
+
+  .admin-shell .admin-login-brand__headline {
+    text-shadow: 0 2px 24px rgb(0 0 0 / 0.28);
+  }
+
+  .admin-shell .admin-login-brand__divider {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      rgb(212 165 116 / 0.85),
+      rgb(255 253 248 / 0.35) 55%,
+      transparent
+    );
+  }
+
+  .admin-shell .admin-login-brand__copy {
+    color: rgb(255 253 248 / 0.92);
+  }
+
+  /* Login form panel */
+  .admin-shell .admin-login-panel {
+    background:
+      linear-gradient(180deg, var(--admin-bg) 0%, color-mix(in srgb, var(--admin-bg) 92%, var(--admin-surface)) 100%);
+  }
+
+  .admin-shell .admin-login-panel__glow {
+    background:
+      radial-gradient(ellipse 75% 55% at 50% -5%, color-mix(in srgb, var(--admin-accent) 16%, transparent), transparent 72%),
+      radial-gradient(ellipse 45% 40% at 100% 100%, color-mix(in srgb, var(--admin-accent) 10%, transparent), transparent 68%);
+  }
+
+  .admin-shell[data-admin-theme="light"] .admin-login-panel {
+    background: linear-gradient(180deg, #f7f4eb 0%, #f0ebe0 100%);
+  }
+
+  .admin-shell[data-admin-theme="light"] .admin-login-panel__glow {
+    background:
+      radial-gradient(ellipse 75% 55% at 50% -5%, rgb(28 87 51 / 0.07), transparent 72%),
+      radial-gradient(ellipse 45% 40% at 100% 100%, rgb(212 165 116 / 0.1), transparent 68%);
+  }
+
+  .admin-shell .admin-login-card {
+    padding: 1.75rem 1.5rem;
+    border-radius: 1.125rem;
+    border: 1px solid var(--admin-border-strong);
+    background-color: var(--admin-surface);
+    box-shadow:
+      var(--admin-shadow),
+      0 1px 0 rgb(255 255 255 / 0.04) inset,
+      0 0 0 1px color-mix(in srgb, var(--admin-accent) 6%, transparent);
+  }
+
+  @media (min-width: 640px) {
+    .admin-shell .admin-login-card {
+      padding: 2rem 1.875rem;
+      border-radius: 1.25rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .admin-shell .admin-login-card {
+      padding: 2.25rem 2rem;
+    }
+  }
+
+  .admin-shell .admin-login-card__header {
+    margin-bottom: 1.625rem;
+  }
+
+  .admin-shell .admin-login-card__eyebrow {
+    margin-top: 1.125rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--admin-link);
+  }
+
+  @media (min-width: 1024px) {
+    .admin-shell .admin-login-card__eyebrow {
+      margin-top: 1.375rem;
+    }
+  }
+
+  .admin-shell .admin-login-card__title {
+    margin-top: 0.5rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.625rem, 4.5vw, 2rem);
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    color: var(--admin-fg);
+  }
+
+  .admin-shell .admin-login-card__subtitle {
+    margin-top: 0.5rem;
+    max-width: 21rem;
+    font-size: 0.875rem;
+    line-height: 1.55;
+  }
+
+  .admin-shell .admin-login-card__error {
+    margin-bottom: 1.125rem;
+    border-radius: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--admin-danger) 35%, transparent);
+    background-color: var(--admin-danger-bg);
+    padding: 0.8125rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--admin-danger);
+  }
+
+  .admin-shell .admin-login-card__fields {
+    margin-bottom: 1.5rem;
+  }
+
+  .admin-shell .admin-login-field {
+    position: relative;
+  }
+
+  .admin-shell .admin-login-field__icon {
+    pointer-events: none;
+    position: absolute;
+    left: 0.9375rem;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.125rem;
+    color: var(--admin-fg-faint);
+    transition: color 0.15s ease;
+  }
+
+  .admin-shell .admin-login-field__icon svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  .admin-shell .admin-login-field:focus-within .admin-login-field__icon {
+    color: var(--admin-link);
+  }
+
+  .admin-shell .admin-login-field__toggle,
+  .admin-shell .admin-password-field__toggle {
+    position: absolute;
+    right: 0.625rem;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--admin-fg-faint);
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease;
+  }
+
+  .admin-shell .admin-login-field__toggle svg,
+  .admin-shell .admin-password-field__toggle svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  .admin-shell .admin-login-field__toggle:hover,
+  .admin-shell .admin-password-field__toggle:hover {
+    color: var(--admin-link);
+    background-color: var(--admin-hover);
+  }
+
+  .admin-shell .admin-login-field__toggle:focus-visible,
+  .admin-shell .admin-password-field__toggle:focus-visible {
+    outline: 2px solid color-mix(in srgb, #188749 55%, transparent);
+    outline-offset: 1px;
+  }
+
+  .admin-shell .admin-login-field--password .admin-input {
+    padding-right: 2.75rem;
+  }
+
+  .admin-shell .admin-password-field {
+    position: relative;
+  }
+
+  .admin-shell .admin-password-field .admin-input {
+    padding-right: 2.75rem;
+  }
+
+  .admin-shell .admin-login-card__submit {
+    display: inline-flex;
+    min-height: 3rem;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 0.625rem;
+    background: linear-gradient(135deg, #0a1f18 0%, #16312a 42%, #1c5733 78%, #188749 100%);
+    padding: 0.75rem 1.25rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #fffdf8;
+    box-shadow: 0 4px 14px rgb(10 31 24 / 0.28);
+    transition:
+      filter 0.2s ease,
+      transform 0.15s ease,
+      box-shadow 0.2s ease,
+      opacity 0.15s ease;
+  }
+
+  .admin-shell .admin-login-card__submit:hover:not(:disabled) {
+    filter: brightness(1.06);
+    box-shadow: 0 6px 20px rgb(10 31 24 / 0.34);
+  }
+
+  .admin-shell .admin-login-card__submit:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .admin-shell .admin-login-card__submit:focus-visible {
+    outline: 2px solid color-mix(in srgb, #188749 65%, white);
+    outline-offset: 2px;
+  }
+
+  .admin-shell .admin-login-card__submit:disabled {
+    cursor: not-allowed;
+    opacity: 0.62;
+    filter: none;
+    box-shadow: none;
+  }
+
+  .admin-shell[data-admin-theme="light"] .admin-login-card__submit {
+    background: linear-gradient(135deg, #0a1f18 0%, #16312a 50%, #1c5733 100%);
+    box-shadow: 0 4px 16px rgb(10 31 24 / 0.18);
+  }
+
+  .admin-shell .admin-login-card__footnote {
+    margin-top: 1.125rem;
+    border-top: 1px solid var(--admin-border);
+    padding-top: 0.875rem;
+    text-align: center;
+    font-size: 0.625rem;
+    line-height: 1.55;
+    letter-spacing: 0.02em;
+    color: var(--admin-fg-faint);
+  }
+
+  .admin-shell .admin-login-card__label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.375rem;
+  }
+
+  .admin-shell .admin-login-card__forgot-link {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--admin-link);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .admin-shell .admin-login-card__forgot-link:hover {
+    color: var(--admin-link-hover);
+    text-decoration: underline;
+  }
+
+  .admin-shell .admin-login-card__forgot-link:focus-visible {
+    outline: 2px solid color-mix(in srgb, #188749 55%, transparent);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+
+  .admin-shell .admin-login-card__notice {
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--admin-accent) 28%, transparent);
+    background-color: color-mix(in srgb, var(--admin-accent) 8%, var(--admin-surface));
+    padding: 1rem 1.125rem;
+  }
+
+  .admin-shell .admin-login-card__notice--info {
+    border-color: color-mix(in srgb, #188749 28%, transparent);
+    background-color: color-mix(in srgb, #188749 8%, var(--admin-surface));
+  }
+
+  .admin-shell .admin-login-field__input--otp {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.28em;
+    font-weight: 600;
+  }
+
+  .admin-shell .admin-login-card__resend .admin-login-card__forgot-link {
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .admin-shell .admin-login-card__resend .admin-login-card__forgot-link:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    text-decoration: none;
+  }
+
+  .admin-shell .admin-login-card__back .admin-login-card__forgot-link {
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .admin-shell .admin-login-card__remember-input {
+    accent-color: #1c5733;
+  }
+
+  .admin-shell .admin-login-card__remember span {
+    user-select: none;
+  }
+
+  .admin-shell .admin-login-card__back {
+    margin-top: 1.25rem;
+  }
+
   .admin-shell {
     --admin-bg: #0b1118;
     --admin-surface: #121a24;
@@ -141,14 +532,17 @@
   .admin-fg {
     color: var(--admin-fg);
   }
+
   .admin-muted {
     color: var(--admin-fg-muted);
     font-weight: 500;
   }
+
   .admin-subtle {
     color: var(--admin-fg-subtle);
     font-weight: 500;
   }
+
   .admin-caption {
     font-size: 0.6875rem;
     font-weight: 700;
@@ -156,11 +550,13 @@
     text-transform: uppercase;
     color: var(--admin-fg-subtle);
   }
+
   .admin-link {
     font-weight: 600;
     color: var(--admin-link);
     transition: color 0.15s ease;
   }
+
   .admin-link:hover {
     color: var(--admin-link-hover);
   }
@@ -170,6 +566,55 @@
     border: 1px solid var(--admin-border);
     background-color: var(--admin-surface);
     box-shadow: var(--admin-shadow);
+  }
+
+  .admin-shell .admin-apps-panel {
+    background-color: var(--admin-surface);
+    color: var(--admin-fg);
+    box-shadow: var(--admin-shadow);
+  }
+
+  .admin-shell .admin-apps-panel__header {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--admin-accent) 16%, var(--admin-surface-2)),
+      var(--admin-surface-2)
+    );
+  }
+
+  .admin-shell .admin-apps-panel__body {
+    background-color: var(--admin-surface);
+  }
+
+  .admin-shell .admin-profile-avatar {
+    background: linear-gradient(145deg, #1a3d32 0%, #16312a 100%);
+    box-shadow: 0 8px 24px rgb(10 31 24 / 0.22);
+  }
+
+  .admin-shell[data-admin-theme="dark"] .admin-profile-avatar {
+    background: linear-gradient(145deg, #234a3d 0%, #16312a 100%);
+  }
+
+  .admin-shell .admin-profile-intro__icon,
+  .admin-shell .admin-profile-field__icon {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  }
+
+  .admin-shell .admin-profile-security__icon {
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--admin-accent) 18%, transparent);
+  }
+
+  .admin-shell .admin-list-avatar {
+    background: linear-gradient(145deg, #1a3d32 0%, #16312a 100%);
+    box-shadow: 0 4px 12px rgb(10 31 24 / 0.18);
+  }
+
+  .admin-shell img.admin-list-avatar {
+    background: none;
+  }
+
+  .admin-shell .admin-page-intro__icon {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
   }
 
   .admin-shell .admin-input,
@@ -203,17 +648,53 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--admin-accent) 18%, transparent);
   }
 
+  .admin-shell .admin-login-field .admin-input {
+    min-height: 2.875rem;
+    padding: 0.6875rem 1rem 0.6875rem 2.8125rem;
+    font-size: 0.9375rem;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
+      background-color 0.15s ease;
+  }
+
+  .admin-shell .admin-login-field .admin-input:focus {
+    border-color: color-mix(in srgb, #188749 50%, var(--admin-border-strong));
+    box-shadow: 0 0 0 3px color-mix(in srgb, #188749 16%, transparent);
+  }
+
+  .admin-shell .admin-login-field .admin-input[aria-invalid="true"] {
+    border-color: color-mix(in srgb, var(--admin-danger) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--admin-danger) 12%, transparent);
+  }
+
+  @media (min-width: 640px) {
+    .admin-shell .admin-login-field .admin-input {
+      min-height: 3rem;
+    }
+  }
+
   .admin-shell .admin-select {
     min-height: 2.5rem;
     min-width: 10.5rem;
     cursor: pointer;
     appearance: none;
     padding-right: 2.25rem;
+    color: var(--admin-fg);
+    background-color: var(--admin-input-bg);
+    border: 1px solid var(--admin-border-strong);
+    border-radius: 0.5rem;
     color-scheme: dark;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23b6814e' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
     background-size: 1.1rem;
+  }
+
+  .admin-shell .admin-select:focus {
+    border-color: color-mix(in srgb, var(--admin-accent) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--admin-accent) 18%, transparent);
+    outline: none;
   }
 
   .admin-shell[data-admin-theme="light"] .admin-select {
@@ -251,9 +732,11 @@
     color: var(--admin-accent-fg);
     transition: filter 0.15s ease, opacity 0.15s ease;
   }
+
   .admin-shell .btn-primary:hover {
     filter: brightness(1.08);
   }
+
   .admin-shell .btn-primary:disabled {
     opacity: 0.5;
   }
@@ -271,6 +754,7 @@
     color: var(--admin-fg);
     transition: background-color 0.15s ease, border-color 0.15s ease;
   }
+
   .admin-shell .btn-secondary:hover {
     background-color: var(--admin-hover);
   }
@@ -288,6 +772,7 @@
     color: var(--admin-link);
     transition: background-color 0.15s ease, color 0.15s ease;
   }
+
   .admin-shell .btn-ghost:hover {
     background-color: var(--admin-hover);
     color: var(--admin-link-hover);
@@ -298,6 +783,7 @@
     background-color: var(--admin-surface-2);
     color: var(--admin-fg-muted);
   }
+
   .admin-shell .admin-theme-toggle:hover {
     background-color: var(--admin-hover);
     color: var(--admin-fg);
@@ -311,7 +797,103 @@
 
   .admin-shell .admin-sidebar {
     border-right: 1px solid var(--admin-border);
-    background-color: var(--admin-sidebar);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--admin-sidebar) 88%, white 12%) 0%, var(--admin-sidebar) 28%, var(--admin-sidebar) 100%);
+    box-shadow: 4px 0 28px rgb(0 0 0 / 0.14);
+    transition: width 0.2s ease;
+  }
+
+  @media (min-width: 1024px) {
+    .admin-shell.admin-shell--sidebar-collapsed .admin-sidebar__link:hover {
+      transform: none;
+    }
+
+    .admin-shell.admin-shell--sidebar-collapsed .admin-sidebar__brand::after {
+      right: 0.75rem;
+      left: 0.75rem;
+    }
+  }
+
+  .admin-shell[data-admin-theme="light"] .admin-sidebar {
+    background:
+      linear-gradient(180deg, #1a3d32 0%, #16312a 22%, #132b25 100%);
+    box-shadow: 4px 0 32px rgb(10 31 24 / 0.18);
+  }
+
+  .admin-shell[data-admin-theme="dark"] .admin-sidebar {
+    background:
+      linear-gradient(180deg, #101820 0%, #0a0f14 24%, #0a0f14 100%);
+  }
+
+  .admin-shell .admin-sidebar__brand {
+    border-bottom: 1px solid rgb(255 255 255 / 0.08);
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.04) 0%, transparent 100%);
+  }
+
+  .admin-shell .admin-sidebar__brand::after {
+    content: "";
+    position: absolute;
+    right: 1.25rem;
+    bottom: 0;
+    left: 1.25rem;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(212 165 116 / 0.55) 50%,
+      transparent
+    );
+  }
+
+  .admin-shell .admin-sidebar__brand-glow {
+    background: radial-gradient(
+      ellipse 90% 80% at 50% 0%,
+      rgb(212 165 116 / 0.14),
+      transparent 68%
+    );
+  }
+
+  .admin-shell .admin-sidebar__brand-link {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .admin-shell.admin-shell--sidebar-collapsed .admin-sidebar__brand-link {
+    justify-content: center;
+  }
+
+  .admin-shell .admin-sidebar__caption {
+    letter-spacing: 0.2em;
+    font-size: 0.625rem;
+  }
+
+  .admin-shell .admin-sidebar__link {
+    transition:
+      background-color 0.18s ease,
+      color 0.18s ease,
+      border-color 0.18s ease,
+      transform 0.15s ease;
+  }
+
+  .admin-shell .admin-sidebar__link:hover {
+    transform: translateX(2px);
+  }
+
+  .admin-shell .admin-sidebar__link--active {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  }
+
+  .admin-shell .admin-sidebar__link-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.88;
+  }
+
+  .admin-shell .admin-sidebar__link--active .admin-sidebar__link-icon {
+    opacity: 1;
+    color: var(--admin-link);
   }
 
   .admin-shell[data-admin-theme="light"] .admin-sidebar {
@@ -334,6 +916,44 @@
 
   .admin-shell[data-admin-theme="light"] .admin-sidebar .admin-caption {
     color: rgb(255 253 248 / 0.55);
+  }
+
+  .admin-shell .admin-sidebar__nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(212 165 116 / 0.45) transparent;
+  }
+
+  .admin-shell .admin-sidebar__nav::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .admin-shell .admin-sidebar__nav::-webkit-scrollbar-track {
+    margin-block: 0.25rem;
+    background: transparent;
+  }
+
+  .admin-shell .admin-sidebar__nav::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgb(212 165 116 / 0.38);
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .admin-shell .admin-sidebar__nav::-webkit-scrollbar-thumb:hover {
+    background: rgb(212 165 116 / 0.62);
+    background-clip: padding-box;
+  }
+
+  .admin-shell[data-admin-theme="dark"] .admin-sidebar__nav {
+    scrollbar-color: rgb(212 165 116 / 0.35) transparent;
+  }
+
+  .admin-shell[data-admin-theme="dark"] .admin-sidebar__nav::-webkit-scrollbar-thumb {
+    background: rgb(212 165 116 / 0.32);
+  }
+
+  .admin-shell[data-admin-theme="dark"] .admin-sidebar__nav::-webkit-scrollbar-thumb:hover {
+    background: rgb(212 165 116 / 0.55);
   }
 
   /* Map legacy page utilities → theme tokens (both themes) */
@@ -412,7 +1032,7 @@
     border-color: var(--admin-border) !important;
   }
 
-  .admin-shell main [class*="divide-emerald-900"] > * + * {
+  .admin-shell main [class*="divide-emerald-900"]>*+* {
     border-color: var(--admin-border) !important;
   }
 
@@ -481,6 +1101,7 @@
   .admin-shell[data-admin-theme="dark"] main [class*="text-cream-50/40"] {
     color: var(--admin-fg-subtle) !important;
   }
+
   .admin-shell[data-admin-theme="dark"] main [class*="text-cream-50/45"],
   .admin-shell[data-admin-theme="dark"] main [class*="text-cream-50/50"] {
     color: var(--admin-fg-muted) !important;

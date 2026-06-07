@@ -246,3 +246,37 @@ export async function notifyReviewModerated(tx, review, productName) {
     dedupeKey: `customer:review:${review.id}:${review.status}`,
   });
 }
+
+export async function notifyLowStock(tx, variant, availableQuantity) {
+  const productName = variant.product?.name ?? "Product";
+  const sku = variant.sku ?? variant.id;
+  const weight = variant.weight ? ` (${variant.weight})` : "";
+
+  await createNotification(tx, {
+    audience: "admin",
+    type: "low_stock",
+    category: "inventory",
+    title: "Low stock alert",
+    message: `${sku} · ${productName}${weight} has ${availableQuantity} unit(s) available.`,
+    actionLabel: "View inventory",
+    actionHref: `/inventory?q=${encodeURIComponent(sku)}`,
+    dedupeKey: `admin:low_stock:${variant.id}`,
+  });
+}
+
+export async function notifyOutOfStock(tx, variant) {
+  const productName = variant.product?.name ?? "Product";
+  const sku = variant.sku ?? variant.id;
+  const weight = variant.weight ? ` (${variant.weight})` : "";
+
+  await createNotification(tx, {
+    audience: "admin",
+    type: "out_of_stock",
+    category: "inventory",
+    title: "Out of stock",
+    message: `${sku} · ${productName}${weight} is now out of stock.`,
+    actionLabel: "View inventory",
+    actionHref: `/inventory?q=${encodeURIComponent(sku)}`,
+    dedupeKey: `admin:out_of_stock:${variant.id}`,
+  });
+}

@@ -1,187 +1,375 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext.jsx";
-import { useAdminTheme } from "../context/AdminThemeContext.jsx";
-import { adminMenuGroups } from "../config/adminMenu.js";
-import { AdminLogo } from "./AdminLogo.jsx";
-import { AdminNotificationsBell } from "./AdminNotificationsBell.jsx";
-import { AdminThemeToggle } from "./AdminThemeToggle.jsx";
-
-function MenuIcon({ open }) {
-  return (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      {open ? (
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-      ) : (
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-      )}
-    </svg>
-  );
-}
-
-function IconGrid() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
-      />
-    </svg>
-  );
-}
-
-function UserAvatar({ name }) {
-  const initials = (name ?? "A")
-    .split(" ")
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  return (
-    <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--admin-tab-active-border)] bg-[var(--admin-surface-2)] text-xs font-bold text-[var(--admin-link)]">
-      {initials}
-    </span>
-  );
-}
-
-export function AdminLayout() {
-  const { user, logout } = useAuth();
-  const { theme } = useAdminTheme();
-  const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  function handleLogout() {
-    logout();
-    navigate("/login");
-  }
-
-  function closeSidebar() {
-    setSidebarOpen(false);
-  }
-
-  const sidebarContent = (
-    <>
-      <div className="border-b border-[var(--admin-border)] px-5 py-5">
-        <Link to="/" className="block" onClick={closeSidebar}>
-          <AdminLogo size="sidebar" showTagline variant="dark" />
-        </Link>
-      </div>
-
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-        {adminMenuGroups.map((group) => (
-          <div key={group.label} className="mb-5">
-            <p className="admin-caption mb-2 px-3">{group.label}</p>
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    onClick={closeSidebar}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-lg border-l-2 py-2.5 pl-2.5 pr-3 text-sm font-semibold transition ${
-                        isActive
-                          ? "border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] text-[var(--admin-tab-active-fg)]"
-                          : "border-transparent text-[var(--admin-tab-fg)] hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]"
-                      }`
-                    }
-                  >
-                    <Icon />
-                    <span className="leading-snug">{item.label}</span>
-                  </NavLink>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      <div className="shrink-0 border-t border-[var(--admin-border)] p-4">
-        <div className="flex items-center gap-3 rounded-xl bg-[var(--admin-surface-2)] px-3 py-3">
-          <UserAvatar name={user?.fullName} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-[var(--admin-fg)]">{user?.fullName ?? "Admin"}</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--admin-link)]">Superuser</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="mt-3 w-full rounded-lg border border-[var(--admin-border-strong)] py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--admin-fg-muted)] transition hover:border-[var(--admin-tab-active-border)] hover:text-[var(--admin-link)]"
-        >
-          Sign out
-        </button>
-      </div>
-    </>
-  );
-
-  return (
-    <div className="admin-shell" data-admin-theme={theme}>
-      {sidebarOpen ? (
-        <button
-          type="button"
-          aria-label="Close menu"
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
-          onClick={closeSidebar}
-        />
-      ) : null}
-
-      <aside
-        className={`admin-sidebar fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col transition-transform duration-200 lg:z-30 lg:w-64 lg:max-w-none lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {sidebarContent}
-      </aside>
-
-      <div className="fixed right-4 top-4 z-20 flex items-center gap-2 lg:hidden">
-        <AdminThemeToggle className="admin-theme-toggle" />
-        <button
-          type="button"
-          aria-label="Open menu"
-          className="rounded-lg border border-[var(--admin-border-strong)] bg-[var(--admin-surface)] p-2 text-[var(--admin-fg)]"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <MenuIcon open={sidebarOpen} />
-        </button>
-      </div>
-
-      <div className="flex min-h-screen flex-col lg:pl-64">
-        <header className="admin-header sticky top-0 z-20 hidden lg:block">
-          <div className="flex h-14 items-center gap-4 px-8">
-            <AdminThemeToggle className="admin-theme-toggle shrink-0" />
-            <div className="flex flex-1 justify-center px-4">
-              <label className="relative w-full max-w-md">
-                <span className="sr-only">Search</span>
-                <input
-                  type="search"
-                  placeholder="Search analytics or orders…"
-                  className="admin-input h-10 w-full rounded-full py-0 pl-4 pr-10 text-sm"
-                />
-              </label>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <AdminNotificationsBell />
-              <button
-                type="button"
-                className="rounded-lg p-2 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]"
-                aria-label="Apps"
-              >
-                <IconGrid />
-              </button>
-              <UserAvatar name={user?.fullName} />
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 px-4 py-6 pt-16 lg:px-8 lg:py-8 lg:pt-8">
-          <Outlet />
-        </main>
-      </div>
-    </div>
-  );
-}
-
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useAdminTheme } from "../context/AdminThemeContext.jsx";
+import { adminMenuGroups } from "../config/adminMenu.js";
+import { AdminAppsLauncher } from "./AdminAppsLauncher.jsx";
+import { AdminGlobalSearch } from "./AdminGlobalSearch.jsx";
+import { AdminLogo } from "./AdminLogo.jsx";
+import { AdminNotificationsBell } from "./AdminNotificationsBell.jsx";
+import { AdminThemeToggle } from "./AdminThemeToggle.jsx";
+import { resolveAdminMediaUrl } from "../lib/mediaUrl.js";
+
+function MenuIcon({ open }) {
+  return (
+    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      {open ? (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+      )}
+    </svg>
+  );
+}
+
+function SidebarCollapseIcon({ collapsed }) {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      {collapsed ? (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5M6.75 19.5l-7.5-7.5 7.5-7.5" />
+      )}
+    </svg>
+  );
+}
+
+const SIDEBAR_COLLAPSED_KEY = "saliah-admin-sidebar-collapsed";
+
+function readSidebarCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function UserAvatar({ name, avatarUrl }) {
+  const initials = (name ?? "A")
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const src = avatarUrl ? resolveAdminMediaUrl(avatarUrl) : "";
+
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        className="h-9 w-9 shrink-0 rounded-full border border-[var(--admin-tab-active-border)] object-cover"
+      />
+    );
+  }
+
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--admin-tab-active-border)] bg-[var(--admin-surface-2)] text-xs font-bold text-[var(--admin-link)]">
+      {initials}
+    </span>
+  );
+}
+
+function formatRoleLabel(role) {
+  if (role === "admin") return "Administrator";
+  if (!role) return "User";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function IconChevronDown({ open }) {
+  return (
+    <svg
+      className={`h-4 w-4 shrink-0 text-[var(--admin-fg-faint)] transition-transform ${open ? "rotate-180" : ""}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      aria-hidden
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+    </svg>
+  );
+}
+
+function HeaderUserProfile({ user }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const displayName = user?.fullName?.trim() || user?.email?.split("@")[0] || "Admin";
+  const profilePath = "/account/profile";
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    function onPointerDown(event) {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    function onKeyDown(event) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  async function handleLogout() {
+    setOpen(false);
+    await logout();
+    navigate("/login", { replace: true });
+  }
+
+  return (
+    <div className="relative border-l border-[var(--admin-border)] pl-3" ref={rootRef}>
+      <button
+        type="button"
+        className="admin-header-user flex max-w-[11rem] cursor-pointer items-center gap-2 rounded-lg py-1 pr-1 transition hover:bg-[var(--admin-hover)] xl:max-w-[13rem]"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <UserAvatar name={displayName} avatarUrl={user?.avatarUrl} />
+        <div className="min-w-0 flex-1 text-left">
+          <p className="truncate text-sm font-semibold leading-tight text-[var(--admin-fg)]">{displayName}</p>
+          <p className="mt-0.5 truncate text-[11px] leading-tight text-[var(--admin-fg-muted)]">
+            {formatRoleLabel(user?.role)}
+          </p>
+        </div>
+        <IconChevronDown open={open} />
+      </button>
+
+      {open ? (
+        <div
+          className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)] shadow-2xl"
+          role="menu"
+        >
+          <div className="border-b border-[var(--admin-border)] px-4 py-3">
+            <p className="truncate text-sm font-semibold text-[var(--admin-fg)]">{displayName}</p>
+            {user?.email ? (
+              <p className="admin-muted mt-0.5 truncate text-xs">{user.email}</p>
+            ) : null}
+          </div>
+          <div className="py-1">
+            <Link
+              to={profilePath}
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--admin-fg)] transition hover:bg-[var(--admin-hover)]"
+              onClick={() => setOpen(false)}
+            >
+              <svg className="h-4 w-4 shrink-0 text-[var(--admin-fg-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.75 0 3.75 3.75 0 017.75 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+              Profile
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-[var(--admin-hover)] dark:text-red-400"
+              onClick={handleLogout}
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              </svg>
+              Sign out
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function AdminLayout() {
+  const { user } = useAuth();
+  const { theme } = useAdminTheme();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+
+  function closeSidebar() {
+    setSidebarOpen(false);
+  }
+
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed((value) => {
+      const next = !value;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore storage errors */
+      }
+      return next;
+    });
+  }
+
+  const sidebarContent = (
+    <>
+      <div
+        className={`admin-sidebar__brand relative flex shrink-0 items-center gap-2 px-4 py-3 ${
+          sidebarCollapsed ? "lg:justify-center lg:px-2" : "justify-between"
+        }`}
+      >
+        <div className="admin-sidebar__brand-glow pointer-events-none absolute inset-0" aria-hidden />
+        <Link
+          to="/"
+          className={`admin-sidebar__brand-link relative z-10 min-w-0 shrink ${
+            sidebarCollapsed ? "lg:shrink-0" : "flex-1"
+          }`}
+          onClick={closeSidebar}
+          title="Saliah Foods home"
+        >
+          <AdminLogo
+            size="sidebar"
+            variant="brand"
+            className={`items-center ${sidebarCollapsed ? "lg:hidden" : ""}`}
+          />
+          {sidebarCollapsed ? (
+            <AdminLogo size="icon" variant="brand" className="hidden items-center lg:flex" />
+          ) : null}
+        </Link>
+        <button
+          type="button"
+          className="admin-sidebar__collapse relative z-10 hidden shrink-0 rounded-lg border border-[var(--admin-border)] p-2 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)] lg:inline-flex"
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!sidebarCollapsed}
+          onClick={toggleSidebarCollapsed}
+        >
+          <SidebarCollapseIcon collapsed={sidebarCollapsed} />
+        </button>
+      </div>
+
+      <nav
+        className={`admin-sidebar__nav min-h-0 flex-1 overflow-y-auto py-5 ${
+          sidebarCollapsed ? "px-2 lg:px-2" : "px-3"
+        }`}
+      >
+        {adminMenuGroups.map((group) => (
+          <div
+            key={group.label}
+            className={`admin-sidebar__group mb-5 last:mb-2 ${sidebarCollapsed ? "lg:mb-3" : ""}`}
+          >
+            <p
+              className={`admin-caption admin-sidebar__caption mb-2.5 px-3 ${
+                sidebarCollapsed ? "lg:sr-only" : ""
+              }`}
+            >
+              {group.label}
+            </p>
+            {sidebarCollapsed ? (
+              <div className="admin-sidebar__group-divider mx-auto mb-2 hidden h-px w-8 bg-[var(--admin-border)] lg:block" aria-hidden />
+            ) : null}
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    title={item.label}
+                    onClick={closeSidebar}
+                    className={({ isActive }) =>
+                      `admin-sidebar__link flex items-center gap-3 rounded-xl border-l-2 py-2.5 text-sm font-semibold transition ${
+                        sidebarCollapsed
+                          ? "lg:justify-center lg:border-l-0 lg:px-2 lg:py-2.5"
+                          : "pl-2.5 pr-3"
+                      } ${
+                        isActive
+                          ? "admin-sidebar__link--active border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] text-[var(--admin-tab-active-fg)]"
+                          : "border-transparent text-[var(--admin-tab-fg)] hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]"
+                      }`
+                    }
+                  >
+                    <span className="admin-sidebar__link-icon shrink-0">
+                      <Icon />
+                    </span>
+                    <span className={`admin-sidebar__link-label leading-snug ${sidebarCollapsed ? "lg:hidden" : ""}`}>
+                      {item.label}
+                    </span>
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+    </>
+  );
+
+  return (
+    <div
+      className={`admin-shell${sidebarCollapsed ? " admin-shell--sidebar-collapsed" : ""}`}
+      data-admin-theme={theme}
+      data-sidebar-collapsed={sidebarCollapsed ? "true" : "false"}
+    >
+      {sidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          onClick={closeSidebar}
+        />
+      ) : null}
+
+      <aside
+        className={`admin-sidebar fixed inset-y-0 left-0 z-50 flex w-80 max-w-[88vw] flex-col transition-[transform,width] duration-200 lg:z-30 lg:max-w-none lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } ${sidebarCollapsed ? "lg:w-[4.75rem]" : "lg:w-72"}`}
+      >
+        {sidebarContent}
+      </aside>
+
+
+      <div
+        className={`flex min-h-screen flex-col transition-[padding] duration-200 ${
+          sidebarCollapsed ? "lg:pl-[4.75rem]" : "lg:pl-72"
+        }`}
+      >
+        <header className="admin-header sticky top-0 z-20 md:hidden">
+          <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
+            <Link to="/" className="min-w-0 shrink" onClick={closeSidebar}>
+              <AdminLogo size="sidebar" variant="brandNative" className="items-center" />
+            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <AdminThemeToggle className="admin-theme-toggle" />
+              <button
+                type="button"
+                aria-label="Open menu"
+                className="rounded-lg border border-[var(--admin-border-strong)] bg-[var(--admin-surface)] p-2 text-[var(--admin-fg)]"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <MenuIcon open={sidebarOpen} />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <header className="admin-header sticky top-0 z-20 hidden overflow-visible md:block">
+          <div className="flex min-h-14 items-center gap-4 px-4 py-2 md:px-6 lg:px-8">
+            <AdminGlobalSearch />
+
+            <div className="flex flex-1" aria-hidden />
+
+            <div className="flex shrink-0 items-center gap-2">
+              <AdminNotificationsBell />
+              <AdminThemeToggle iconOnly />
+              <AdminAppsLauncher />
+              <HeaderUserProfile user={user} />
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 py-6 md:px-6 md:py-8 lg:px-8">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
+

@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import path from "node:path";
 import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
@@ -18,9 +19,15 @@ import { customerPublicAssetsDir } from "./lib/paths.js";
 
 const app = express();
 
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
 const corsOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
-  : ["http://localhost:5173", "http://localhost:5174"];
+  : ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"];
 
 app.use(
   cors({

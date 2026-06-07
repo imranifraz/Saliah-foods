@@ -22,9 +22,11 @@ export function DataTable({ columns, children, emptyMessage = "No data found" })
   );
 }
 
-export function DataRow({ children, className = "" }) {
+export function DataRow({ children, className = "", ...rest }) {
   return (
-    <tr className={`transition hover:bg-[var(--admin-hover)] ${className}`}>{children}</tr>
+    <tr className={`transition hover:bg-[var(--admin-hover)] ${className}`} {...rest}>
+      {children}
+    </tr>
   );
 }
 

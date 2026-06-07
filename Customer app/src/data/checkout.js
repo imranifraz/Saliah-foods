@@ -41,8 +41,17 @@ export const PAYMENT_METHODS = [
 export const FREE_SHIPPING_THRESHOLD = 999;
 export const SHIPPING_FEE = 99;
 
-export function getShippingFee(subtotal) {
-  return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+export function getShippingFee(subtotal, settings) {
+  const threshold = Number(settings?.freeShippingThreshold ?? FREE_SHIPPING_THRESHOLD);
+  const fee = Number(settings?.shippingFee ?? SHIPPING_FEE);
+  return subtotal >= threshold ? 0 : fee;
+}
+
+export function getDefaultShippingSettings() {
+  return {
+    freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
+    shippingFee: SHIPPING_FEE,
+  };
 }
 
 export function generateOrderId() {

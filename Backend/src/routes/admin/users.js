@@ -2,9 +2,9 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../lib/prisma.js";
 import { requireAdmin } from "../../middleware/admin.js";
+import { isEmailTaken } from "../../lib/emailAvailability.js";
 
 const router = Router();
-const ROLES = new Set(["customer", "admin"]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function formatUser(user, counts = {}) {
@@ -13,7 +13,7 @@ function formatUser(user, counts = {}) {
     fullName: user.fullName,
     email: user.email,
     phone: user.phone,
-    role: user.role,
+    role: "customer",
     provider: user.provider ?? "local",
     dateOfBirth: user.dateOfBirth ?? "",
     profileNote: user.profileNote ?? "",
@@ -30,12 +30,8 @@ router.use(requireAdmin);
 
 router.get("/", async (req, res, next) => {
   try {
-    const { role, q } = req.query;
+    const { q } = req.query;
     const where = {};
-
-    if (role && role !== "all") {
-      where.role = String(role);
-    }
 
     if (q?.trim()) {
       const search = q.trim();
@@ -112,7 +108,7 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const { fullName, email, phone, password, role = "customer" } = req.body;
+    const { fullName, email, phone, password } = req.body;
 
     if (!fullName?.trim() || !email?.trim()) {
       return res.status(400).json({ ok: false, error: "Name and email are required" });
@@ -120,16 +116,9 @@ router.post("/", async (req, res, next) => {
     if (!EMAIL_RE.test(email.trim())) {
       return res.status(400).json({ ok: false, error: "Invalid email address" });
     }
-    if (!ROLES.has(role)) {
-      return res.status(400).json({ ok: false, error: "Invalid role" });
-    }
-    if (role === "admin" && (!password || password.length < 6)) {
-      return res.status(400).json({ ok: false, error: "Admin accounts need a password (min 6 chars)" });
-    }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-    if (existing) {
+    if (await isEmailTaken(normalizedEmail)) {
       return res.status(409).json({ ok: false, error: "Email already registered" });
     }
 
@@ -139,7 +128,6 @@ router.post("/", async (req, res, next) => {
         fullName: fullName.trim(),
         email: normalizedEmail,
         phone: phone?.trim() ?? "",
-        role,
         passwordHash,
         provider: "local",
       },
@@ -148,9 +136,7 @@ router.post("/", async (req, res, next) => {
       },
     });
 
-    if (role === "customer") {
-      await prisma.notificationPrefs.create({ data: { userId: user.id } });
-    }
+    await prisma.notificationPrefs.create({ data: { userId: user.id } });
 
     res.status(201).json({
       ok: true,
@@ -170,22 +156,12 @@ router.patch("/:id", async (req, res, next) => {
     const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ ok: false, error: "User not found" });
 
-    const { fullName, phone, role, profileNote } = req.body;
+    const { fullName, phone, profileNote } = req.body;
     const data = {};
 
     if (fullName !== undefined) data.fullName = fullName.trim();
     if (phone !== undefined) data.phone = phone.trim();
     if (profileNote !== undefined) data.profileNote = profileNote.trim();
-
-    if (role !== undefined) {
-      if (!ROLES.has(role)) {
-        return res.status(400).json({ ok: false, error: "Invalid role" });
-      }
-      if (existing.id === req.user.id && role !== "admin") {
-        return res.status(400).json({ ok: false, error: "You cannot remove your own admin access" });
-      }
-      data.role = role;
-    }
 
     const user = await prisma.user.update({
       where: { id: existing.id },
@@ -212,13 +188,6 @@ router.delete("/:id", async (req, res, next) => {
   try {
     const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ ok: false, error: "User not found" });
-
-    if (existing.id === req.user.id) {
-      return res.status(400).json({ ok: false, error: "You cannot delete your own account" });
-    }
-    if (existing.role === "admin") {
-      return res.status(400).json({ ok: false, error: "Admin accounts cannot be deleted from the panel" });
-    }
 
     await prisma.user.delete({ where: { id: existing.id } });
     res.json({ ok: true });

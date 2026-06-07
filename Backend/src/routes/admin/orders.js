@@ -2,6 +2,8 @@ import { Router } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { syncBestSellersFromSales } from "../../lib/best-sellers.js";
 import { applyOrderCancellation, canAdminCancel } from "../../lib/orderCancel.js";
+import { PRE_FULFILL_STATUSES, FULFILL_STATUSES } from "../../lib/inventoryConstants.js";
+import { fulfillOrderInventory } from "../../lib/inventoryStock.js";
 import { notifyOrderCancelled, notifyOrderStatusChange } from "../../lib/notifications.js";
 import { requireAdmin } from "../../middleware/admin.js";
 
@@ -181,6 +183,15 @@ router.patch("/:id", async (req, res, next) => {
 
     const previousStatus = order.status;
     const updated = await prisma.$transaction(async (tx) => {
+      if (
+        status !== undefined &&
+        nextStatus !== order.status &&
+        FULFILL_STATUSES.has(nextStatus) &&
+        PRE_FULFILL_STATUSES.has(order.status)
+      ) {
+        await fulfillOrderInventory(tx, order);
+      }
+
       const result = await tx.order.update({
         where: { id: order.id },
         data,

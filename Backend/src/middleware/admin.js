@@ -1,5 +1,6 @@
-import { verifyToken } from "../lib/auth.js";
+import { verifyAdminAccessToken, toAdminSession } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
+import { adminSessionSelect } from "../lib/adminRefreshToken.js";
 
 export async function requireAdmin(req, res, next) {
   const header = req.headers.authorization;
@@ -8,20 +9,22 @@ export async function requireAdmin(req, res, next) {
   }
 
   try {
-    const payload = verifyToken(header.slice(7));
-    const user = await prisma.user.findUnique({
+    const payload = verifyAdminAccessToken(header.slice(7));
+    const admin = await prisma.admin.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, fullName: true, phone: true, role: true, dateOfBirth: true, profileNote: true, provider: true },
+      select: adminSessionSelect,
     });
-    if (!user) {
+
+    if (!admin) {
       return res.status(401).json({ ok: false, error: "Invalid session" });
     }
-    const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-    const isAdmin = user.role === "admin" || (adminEmail && user.email === adminEmail);
-    if (!isAdmin) {
-      return res.status(403).json({ ok: false, error: "Admin access required" });
+
+    if (payload.tv !== admin.tokenVersion) {
+      return res.status(401).json({ ok: false, error: "Session expired. Please sign in again." });
     }
-    req.user = user;
+
+    req.admin = admin;
+    req.user = toAdminSession(admin);
     next();
   } catch {
     return res.status(401).json({ ok: false, error: "Invalid or expired token" });

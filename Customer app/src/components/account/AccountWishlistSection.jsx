@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
 import { OptimizedImage } from "../ui/OptimizedImage";
@@ -92,8 +93,32 @@ function WishlistRow({ item, onAddToCart, onRemove }) {
 }
 
 export function AccountWishlistSection() {
-  const { items, removeFromWishlist } = useWishlist();
+  const { items, loading, error, removeFromWishlist } = useWishlist();
   const { addItem } = useCart();
+  const [actionError, setActionError] = useState("");
+
+  const handleRemove = async (item) => {
+    setActionError("");
+    try {
+      await removeFromWishlist(item.variantId ?? null, item.slug, item.packSize);
+    } catch (err) {
+      setActionError(err.message ?? "Could not remove item");
+    }
+  };
+
+  if (loading && items.length === 0) {
+    return (
+      <div>
+        <AccountSectionHeader
+          title="Wishlist"
+          description="Curate the dates, honey, and preserves you love for later."
+        />
+        <AccountCard>
+          <p className="font-body text-sm text-emerald-900/50">Loading wishlist…</p>
+        </AccountCard>
+      </div>
+    );
+  }
 
   if (!items.length) {
     return (
@@ -102,6 +127,11 @@ export function AccountWishlistSection() {
           title="Wishlist"
           description="Curate the dates, honey, and preserves you love for later."
         />
+        {error ? (
+          <p className="mb-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 font-body text-sm text-amber-900/80">
+            {error}
+          </p>
+        ) : null}
         <AccountCard>
           <AccountEmptyState
             icon="♡"
@@ -121,6 +151,18 @@ export function AccountWishlistSection() {
         title="Wishlist"
         description={`${items.length} saved item${items.length !== 1 ? "s" : ""}`}
       />
+
+      {error ? (
+        <p className="mb-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 font-body text-sm text-amber-900/80">
+          {error}
+        </p>
+      ) : null}
+
+      {actionError ? (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700/85">
+          {actionError}
+        </p>
+      ) : null}
 
       <ul className="account-wishlist-list" role="list">
         {items.map((item) => (
@@ -142,7 +184,7 @@ export function AccountWishlistSection() {
                   packSize: item.packSize ?? "",
                 })
               }
-              onRemove={() => removeFromWishlist(item.variantId ?? null, item.slug, item.packSize)}
+              onRemove={() => handleRemove(item)}
             />
           </li>
         ))}

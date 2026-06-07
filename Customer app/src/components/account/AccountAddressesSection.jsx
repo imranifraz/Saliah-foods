@@ -130,11 +130,26 @@ function AddressForm({ initial, onSubmit, onCancel, title }) {
 }
 
 export function AccountAddressesSection() {
-  const { addresses, addAddress, updateAddress, setDefaultAddress, removeAddress } = useProfile();
+  const { addresses, loading, error, addAddress, updateAddress, setDefaultAddress, removeAddress } =
+    useProfile();
   const [mode, setMode] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const editingAddress = addresses.find((a) => a.id === editingId) ?? null;
+
+  const runAction = async (action) => {
+    setBusy(true);
+    setActionError("");
+    try {
+      await action();
+    } catch (err) {
+      setActionError(err.message ?? "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div>
@@ -143,14 +158,30 @@ export function AccountAddressesSection() {
         description="Manage delivery locations for faster checkout across India."
         action={
           mode !== "add" && !editingAddress ? (
-            <AccountBtn variant="primary" onClick={() => setMode("add")}>
+            <AccountBtn variant="primary" onClick={() => setMode("add")} disabled={loading}>
               Add new address
             </AccountBtn>
           ) : null
         }
       />
 
-      {addresses.length === 0 && mode !== "add" ? (
+      {error ? (
+        <p className="mb-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 font-body text-sm text-amber-900/80">
+          {error}
+        </p>
+      ) : null}
+
+      {actionError ? (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700/85">
+          {actionError}
+        </p>
+      ) : null}
+
+      {loading && addresses.length === 0 ? (
+        <AccountCard>
+          <p className="font-body text-sm text-emerald-900/50">Loading saved addresses…</p>
+        </AccountCard>
+      ) : addresses.length === 0 && mode !== "add" ? (
         <AccountCard>
           <AccountEmptyState
             title="No saved addresses"
@@ -188,12 +219,22 @@ export function AccountAddressesSection() {
                   Edit
                 </AccountBtn>
                 {!address.isDefault ? (
-                  <AccountBtn variant="soft" className="account-btn--sm" onClick={() => setDefaultAddress(address.id)}>
+                  <AccountBtn
+                    variant="soft"
+                    className="account-btn--sm"
+                    disabled={busy}
+                    onClick={() => runAction(() => setDefaultAddress(address.id))}
+                  >
                     Set as default
                   </AccountBtn>
                 ) : null}
                 {addresses.length > 1 ? (
-                  <AccountBtn variant="danger" className="account-btn--sm" onClick={() => removeAddress(address.id)}>
+                  <AccountBtn
+                    variant="danger"
+                    className="account-btn--sm"
+                    disabled={busy}
+                    onClick={() => runAction(() => removeAddress(address.id))}
+                  >
                     Delete
                   </AccountBtn>
                 ) : null}
@@ -206,7 +247,12 @@ export function AccountAddressesSection() {
       {mode === "add" ? (
         <AddressForm
           title="Add new address"
-          onSubmit={(data) => { addAddress(data); setMode(null); }}
+          onSubmit={(data) =>
+            runAction(async () => {
+              await addAddress(data);
+              setMode(null);
+            })
+          }
           onCancel={() => setMode(null)}
         />
       ) : null}
@@ -215,12 +261,17 @@ export function AccountAddressesSection() {
         <AddressForm
           title="Edit address"
           initial={editingAddress}
-          onSubmit={(data) => {
-            updateAddress(editingId, data);
+          onSubmit={(data) =>
+            runAction(async () => {
+              await updateAddress(editingId, data);
+              setMode(null);
+              setEditingId(null);
+            })
+          }
+          onCancel={() => {
             setMode(null);
             setEditingId(null);
           }}
-          onCancel={() => { setMode(null); setEditingId(null); }}
         />
       ) : null}
     </div>

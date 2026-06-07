@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { signToken, toSessionUser } from "../lib/auth.js";
+import { isEmailTaken } from "../lib/emailAvailability.js";
 
 const router = Router();
 
@@ -36,8 +37,7 @@ router.post("/register", async (req, res, next) => {
     if (Object.keys(errors).length) return res.status(400).json({ ok: false, errors });
 
     const email = req.body.email.trim().toLowerCase();
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
+    if (await isEmailTaken(email)) {
       return res.status(409).json({ ok: false, error: "An account with this email already exists" });
     }
 
@@ -95,6 +95,13 @@ router.post("/social", async (req, res, next) => {
     let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
     if (!user) {
+      if (await isEmailTaken(normalizedEmail)) {
+        return res.status(409).json({
+          ok: false,
+          error: "This email is registered as an admin account. Use a different email for the storefront.",
+        });
+      }
+
       user = await prisma.user.create({
         data: {
           fullName: (fullName ?? "User").trim(),
@@ -129,10 +136,7 @@ router.patch("/profile", requireAuth, async (req, res, next) => {
     const nextEmail = email?.trim().toLowerCase();
 
     if (nextEmail) {
-      const duplicate = await prisma.user.findFirst({
-        where: { email: nextEmail, NOT: { id: req.user.id } },
-      });
-      if (duplicate) {
+      if (await isEmailTaken(nextEmail, { excludeUserId: req.user.id })) {
         return res.status(409).json({ ok: false, error: "Another account uses this email" });
       }
     }

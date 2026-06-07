@@ -9,6 +9,8 @@ import {
   IconCms,
   IconPayment,
   IconReview,
+  IconAdmin,
+  IconProfile,
 } from "../components/icons/AdminIcons.jsx";
 
 export const adminMenuGroups = [
@@ -30,6 +32,7 @@ export const adminMenuGroups = [
     label: "Customers",
     items: [
       { to: "/users", label: "User Management", icon: IconUsers },
+      { to: "/admins", label: "Admin Management", icon: IconAdmin },
       { to: "/reviews", label: "Review Moderation", icon: IconReview },
     ],
   },
@@ -42,6 +45,9 @@ export const adminMenuGroups = [
   },
   {
     label: "Settings",
-    items: [{ to: "/payments", label: "Payments & Shipping", icon: IconPayment }],
+    items: [
+      { to: "/account/profile", label: "My Profile", icon: IconProfile },
+      { to: "/payments", label: "Payments & Shipping", icon: IconPayment },
+    ],
   },
 ];

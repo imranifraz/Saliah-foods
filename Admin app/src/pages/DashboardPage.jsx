@@ -228,7 +228,12 @@ export function DashboardPage() {
           hint="Awaiting dispatch"
           icon={<IconPackage />}
         />
-        <KpiCard label="SKUs in Stock" value={stats.productCount} icon={<IconProducts />} />
+        <KpiCard
+          label="Low stock SKUs"
+          value={stats.lowStockVariants ?? 0}
+          hint={`Active variants below ${stats.lowStockThreshold ?? 5} available`}
+          icon={<IconPackage />}
+        />
         <KpiCard
           label="Customers with orders"
           value={stats.customerCount}
@@ -236,6 +241,30 @@ export function DashboardPage() {
           icon={<IconUsers />}
         />
       </div>
+
+      {(stats.lowStockVariants > 0 || stats.outOfStockVariants > 0) && (
+        <div className="mt-4 space-y-3">
+          {stats.lowStockVariants > 0 ? (
+            <Link
+              to="/inventory?stock=low_stock"
+              className="block rounded-xl border border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] px-4 py-3 text-sm text-[var(--admin-link)] transition hover:opacity-90"
+            >
+              <strong>{stats.lowStockVariants}</strong> active variant{stats.lowStockVariants === 1 ? "" : "s"}{" "}
+              {stats.lowStockVariants === 1 ? "has" : "have"} low stock (below {stats.lowStockThreshold ?? 5} units
+              available). Review inventory →
+            </Link>
+          ) : null}
+          {stats.outOfStockVariants > 0 ? (
+            <Link
+              to="/inventory?stock=out_of_stock"
+              className="block rounded-xl border border-[var(--admin-danger-bg)] bg-[var(--admin-danger-bg)] px-4 py-3 text-sm text-[var(--admin-danger)] transition hover:opacity-90"
+            >
+              <strong>{stats.outOfStockVariants}</strong> active variant{stats.outOfStockVariants === 1 ? "" : "s"}{" "}
+              {stats.outOfStockVariants === 1 ? "is" : "are"} out of stock. Review inventory →
+            </Link>
+          ) : null}
+        </div>
+      )}
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.55fr_1fr]">
         <AdminCard

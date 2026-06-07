@@ -1,6 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../src/lib/prisma.js";
 
-const prisma = new PrismaClient();
-const user = await prisma.user.findUnique({ where: { email: "admin@saliahfoods.com" } });
-console.log(user ? { email: user.email, role: user.role, hasPassword: Boolean(user.passwordHash) } : "NOT FOUND");
+const admin = await prisma.admin.findUnique({ where: { email: "admin@saliahfoods.com" } });
+console.log(
+  admin ? { email: admin.email, hasPassword: Boolean(admin.passwordHash) } : "NOT FOUND"
+);
 await prisma.$disconnect();
