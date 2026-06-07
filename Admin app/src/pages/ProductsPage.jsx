@@ -79,6 +79,9 @@ export function ProductsPage() {
         mode={manageProduct?.mode ?? "view"}
         categories={categories}
         onClose={() => setManageProduct(null)}
+        onModeChange={(nextMode) =>
+          setManageProduct((prev) => (prev ? { ...prev, mode: nextMode } : prev))
+        }
         onUpdated={reload}
       />
     </div>

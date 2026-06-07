@@ -24,7 +24,8 @@ import { ProductPrice } from "./ProductPrice";
  * @property {'contain'} [imageFit] — legacy; maps to smaller scale
  */
 
-function StarRating({ rating = 4.8, small = false }) {
+function StarRating({ rating, small = false }) {
+  if (rating == null) return null;
   const full = Math.floor(rating);
   const half = rating - full >= 0.5;
   const size = small ? "h-2.5 w-2.5" : "h-3 w-3";
@@ -41,6 +42,18 @@ function StarRating({ rating = 4.8, small = false }) {
           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
         </svg>
       ))}
+    </div>
+  );
+}
+
+function ProductCardRatingMeta({ rating, reviewCount, ratingClassName = "", countClassName = "" }) {
+  if (rating == null || reviewCount <= 0) return null;
+
+  return (
+    <div className="product-card-meta">
+      <StarRating rating={rating} small />
+      <span className={`product-card-meta__rating ${ratingClassName}`.trim()}>{rating.toFixed(1)}</span>
+      <span className={`product-card-meta__count ${countClassName}`.trim()}>({reviewCount})</span>
     </div>
   );
 }
@@ -74,8 +87,8 @@ export function ProductCard({
     product.variants?.find((variantRow) => variantRow.inStock) ??
     product.variants?.[0] ??
     null;
-  const rating = product.rating ?? 4.8;
   const reviewCount = product.reviewCount ?? 0;
+  const rating = reviewCount > 0 && product.rating != null ? product.rating : null;
   const description = product.description ?? product.tagline ?? "";
   const badge = product.badge || product.tag;
   const isOutOfStock = activeVariant ? activeVariant.inStock === false : product.inStock === false;
@@ -128,13 +141,12 @@ export function ProductCard({
                   <p className="product-card-tagline">{product.tagline}</p>
                 ) : null}
 
-                <div className="product-card-meta">
-                  <StarRating rating={rating} small />
-                  <span className="font-body text-[10px] font-medium text-emerald-900/60">{rating.toFixed(1)}</span>
-                  {reviewCount > 0 ? (
-                    <span className="font-body text-[10px] text-emerald-900/25">({reviewCount})</span>
-                  ) : null}
-                </div>
+                <ProductCardRatingMeta
+                  rating={rating}
+                  reviewCount={reviewCount}
+                  ratingClassName="font-body text-[10px] font-medium text-emerald-900/60"
+                  countClassName="font-body text-[10px] text-emerald-900/25"
+                />
 
                 <div className="product-card-price-row flex flex-wrap items-end justify-between gap-1.5">
                   <ProductPrice
@@ -190,26 +202,16 @@ export function ProductCard({
               <ProductCardImage product={product} badge={displayBadge} size="listing" />
 
               <div className="product-card-body product-card-body--listing flex flex-1 flex-col">
-                <h3 className="product-card-title text-[1.0625rem]">
-                  {product.name}
-                </h3>
+                <h3 className="product-card-title">{product.name}</h3>
 
                 {showTagline && product.tagline ? (
-                  <p className="product-card-tagline line-clamp-2 text-[11px]">{product.tagline}</p>
+                  <p className="product-card-tagline">{product.tagline}</p>
                 ) : null}
 
-                <div className="product-card-meta">
-                  <StarRating rating={rating} small />
-                  <span className="font-body text-[11px] font-medium text-emerald-900/65">{rating.toFixed(1)}</span>
-                  {reviewCount > 0 ? (
-                    <span className="font-body text-[11px] text-emerald-900/28">({reviewCount})</span>
-                  ) : null}
-                </div>
+                <ProductCardRatingMeta rating={rating} reviewCount={reviewCount} />
 
                 {showPackSize && product.packSize ? (
-                  <p className="mt-0.5 font-body text-[10px] uppercase tracking-[0.16em] text-emerald-900/28">
-                    {product.packSize}
-                  </p>
+                  <p className="product-card-packsize">{product.packSize}</p>
                 ) : null}
 
                 <div className="product-card-price-row">
@@ -219,7 +221,8 @@ export function ProductCard({
                     price={product.price}
                     mrp={product.mrp}
                     discountPercent={product.discountPercent}
-                    size="md"
+                    size="lg"
+                    className="product-price--plp"
                   />
                 </div>
               </div>
@@ -229,24 +232,16 @@ export function ProductCard({
               <ProductCardImage product={product} badge={displayBadge} size="listing" />
 
               <div className="product-card-body product-card-body--listing flex flex-1 flex-col">
-                <h3 className="product-card-title text-[1.0625rem]">{product.name}</h3>
+                <h3 className="product-card-title">{product.name}</h3>
 
                 {showTagline && product.tagline ? (
-                  <p className="product-card-tagline line-clamp-2 text-[11px]">{product.tagline}</p>
+                  <p className="product-card-tagline">{product.tagline}</p>
                 ) : null}
 
-                <div className="product-card-meta">
-                  <StarRating rating={rating} small />
-                  <span className="font-body text-[11px] font-medium text-emerald-900/65">{rating.toFixed(1)}</span>
-                  {reviewCount > 0 ? (
-                    <span className="font-body text-[11px] text-emerald-900/28">({reviewCount})</span>
-                  ) : null}
-                </div>
+                <ProductCardRatingMeta rating={rating} reviewCount={reviewCount} />
 
                 {showPackSize && product.packSize ? (
-                  <p className="mt-0.5 font-body text-[10px] uppercase tracking-[0.16em] text-emerald-900/28">
-                    {product.packSize}
-                  </p>
+                  <p className="product-card-packsize">{product.packSize}</p>
                 ) : null}
 
                 <div className="product-card-price-row">
@@ -256,7 +251,8 @@ export function ProductCard({
                     price={product.price}
                     mrp={product.mrp}
                     discountPercent={product.discountPercent}
-                    size="md"
+                    size="lg"
+                    className="product-price--plp"
                   />
                 </div>
               </div>
@@ -326,13 +322,12 @@ export function ProductCard({
               <p className="product-card-tagline line-clamp-2 text-[11px]">{product.tagline}</p>
             ) : null}
 
-            <div className="product-card-meta">
-              <StarRating rating={rating} small />
-              <span className="font-body text-[11px] font-medium text-emerald-900/60">{rating.toFixed(1)}</span>
-              {reviewCount > 0 ? (
-                <span className="font-body text-[11px] text-emerald-900/28">({reviewCount})</span>
-              ) : null}
-            </div>
+            <ProductCardRatingMeta
+              rating={rating}
+              reviewCount={reviewCount}
+              ratingClassName="font-body text-[11px] font-medium text-emerald-900/60"
+              countClassName="font-body text-[11px] text-emerald-900/28"
+            />
 
             {showPackSize && product.packSize ? (
               <p className="mt-0.5 font-body text-[10px] uppercase tracking-[0.16em] text-emerald-900/30">
@@ -419,15 +414,17 @@ export function ProductCard({
           </p>
         ) : null}
 
-        <div className={`flex flex-wrap items-center gap-1.5 ${compact ? "mt-1" : "mt-1.5"}`}>
-          <StarRating rating={rating} small={compact} />
-          <span className={`font-body font-medium text-emerald-900 ${compact ? "text-[10px]" : "text-xs"}`}>
-            {rating.toFixed(1)}
-          </span>
-          {!compact && reviewCount > 0 ? (
-            <span className="font-body text-xs text-emerald-900/45">({reviewCount} reviews)</span>
-          ) : null}
-        </div>
+        {rating != null && reviewCount > 0 ? (
+          <div className={`flex flex-wrap items-center gap-1.5 ${compact ? "mt-1" : "mt-1.5"}`}>
+            <StarRating rating={rating} small={compact} />
+            <span className={`font-body font-medium text-emerald-900 ${compact ? "text-[10px]" : "text-xs"}`}>
+              {rating.toFixed(1)}
+            </span>
+            {!compact ? (
+              <span className="font-body text-xs text-emerald-900/45">({reviewCount} reviews)</span>
+            ) : null}
+          </div>
+        ) : null}
 
         {showPackSize && product.packSize ? (
           <p

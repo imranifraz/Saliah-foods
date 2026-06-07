@@ -10,14 +10,13 @@ import {
   AccountBtn,
   AccountCard,
   AccountEmptyState,
-  AccountSectionHeader,
 } from "./AccountUI";
 
 function NotificationIcon({ type }) {
   const base = "account-notification-item__icon";
   if (type === "rating") {
     return (
-      <span className={`${base} bg-gold-500/12 text-gold-600`} aria-hidden>
+      <span className={`${base} account-notification-item__icon--gold`} aria-hidden>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 7.1-1.01L12 2z" />
         </svg>
@@ -26,7 +25,7 @@ function NotificationIcon({ type }) {
   }
   if (type === "review_approved" || type === "review_rejected") {
     return (
-      <span className={`${base} bg-emerald-800/10 text-emerald-800`} aria-hidden>
+      <span className={`${base} account-notification-item__icon--emerald`} aria-hidden>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 7.1-1.01L12 2z" />
         </svg>
@@ -35,7 +34,7 @@ function NotificationIcon({ type }) {
   }
   if (type === "order_cancelled") {
     return (
-      <span className={`${base} bg-red-500/10 text-red-700`} aria-hidden>
+      <span className={`${base} account-notification-item__icon--danger`} aria-hidden>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M6 18L18 6M6 6l12 12" />
         </svg>
@@ -73,60 +72,59 @@ export function AccountNotificationsSection() {
   const unreadCount = feed.filter((item) => !isRead(item.id)).length;
 
   return (
-    <div className="space-y-6">
-      <AccountSectionHeader
-        title="Notifications"
-        description="Order tracking, delivery updates, and reminders to rate your purchases."
-        action={
-          feed.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              <AccountBtn
-                variant="ghost"
-                className="account-btn--sm"
-                onClick={() => markAllRead(feed.map((f) => f.id))}
-              >
-                Mark all read
-              </AccountBtn>
-              <AccountBtn
-                variant="ghost"
-                className="account-btn--sm"
-                onClick={() => clearAll(allFeed.map((f) => f.id))}
-              >
-                Clear all
-              </AccountBtn>
-            </div>
-          ) : null
-        }
-      />
+    <div className="account-notifications-section space-y-6 md:space-y-7">
+      {feed.length > 0 ? (
+        <div className="flex flex-wrap justify-end gap-2">
+          <AccountBtn
+            variant="ghost"
+            className="account-btn--sm"
+            onClick={() => markAllRead(feed.map((f) => f.id))}
+          >
+            Mark all read
+          </AccountBtn>
+          <AccountBtn
+            variant="ghost"
+            className="account-btn--sm"
+            onClick={() => clearAll(allFeed.map((f) => f.id))}
+          >
+            Clear all
+          </AccountBtn>
+        </div>
+      ) : null}
 
-      <AccountCard>
-        <div className="account-filter-pills">
-          {NOTIFICATION_CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              className={`account-filter-pill ${category === cat.id ? "account-filter-pill--active" : ""}`}
-              onClick={() => setCategory(cat.id)}
-            >
-              {cat.label}
-              {cat.id === "all" && unreadCount > 0 ? ` (${unreadCount})` : ""}
-            </button>
-          ))}
+      <AccountCard className="account-notifications-card">
+        <div className="account-filter-pills" role="tablist" aria-label="Filter notifications">
+          {NOTIFICATION_CATEGORIES.map((cat) => {
+            const isActive = category === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={`account-filter-pill ${isActive ? "account-filter-pill--active" : ""}`}
+                onClick={() => setCategory(cat.id)}
+              >
+                {cat.label}
+                {cat.id === "all" && unreadCount > 0 ? ` (${unreadCount})` : ""}
+              </button>
+            );
+          })}
         </div>
 
         {loading && feed.length === 0 ? (
-          <p className="mt-6 text-center font-body text-sm text-emerald-900/45">Loading notifications…</p>
+          <p className="account-notifications-loading">Loading notifications…</p>
         ) : feed.length === 0 ? (
-          <div className="mt-6">
+          <div className="account-notifications-empty">
             <AccountEmptyState
               title="All caught up"
               description="You have no notifications in this category. Order updates will appear here after you shop."
               actionLabel="Browse products"
-              actionHref="/products/all"
+              actionHref="/products"
             />
           </div>
         ) : (
-          <ul className="mt-6 space-y-2">
+          <ul className="account-notifications-list">
             {feed.map((item) => {
               const unread = !isRead(item.id);
               return (
@@ -137,17 +135,17 @@ export function AccountNotificationsSection() {
                     <NotificationIcon type={item.type} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="font-body text-sm font-medium text-emerald-900">{item.title}</p>
-                        <time className="shrink-0 font-body text-[11px] text-emerald-900/35" dateTime={item.at}>
+                        <p className="account-notification-item__title">{item.title}</p>
+                        <time className="account-notification-item__time" dateTime={item.at}>
                           {formatNotificationTime(item.at)}
                         </time>
                       </div>
-                      <p className="mt-1 font-body text-xs leading-relaxed text-emerald-900/50">{item.message}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <p className="account-notification-item__message">{item.message}</p>
+                      <div className="account-notification-item__actions">
                         {item.actionHref ? (
                           <Link
                             to={item.actionHref}
-                            className="font-body text-xs font-medium text-emerald-800/75 underline-offset-2 hover:underline"
+                            className="account-notification-item__link"
                             onClick={() => markAsRead(item.id)}
                           >
                             {item.actionLabel}
@@ -156,7 +154,7 @@ export function AccountNotificationsSection() {
                         {unread ? (
                           <button
                             type="button"
-                            className="font-body text-xs text-emerald-900/40 hover:text-emerald-900/65"
+                            className="account-notification-item__mark-read"
                             onClick={() => markAsRead(item.id)}
                           >
                             Mark as read
@@ -172,28 +170,30 @@ export function AccountNotificationsSection() {
         )}
       </AccountCard>
 
-      <AccountCard>
-        <h3 className="font-display text-lg text-emerald-900">Notification preferences</h3>
-        <p className="mt-1.5 font-body text-sm text-emerald-900/45">
-          Choose which updates you would like to receive.
-        </p>
+      <AccountCard className="account-prefs-card">
+        <header className="account-prefs-card__header">
+          <h3 className="account-prefs-card__title">Notification preferences</h3>
+          <p className="account-prefs-card__desc">
+            Choose which updates you would like to receive.
+          </p>
+        </header>
 
-        <ul className="mt-6 divide-y divide-cream-200/70">
+        <ul className="account-prefs-list">
           {NOTIFICATION_OPTIONS.map((option) => (
-            <li key={option.id} className="flex items-start justify-between gap-4 py-5 first:pt-0 last:pb-0">
-              <div>
-                <p className="font-body text-sm font-medium text-emerald-900">{option.label}</p>
-                <p className="mt-1 font-body text-xs leading-relaxed text-emerald-900/45">{option.description}</p>
+            <li key={option.id} className="account-prefs-row">
+              <div className="account-prefs-row__text">
+                <p className="account-prefs-row__label">{option.label}</p>
+                <p className="account-prefs-row__desc">{option.description}</p>
               </div>
-              <label className="account-toggle relative inline-flex shrink-0 cursor-pointer items-center">
+              <label className="account-toggle">
                 <input
                   type="checkbox"
-                  className="peer sr-only"
+                  className="account-toggle__input"
                   checked={Boolean(prefs[option.id])}
                   onChange={(e) => updatePref(option.id, e.target.checked)}
                 />
-                <span className="h-7 w-12 rounded-full bg-cream-200 transition-colors peer-checked:bg-emerald-800/85 peer-focus-visible:ring-2 peer-focus-visible:ring-gold-400/35" />
-                <span className="absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow-md transition-transform peer-checked:translate-x-5" />
+                <span className="account-toggle__track" aria-hidden />
+                <span className="account-toggle__thumb" aria-hidden />
               </label>
             </li>
           ))}

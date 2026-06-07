@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { customerPublicAssetsDir } from "./paths.js";
+import { customerPublicAssetsDirs } from "./paths.js";
 
 /** Packshot files referenced by prisma/seed.js */
 export const SEED_PRODUCT_IMAGE_FILES = [
@@ -32,10 +32,17 @@ export function productUploadUrl(filename) {
 
 function resolveSourceDir() {
   const seedDir = seedAssetsProductsDir();
-  if (fs.existsSync(seedDir)) {
+  if (fs.existsSync(seedDir) && SEED_PRODUCT_IMAGE_FILES.some((file) => fs.existsSync(path.join(seedDir, file)))) {
     return seedDir;
   }
-  return customerPublicAssetsDir();
+
+  for (const dir of customerPublicAssetsDirs()) {
+    if (SEED_PRODUCT_IMAGE_FILES.some((file) => fs.existsSync(path.join(dir, file)))) {
+      return dir;
+    }
+  }
+
+  return seedDir;
 }
 
 /**

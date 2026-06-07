@@ -13,9 +13,9 @@ export function AccountSectionHeader({ title, description, action }) {
   );
 }
 
-export function AccountCard({ children, className = "", padding = true }) {
+export function AccountCard({ children, className = "", padding = true, ...props }) {
   return (
-    <section className={`account-card ${padding ? "account-card--padded" : ""} ${className}`.trim()}>
+    <section className={`account-card ${padding ? "account-card--padded" : ""} ${className}`.trim()} {...props}>
       {children}
     </section>
   );
@@ -24,11 +24,19 @@ export function AccountCard({ children, className = "", padding = true }) {
 export function AccountEmptyState({ icon, title, description, actionLabel, actionHref }) {
   return (
     <div className="account-empty">
-      {icon ? <div className="account-empty__icon" aria-hidden>{icon}</div> : null}
+      <div className="account-empty__icon" aria-hidden>
+        {icon ?? (
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M9 11l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </div>
       <h3 className="account-empty__title">{title}</h3>
       {description ? <p className="account-empty__desc">{description}</p> : null}
       {actionHref && actionLabel ? (
-        <Link to={actionHref} className="account-btn account-btn--primary">
+        <Link to={actionHref} className="account-btn account-btn--primary account-empty__action">
           {actionLabel}
         </Link>
       ) : null}
@@ -64,8 +72,40 @@ export function AccountField({ id, label, error, children, className = "" }) {
   );
 }
 
+export function AccountDetailField({ label, value, className = "" }) {
+  return (
+    <div className={`account-detail ${className}`.trim()}>
+      <p className="account-label">{label}</p>
+      <p className="account-detail__value">{value || "—"}</p>
+    </div>
+  );
+}
+
 export function AccountInput(props) {
   return <input className="account-input" {...props} />;
+}
+
+export function AccountPhoneInput({ id, value, onChange, error, placeholder = "9876543210", ...props }) {
+  return (
+    <div className={`account-phone-input${error ? " account-phone-input--error" : ""}`}>
+      <span className="account-phone-input__prefix" aria-hidden>
+        +91
+      </span>
+      <input
+        id={id}
+        type="tel"
+        autoComplete="tel-national"
+        inputMode="numeric"
+        className="account-phone-input__field"
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        maxLength={10}
+        aria-invalid={Boolean(error)}
+        {...props}
+      />
+    </div>
+  );
 }
 
 export function AccountSelect(props) {

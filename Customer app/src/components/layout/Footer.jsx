@@ -106,7 +106,7 @@ export function Footer() {
           <div className="lg:col-span-4">
             <Link to="/" className="inline-block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-400/50">
               <OptimizedImage
-                src={homeContent.siteLogo || "/assets/application-logo.png"}
+                src={resolveMediaUrl(homeContent.siteLogoLight) || "/assets/application-logo-white.webp"}
                 alt="Saliah Foods"
                 className="h-11 w-auto sm:h-12 md:h-14"
                 width={595}
@@ -155,7 +155,7 @@ export function Footer() {
                 </li>
               ))}
               <li>
-                <FooterLink to="/products/dates">View all products</FooterLink>
+                <FooterLink to="/products">View all products</FooterLink>
               </li>
             </ul>
           </div>

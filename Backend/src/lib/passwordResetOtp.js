@@ -38,3 +38,10 @@ export const passwordResetOtpConfig = {
   OTP_RESEND_MS,
   MAX_ATTEMPTS,
 };
+
+export const customerPasswordResetOtpConfig = {
+  OTP_PURPOSE: "customer_password_reset",
+  OTP_TTL_MS,
+  OTP_RESEND_MS,
+  MAX_ATTEMPTS,
+};

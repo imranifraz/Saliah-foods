@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { mainNav } from "../../data/navigation";
 import { useCart } from "../../context/CartContext";
@@ -9,6 +9,7 @@ import { useHomeContent } from "../../context/HomeContentContext.jsx";
 import { resolveMediaUrl } from "../../lib/api.js";
 
 import { MobileProductMegaMenu } from "./ProductMegaMenu";
+import { HeaderAccountMenu } from "./HeaderAccountMenu";
 
 const ProductMegaMenu = lazy(() =>
   import("./ProductMegaMenu").then((m) => ({ default: m.ProductMegaMenu }))
@@ -22,8 +23,9 @@ export function Header() {
   const megaRef = useRef(null);
   const outsideHandlerRef = useRef(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const { totalCount, openCart, closeCart } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const { count: wishlistCount } = useWishlist();
   const { content: homeContent } = useHomeContent();
 
@@ -82,6 +84,17 @@ export function Header() {
   }, [megaOpen]);
 
   const closeMenu = () => setMenuOpen(false);
+
+  const handleMobileSignOut = () => {
+    logout();
+    closeMenu();
+    closeCart();
+    navigate("/");
+  };
+
+  const mobileNavLinks = mainNav.filter((item) => !item.megaMenu);
+  const homeNavItem = mobileNavLinks.find((item) => item.href === "/");
+  const mobileNavLinksAfterHome = mobileNavLinks.filter((item) => item.href !== "/");
 
   return (
     <header
@@ -162,13 +175,7 @@ export function Header() {
                     </span>
                   ) : null}
                 </Link>
-                <Link
-                  to="/account"
-                  className="hidden h-9 w-9 items-center justify-center rounded-full bg-emerald-900/5 text-emerald-900 sm:flex"
-                  aria-label="Account"
-                >
-                  <IconUser />
-                </Link>
+                <HeaderAccountMenu onNavigate={closeCart} />
               </>
             ) : (
               <Link
@@ -211,10 +218,26 @@ export function Header() {
             <motion.button type="button" className="fixed inset-0 z-40 bg-emerald-950/40 backdrop-blur-sm xl:hidden" aria-label="Close menu" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeMenu} />
             <motion.nav className="fixed inset-x-0 top-[calc(var(--site-header)+0.5rem)] z-50 mx-4 max-h-[min(80vh,640px)] overflow-y-auto rounded-2xl border border-cream-200 bg-cream-50 p-4 shadow-luxury-lg sm:mx-5 xl:hidden" aria-label="Mobile" initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
               <ul className="flex flex-col gap-1">
+                {homeNavItem ? (
+                  <li>
+                    <Link
+                      to={homeNavItem.href}
+                      className="block rounded-xl px-4 py-3.5 font-body text-base font-medium text-emerald-900 hover:bg-cream-100"
+                      onClick={closeMenu}
+                    >
+                      {homeNavItem.label}
+                    </Link>
+                  </li>
+                ) : null}
                 <li>
-                  <button type="button" className="flex w-full items-center justify-between rounded-xl px-4 py-3.5 font-body text-base font-medium text-emerald-900" onClick={() => setMobileProductsOpen((v) => !v)} aria-expanded={mobileProductsOpen}>
-                    Products
-                    <span className="text-emerald-900/40">{mobileProductsOpen ? "−" : "+"}</span>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3.5 font-body text-base font-medium text-emerald-900 transition-colors hover:bg-cream-100"
+                    onClick={() => setMobileProductsOpen((v) => !v)}
+                    aria-expanded={mobileProductsOpen}
+                  >
+                    <span>Products</span>
+                    <MobileNavChevron open={mobileProductsOpen} />
                   </button>
                   {mobileProductsOpen ? (
                     <div className="px-2 pb-1">
@@ -222,19 +245,64 @@ export function Header() {
                     </div>
                   ) : null}
                 </li>
-                {mainNav.filter((i) => !i.megaMenu).map((item) => (
+                {mobileNavLinksAfterHome.map((item) => (
                   <li key={item.label}>
                     <Link to={item.href} className="block rounded-xl px-4 py-3.5 font-body text-base font-medium text-emerald-900 hover:bg-cream-100" onClick={closeMenu}>
                       {item.label}
                     </Link>
                   </li>
                 ))}
+                {isAuthenticated ? (
+                  <>
+                    <li className="mt-2 border-t border-cream-200/90 pt-2">
+                      <Link
+                        to="/account"
+                        className="block rounded-xl px-4 py-3.5 font-body text-base font-medium text-emerald-900 hover:bg-cream-100"
+                        onClick={closeMenu}
+                      >
+                        Profile
+                      </Link>
+                    </li>
+                    <li>
+                      <button
+                        type="button"
+                        className="block w-full rounded-xl px-4 py-3.5 text-left font-body text-base font-medium text-red-800/85 hover:bg-red-50/80"
+                        onClick={handleMobileSignOut}
+                      >
+                        Sign out
+                      </button>
+                    </li>
+                  </>
+                ) : (
+                  <li className="mt-2 border-t border-cream-200/90 pt-2">
+                    <Link
+                      to="/login"
+                      className="block rounded-xl px-4 py-3.5 font-body text-base font-medium text-emerald-900 hover:bg-cream-100"
+                      onClick={closeMenu}
+                    >
+                      Sign in
+                    </Link>
+                  </li>
+                )}
               </ul>
             </motion.nav>
           </>
         ) : null}
       </AnimatePresence>
     </header>
+  );
+}
+
+function MobileNavChevron({ open }) {
+  return (
+    <span
+      className={`mobile-nav-chevron${open ? " mobile-nav-chevron--open" : ""}`}
+      aria-hidden
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }
 
@@ -259,15 +327,6 @@ function IconSearch() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
       <circle cx="11" cy="11" r="7" />
       <path d="M20 20l-4-4" />
-    </svg>
-  );
-}
-
-function IconUser() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
     </svg>
   );
 }

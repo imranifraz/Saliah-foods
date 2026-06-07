@@ -8,22 +8,24 @@ export function AuthSplitLayout({ mode, onSocialSuccess, children }) {
 
   if (isRegister) {
     return (
-      <div className="auth-split auth-split--register mt-5 flex flex-col gap-6 md:mt-6 md:gap-7">
-        <section aria-labelledby="auth-social-heading">
-          <SocialAuthButtons
-            mode={mode}
-            onSuccess={onSocialSuccess}
-            headingId="auth-social-heading"
-            buttonLayout="row"
-          />
-        </section>
+      <div className="auth-split mt-5 md:mt-6">
+        <div className="flex flex-col gap-4">
+          <section className="w-full" aria-labelledby="auth-social-heading">
+            <SocialAuthButtons
+              mode={mode}
+              onSuccess={onSocialSuccess}
+              headingId="auth-social-heading"
+              buttonLayout="row"
+            />
+          </section>
 
-        <AuthOrDivider orientation="horizontal" className="py-1" />
+          <AuthOrDivider orientation="horizontal" className="py-0" />
 
-        <section className="w-full">
-          <p className={`${authSectionLabelClass} mb-4`}>{emailLabel}</p>
-          {children}
-        </section>
+          <section className="w-full">
+            <p className={`${authSectionLabelClass} mb-3`}>{emailLabel}</p>
+            {children}
+          </section>
+        </div>
       </div>
     );
   }
@@ -32,16 +34,22 @@ export function AuthSplitLayout({ mode, onSocialSuccess, children }) {
     <div className="auth-split mt-5 md:mt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-0">
         <section
-          className="auth-split__social w-full md:w-[46%] md:shrink-0"
+          className="auth-split__social flex w-full flex-col items-center justify-center text-center md:w-[46%] md:shrink-0 md:pr-1 lg:pr-2"
           aria-labelledby="auth-social-heading"
         >
-          <SocialAuthButtons mode={mode} onSuccess={onSocialSuccess} headingId="auth-social-heading" />
+          <SocialAuthButtons
+            mode={mode}
+            onSuccess={onSocialSuccess}
+            headingId="auth-social-heading"
+            buttonLayout="column"
+            className="mx-auto w-full max-w-[17.5rem] sm:max-w-[19rem] md:mx-0 md:max-w-none"
+          />
         </section>
 
         <AuthOrDivider />
 
-        <section className="auth-split__email min-w-0 w-full flex-1 md:pt-0">
-          <p className={`${authSectionLabelClass} mb-3`}>{emailLabel}</p>
+        <section className="auth-split__email min-w-0 w-full flex-1 md:pl-1 lg:pl-2">
+          <p className={`${authSectionLabelClass} mb-3 md:mb-4`}>{emailLabel}</p>
           {children}
         </section>
       </div>

@@ -7,7 +7,7 @@ export function getPasswordStrength(password) {
   if (!password) return { score: 0, label: "", percent: 0, color: "bg-cream-200" };
 
   let score = 0;
-  if (password.length >= 6) score += 1;
+  if (password.length >= 8) score += 1;
   if (password.length >= 10) score += 1;
   if (/[A-Z]/.test(password)) score += 1;
   if (/[0-9]/.test(password)) score += 1;
@@ -256,3 +256,20 @@ export async function downloadOrderInvoice(order) {
 }
 
 export const ADDRESS_TYPE_OPTIONS = ["Home", "Office", "Other"];
+
+export function formatMemberSince(iso) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export function formatSignInMethod(provider) {
+  if (provider === "google") return "Google";
+  if (!provider || provider === "local") return "Email & password";
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
+}

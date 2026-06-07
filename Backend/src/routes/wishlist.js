@@ -5,7 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 const router = Router();
 router.use(requireAuth);
 
-function formatItem(item) {
+function formatItem(item, live = null) {
   const mrp = item.mrpValue ?? null;
   const discount =
     mrp && mrp > item.priceValue ? Math.round(((mrp - item.priceValue) / mrp) * 100) : 0;
@@ -25,7 +25,48 @@ function formatItem(item) {
     discountPercent: discount || null,
     tagline: item.tagline ?? "",
     addedAt: item.addedAt.toISOString(),
+    rating: live?.rating ?? null,
+    inStock: live?.inStock ?? null,
+    stockLabel: live?.stockLabel ?? null,
   };
+}
+
+function variantAvailable(variant) {
+  return variant.stockStatus === "in_stock" && variant.stockQuantity - variant.reservedQuantity > 0;
+}
+
+function enrichWishlistItems(items, { variants, productsById, productsBySlug }) {
+  const variantMap = new Map(variants.map((variant) => [variant.id, variant]));
+  const productIdMap = new Map(productsById.map((product) => [product.id, product]));
+  const slugMap = new Map(productsBySlug.map((product) => [product.slug, product]));
+
+  return items.map((item) => {
+    if (item.variantId) {
+      const variant = variantMap.get(item.variantId);
+      if (variant) {
+        const inStock = variantAvailable(variant);
+        return formatItem(item, {
+          rating: variant.product.rating,
+          inStock,
+          stockLabel: inStock ? "In stock" : "Out of stock",
+        });
+      }
+    }
+
+    const product = item.productId
+      ? productIdMap.get(item.productId)
+      : slugMap.get(item.slug);
+
+    if (product) {
+      return formatItem(item, {
+        rating: product.rating,
+        inStock: product.inStock,
+        stockLabel: product.inStock ? "In stock" : "Out of stock",
+      });
+    }
+
+    return formatItem(item);
+  });
 }
 
 router.get("/", async (req, res, next) => {
@@ -34,7 +75,35 @@ router.get("/", async (req, res, next) => {
       where: { userId: req.user.id },
       orderBy: { addedAt: "desc" },
     });
-    res.json({ ok: true, items: items.map(formatItem) });
+
+    const variantIds = [...new Set(items.map((item) => item.variantId).filter(Boolean))];
+    const productIds = [...new Set(items.map((item) => item.productId).filter(Boolean))];
+    const slugs = [
+      ...new Set(items.filter((item) => !item.variantId && !item.productId).map((item) => item.slug)),
+    ];
+
+    const [variants, productsById, productsBySlug] = await Promise.all([
+      variantIds.length
+        ? prisma.productVariant.findMany({
+            where: { id: { in: variantIds } },
+            include: { product: { select: { rating: true, inStock: true } } },
+          })
+        : [],
+      productIds.length
+        ? prisma.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, slug: true, rating: true, inStock: true },
+          })
+        : [],
+      slugs.length
+        ? prisma.product.findMany({
+            where: { slug: { in: slugs } },
+            select: { id: true, slug: true, rating: true, inStock: true },
+          })
+        : [],
+    ]);
+
+    res.json({ ok: true, items: enrichWishlistItems(items, { variants, productsById, productsBySlug }) });
   } catch (err) {
     next(err);
   }

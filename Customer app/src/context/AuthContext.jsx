@@ -10,6 +10,8 @@ import {
   changePasswordApi,
   deleteAccountApi,
   clearAuthToken,
+  verifyEmailApi,
+  resendVerificationEmailApi,
 } from "../services/authApi.js";
 
 const AuthContext = createContext(null);
@@ -20,8 +22,12 @@ export function AuthProvider({ children }) {
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    saveSession(user);
-  }, [user]);
+    if (user) {
+      saveSession(user);
+    } else if (authReady && !getAuthToken()) {
+      saveSession(null);
+    }
+  }, [user, authReady]);
 
   useEffect(() => {
     purgeLegacyLocalUsers();
@@ -45,8 +51,8 @@ export function AuthProvider({ children }) {
           setUser(data.user);
           setHasPassword(data.hasPassword);
         }
-      } catch {
-        if (!cancelled) {
+      } catch (err) {
+        if (!cancelled && err.status === 401) {
           clearAuthToken();
           setUser(null);
           setHasPassword(false);
@@ -65,7 +71,13 @@ export function AuthProvider({ children }) {
   const applyAuth = useCallback((data) => {
     setUser(data.user);
     setHasPassword(Boolean(data.hasPassword));
-    return { ok: true, user: data.user };
+    return {
+      ok: true,
+      user: data.user,
+      message: data.message,
+      verificationEmailSent: data.verificationEmailSent,
+      emailVerified: Boolean(data.user?.emailVerified ?? data.emailVerified),
+    };
   }, []);
 
   const login = useCallback(async ({ email, password }) => {
@@ -153,10 +165,41 @@ export function AuthProvider({ children }) {
     [user?.id]
   );
 
+  const markPasswordUpdated = useCallback(() => {
+    setHasPassword(true);
+  }, []);
+
+  const verifyEmail = useCallback(async (token) => {
+    try {
+      const data = await verifyEmailApi(token);
+      setUser(data.user);
+      return {
+        ok: true,
+        message: data.message,
+        alreadyVerified: Boolean(data.alreadyVerified),
+      };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }, []);
+
+  const resendVerificationEmail = useCallback(async () => {
+    if (!user?.id) return { ok: false, error: "Sign in to resend verification email" };
+    try {
+      const data = await resendVerificationEmailApi();
+      return { ok: true, message: data.message ?? "Verification email sent." };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }, [user?.id]);
+
+  const emailVerified = Boolean(user?.emailVerified);
+
   const value = useMemo(
     () => ({
       user,
-      isAuthenticated: Boolean(user),
+      isAuthenticated: Boolean(user) || (!authReady && Boolean(getAuthToken())),
+      emailVerified,
       hasPassword,
       authReady,
       login,
@@ -166,9 +209,13 @@ export function AuthProvider({ children }) {
       deleteAccount,
       updateProfile,
       changePassword,
+      markPasswordUpdated,
+      verifyEmail,
+      resendVerificationEmail,
     }),
     [
       user,
+      emailVerified,
       hasPassword,
       authReady,
       login,
@@ -178,6 +225,9 @@ export function AuthProvider({ children }) {
       deleteAccount,
       updateProfile,
       changePassword,
+      markPasswordUpdated,
+      verifyEmail,
+      resendVerificationEmail,
     ]
   );
 

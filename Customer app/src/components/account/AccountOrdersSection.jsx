@@ -12,7 +12,6 @@ import {
   AccountCard,
   AccountEmptyState,
   AccountInput,
-  AccountSectionHeader,
   AccountStatusBadge,
   AccountTextarea,
 } from "./AccountUI";
@@ -564,14 +563,13 @@ export function AccountOrdersSection() {
 
   if (!currentOrders.length && !pastOrders.length) {
     return (
-      <div>
-        <AccountSectionHeader title="Order history" description="View and track your Saliah orders." />
+      <div className="account-section">
         <AccountCard>
           <AccountEmptyState
             title="No orders yet"
             description="When you place your first order, it will appear here with tracking and invoice options."
             actionLabel="Continue shopping"
-            actionHref="/products/all"
+            actionHref="/products"
           />
         </AccountCard>
       </div>
@@ -579,11 +577,7 @@ export function AccountOrdersSection() {
   }
 
   return (
-    <div className="space-y-8">
-      <AccountSectionHeader
-        title="Order history"
-        description="Track deliveries, download invoices, and reorder your favourites."
-      />
+    <div className="account-orders-section space-y-8">
       {feedback ? <AccountAlert type={feedback.type}>{feedback.message}</AccountAlert> : null}
 
       {currentOrders.length > 0 ? (

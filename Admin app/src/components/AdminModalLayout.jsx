@@ -48,6 +48,7 @@ export function AdminModalLayout({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-4 sm:px-5">
           <div className="min-w-0">

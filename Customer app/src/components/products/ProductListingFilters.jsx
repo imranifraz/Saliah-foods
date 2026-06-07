@@ -1,83 +1,130 @@
-import { useEffect, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useCallback, useEffect, useState } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
-function FilterDropdown({ label, value, options, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const selected = options.find((o) => o.value === value) ?? options[0];
-  const isActive = value !== options[0]?.value;
+function formatPrice(value) {
+  return `₹${value.toLocaleString("en-IN")}`;
+}
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onPointerDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [open]);
+function PriceRangeFilter({ bounds, value, onChange }) {
+  const { min, max, step } = bounds;
+  const [minValue, maxValue] = value;
+  const minGap = step;
+  const range = Math.max(max - min, step);
+  const fillLeft = ((minValue - min) / range) * 100;
+  const fillRight = 100 - ((maxValue - min) / range) * 100;
+
+  const handleMinChange = useCallback(
+    (nextMin) => {
+      const clamped = Math.min(nextMin, maxValue - minGap);
+      onChange([Math.max(min, clamped), maxValue]);
+    },
+    [maxValue, min, minGap, onChange]
+  );
+
+  const handleMaxChange = useCallback(
+    (nextMax) => {
+      const clamped = Math.max(nextMax, minValue + minGap);
+      onChange([minValue, Math.min(max, clamped)]);
+    },
+    [minValue, max, minGap, onChange]
+  );
 
   return (
-    <div ref={ref} className="relative shrink-0">
-      <button
-        type="button"
-        className={`inline-flex h-[34px] items-center gap-1.5 rounded-full px-3 font-body text-[11px] tracking-wide transition-colors duration-200 sm:text-[12px] ${
-          isActive
-            ? "bg-emerald-900/[0.07] text-emerald-900"
-            : "text-emerald-900/50 hover:bg-white/50 hover:text-emerald-900"
-        }`}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {value === options[0]?.value ? label : selected.label}
-        <svg
-          className={`h-3 w-3 text-emerald-900/30 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          viewBox="0 0 12 12"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          aria-hidden
-        >
-          <path d="M3 4.5 6 7.5 9 4.5" />
-        </svg>
-      </button>
+    <div className="plp-price-range" role="group" aria-labelledby="plp-price-range-label">
+      <div className="plp-price-range__values" id="plp-price-range-label">
+        <span>{formatPrice(minValue)}</span>
+        <span className="plp-price-range__dash" aria-hidden>
+          –
+        </span>
+        <span>{formatPrice(maxValue)}</span>
+      </div>
 
-      {open ? (
-        <motion.ul
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.18 }}
-          className="absolute left-0 top-[calc(100%+0.3rem)] z-50 min-w-[11rem] overflow-hidden rounded-lg border border-cream-200/90 bg-white py-1 shadow-[0_8px_24px_rgba(22,49,42,0.08)]"
-        >
-          {options.map((option) => (
-            <li key={option.value}>
-              <button
-                type="button"
-                className={`w-full px-3.5 py-2 text-left font-body text-[12px] transition-colors ${
-                  value === option.value
-                    ? "bg-emerald-900/[0.04] font-medium text-emerald-900"
-                    : "text-emerald-900/55 hover:bg-cream-50"
-                }`}
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-              >
-                {option.label}
-              </button>
-            </li>
-          ))}
-        </motion.ul>
-      ) : null}
+      <div className="plp-price-range__slider">
+        <div className="plp-price-range__track" aria-hidden>
+          <div
+            className="plp-price-range__fill"
+            style={{ left: `${fillLeft}%`, right: `${fillRight}%` }}
+          />
+        </div>
+
+        <input
+          type="range"
+          className="plp-price-range__input plp-price-range__input--min"
+          min={min}
+          max={max}
+          step={step}
+          value={minValue}
+          aria-label="Minimum price"
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={minValue}
+          aria-valuetext={formatPrice(minValue)}
+          onChange={(e) => handleMinChange(Number(e.target.value))}
+        />
+        <input
+          type="range"
+          className="plp-price-range__input plp-price-range__input--max"
+          min={min}
+          max={max}
+          step={step}
+          value={maxValue}
+          aria-label="Maximum price"
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={maxValue}
+          aria-valuetext={formatPrice(maxValue)}
+          onChange={(e) => handleMaxChange(Number(e.target.value))}
+        />
+      </div>
+
+      <div className="plp-price-range__limits" aria-hidden>
+        <span>{formatPrice(min)}</span>
+        <span>{formatPrice(max)}</span>
+      </div>
     </div>
   );
 }
 
-export function ProductListingFilterBar({
-  categoryPills = [{ id: "all", label: "All Products" }],
+function FilterOptionList({ options, value, onChange, name }) {
+  return (
+    <ul className="plp-filter-options" role="list">
+      {options.map((option) => {
+        const active = value === option.value;
+        const inputId = `${name}-${option.value}`;
+
+        return (
+          <li key={option.value}>
+            <label
+              htmlFor={inputId}
+              className={`plp-filter-option${active ? " plp-filter-option--active" : ""}`}
+            >
+              <input
+                id={inputId}
+                type="radio"
+                name={name}
+                className="sr-only"
+                checked={active}
+                onChange={() => onChange(option.value)}
+              />
+              <span className="plp-filter-option__marker" aria-hidden />
+              <span>{option.label}</span>
+            </label>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function FilterPanelContent({
+  categoryPills,
   activeCategory,
   onCategoryChange,
   filters,
   onFilterChange,
+  priceBounds,
+  priceRange,
+  onPriceRangeChange,
   sortBy,
   sortOptions,
   onSortChange,
@@ -86,67 +133,16 @@ export function ProductListingFilterBar({
   productCount,
   onClearFilters,
   hasActiveFilters,
-  isPinned = false,
-  filterRef,
 }) {
-  const reduce = useReducedMotion();
-
-  const barContent = (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 sm:gap-x-2">
-      {categoryPills.map((pill) => (
-        <button
-          key={pill.id}
-          type="button"
-          className={`h-[34px] rounded-full px-3.5 font-body text-[11px] tracking-wide transition-colors duration-200 sm:text-[12px] ${
-            activeCategory === pill.id
-              ? "bg-emerald-900 text-cream-50"
-              : "text-emerald-900/50 hover:bg-white/60 hover:text-emerald-900"
-          }`}
-          onClick={() => onCategoryChange(pill.id)}
-        >
-          {pill.label}
-        </button>
-      ))}
-
-      <span className="mx-1 hidden h-3.5 w-px bg-emerald-900/10 lg:block" aria-hidden />
-
-      <FilterDropdown
-        label="Price"
-        value={filters.price}
-        options={filters.priceOptions}
-        onChange={(v) => onFilterChange("price", v)}
-      />
-      <FilterDropdown
-        label="Benefits"
-        value={filters.benefits}
-        options={filters.benefitsOptions}
-        onChange={(v) => onFilterChange("benefits", v)}
-      />
-      <FilterDropdown
-        label="Packaging"
-        value={filters.packaging}
-        options={filters.packagingOptions}
-        onChange={(v) => onFilterChange("packaging", v)}
-      />
-      <FilterDropdown label="Sort" value={sortBy} options={sortOptions} onChange={onSortChange} />
-
-      {hasActiveFilters ? (
-        <button
-          type="button"
-          className="h-[34px] px-2 font-body text-[11px] text-emerald-800/55 underline underline-offset-2 hover:text-emerald-900 sm:text-[12px]"
-          onClick={onClearFilters}
-        >
-          Clear
-        </button>
-      ) : null}
-
-      <div className="flex w-full items-center gap-2.5 sm:ml-auto sm:w-auto">
-        <div className="relative min-w-0 flex-1 sm:w-[12rem] sm:flex-none md:w-[13.5rem]">
-          <label htmlFor="plp-search" className="sr-only">
-            Search products
-          </label>
+  return (
+    <div className="plp-filter-panel space-y-6">
+      <div>
+        <label htmlFor="plp-search-sidebar" className="plp-filter-group__title">
+          Search
+        </label>
+        <div className="relative mt-2">
           <svg
-            className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-emerald-900/25"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-900/30"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -157,32 +153,207 @@ export function ProductListingFilterBar({
             <path d="M20 20l-4-4" />
           </svg>
           <input
-            id="plp-search"
+            id="plp-search-sidebar"
             type="search"
             value={searchQuery}
-            placeholder="Search..."
-            className="h-[34px] w-full rounded-full border border-cream-200/70 bg-white/60 pl-9 pr-3.5 font-body text-[12px] text-emerald-900 placeholder:text-emerald-900/30 focus:border-emerald-900/12 focus:bg-white focus:outline-none"
+            placeholder="Search products..."
+            className="plp-filter-search"
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
-        <p className="shrink-0 font-body text-[11px] tracking-wide text-emerald-900/35 sm:text-[12px]">
-          {productCount} items
+      </div>
+
+      <div className="plp-filter-group">
+        <h3 className="plp-filter-group__title">Category</h3>
+        <ul className="plp-filter-categories" role="list">
+          {categoryPills.map((pill) => (
+            <li key={pill.id}>
+              <button
+                type="button"
+                className={`plp-filter-category${activeCategory === pill.id ? " plp-filter-category--active" : ""}`}
+                onClick={() => onCategoryChange(pill.id)}
+              >
+                {pill.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="plp-filter-group">
+        <h3 className="plp-filter-group__title">Price</h3>
+        <FilterOptionList
+          name="price"
+          options={filters.priceOptions}
+          value={filters.price === "custom" ? "" : filters.price}
+          onChange={(v) => onFilterChange("price", v)}
+        />
+        <p className="plp-filter-group__subtitle">Custom range</p>
+        <PriceRangeFilter bounds={priceBounds} value={priceRange} onChange={onPriceRangeChange} />
+      </div>
+
+      <div className="plp-filter-group">
+        <h3 className="plp-filter-group__title">Benefits</h3>
+        <FilterOptionList
+          name="benefits"
+          options={filters.benefitsOptions}
+          value={filters.benefits}
+          onChange={(v) => onFilterChange("benefits", v)}
+        />
+      </div>
+
+      <div className="plp-filter-group">
+        <h3 className="plp-filter-group__title">Packaging</h3>
+        <FilterOptionList
+          name="packaging"
+          options={filters.packagingOptions}
+          value={filters.packaging}
+          onChange={(v) => onFilterChange("packaging", v)}
+        />
+      </div>
+
+      <div className="plp-filter-group">
+        <h3 className="plp-filter-group__title">Availability</h3>
+        <FilterOptionList
+          name="availability"
+          options={filters.availabilityOptions}
+          value={filters.availability}
+          onChange={(v) => onFilterChange("availability", v)}
+        />
+      </div>
+
+      <div className="plp-filter-group">
+        <h3 className="plp-filter-group__title">Sort by</h3>
+        <FilterOptionList name="sort" options={sortOptions} value={sortBy} onChange={onSortChange} />
+      </div>
+
+      <div className="border-t border-cream-200/80 pt-4">
+        <p className="font-body text-sm text-emerald-900/50">
+          <span className="font-semibold text-emerald-900/75">{productCount}</span>{" "}
+          {productCount === 1 ? "product" : "products"}
         </p>
+        {hasActiveFilters ? (
+          <button type="button" className="plp-filter-clear mt-3" onClick={onClearFilters}>
+            Clear all filters
+          </button>
+        ) : null}
       </div>
     </div>
   );
+}
+
+export function ProductListingSidebar(props) {
+  const reduce = useReducedMotion();
 
   return (
-    <motion.div
-      ref={filterRef}
-      initial={reduce ? false : { opacity: 0 }}
-      animate={reduce ? undefined : { opacity: 1 }}
-      transition={{ duration: 0.3 }}
-      className={`plp-filter-bar border-b border-cream-200/70 py-1.5 ${
-        isPinned ? "plp-filter-bar--pinned fixed inset-x-0 top-[var(--site-header)] z-30 border-t py-1.5" : "relative mb-0"
-      }`}
-    >
-      <div className="mx-auto max-w-[1480px] px-4 sm:px-5 md:px-10">{barContent}</div>
-    </motion.div>
+    <aside className="plp-sidebar hidden lg:block" aria-label="Product filters">
+      <motion.div
+        initial={reduce ? false : { opacity: 0, x: -8 }}
+        animate={reduce ? undefined : { opacity: 1, x: 0 }}
+        transition={{ duration: 0.35 }}
+        className="plp-sidebar__inner"
+      >
+        <p className="plp-sidebar__heading">Filter & sort</p>
+        <FilterPanelContent {...props} />
+      </motion.div>
+    </aside>
+  );
+}
+
+export function ProductListingMobileFilters(props) {
+  const { productCount, hasActiveFilters, onClearFilters } = props;
+  const [open, setOpen] = useState(false);
+  const reduce = useReducedMotion();
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  return (
+    <div className="plp-mobile-filters lg:hidden">
+      <div className="plp-mobile-filters__bar">
+        <button
+          type="button"
+          className="plp-mobile-filters__trigger"
+          onClick={() => setOpen(true)}
+          aria-expanded={open}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <path d="M4 6h16M4 12h10M4 18h7" strokeLinecap="round" />
+          </svg>
+          Filters
+          {hasActiveFilters ? <span className="plp-mobile-filters__badge" aria-hidden /> : null}
+        </button>
+
+        <p className="plp-mobile-filters__count">
+          {productCount} {productCount === 1 ? "item" : "items"}
+        </p>
+      </div>
+
+      <AnimatePresence>
+        {open ? (
+          <>
+            <motion.button
+              type="button"
+              className="plp-mobile-filters__backdrop"
+              aria-label="Close filters"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Product filters"
+              className="plp-mobile-filters__drawer"
+              initial={reduce ? false : { x: "-100%" }}
+              animate={reduce ? undefined : { x: 0 }}
+              exit={reduce ? undefined : { x: "-100%" }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="plp-mobile-filters__drawer-header">
+                <h2 className="font-display text-lg text-emerald-900">Filters</h2>
+                <button
+                  type="button"
+                  className="plp-mobile-filters__close"
+                  aria-label="Close filters"
+                  onClick={() => setOpen(false)}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="plp-mobile-filters__drawer-body">
+                <FilterPanelContent
+                  {...props}
+                  onCategoryChange={(id) => {
+                    props.onCategoryChange(id);
+                  }}
+                />
+              </div>
+
+              <div className="plp-mobile-filters__drawer-footer">
+                {hasActiveFilters ? (
+                  <button type="button" className="plp-filter-clear" onClick={onClearFilters}>
+                    Clear all
+                  </button>
+                ) : null}
+                <button type="button" className="plp-mobile-filters__apply" onClick={() => setOpen(false)}>
+                  Show {productCount} {productCount === 1 ? "product" : "products"}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        ) : null}
+      </AnimatePresence>
+    </div>
   );
 }

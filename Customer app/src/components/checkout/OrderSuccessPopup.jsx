@@ -112,7 +112,7 @@ export function OrderSuccessPopup({ order, onClose }) {
               View my orders
             </Link>
             <Link
-              to="/products/all"
+              to="/products"
               className="order-success-popup__btn order-success-popup__btn--ghost"
               onClick={onClose}
             >

@@ -36,8 +36,12 @@ export function AuthPasswordField({
   placeholder,
   value,
   onChange,
+  onBlur,
 }) {
   const [visible, setVisible] = useState(false);
+  const describedBy = [hint && !error ? `${id}-hint` : null, error ? `${id}-error` : null]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className={className}>
@@ -51,11 +55,12 @@ export function AuthPasswordField({
           type={visible ? "text" : "password"}
           autoComplete={autoComplete}
           placeholder={placeholder}
-          className={`${authFieldInputClass} pr-11`}
+          className={`${authFieldInputClass} pr-11${error ? " border-red-300/80" : ""}`}
           value={value}
           onChange={onChange}
+          onBlur={onBlur}
           aria-invalid={Boolean(error)}
-          aria-describedby={hint ? `${id}-hint` : undefined}
+          aria-describedby={describedBy || undefined}
         />
         <button
           type="button"
@@ -74,7 +79,7 @@ export function AuthPasswordField({
         </p>
       ) : null}
       {error ? (
-        <p className="mt-1 font-body text-sm text-red-800/90" role="alert">
+        <p id={`${id}-error`} className="mt-1 font-body text-sm text-red-800/90" role="alert">
           {error}
         </p>
       ) : null}

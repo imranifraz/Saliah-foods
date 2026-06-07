@@ -2,14 +2,14 @@ import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useProfile } from "../../context/ProfileContext";
 import { formatAddressSummary } from "../../data/profile";
-import { getEmptyCheckoutForm, INDIAN_STATES, validateAddressForm } from "../../data/checkout";
+import { getEmptyCheckoutForm, INDIAN_STATES, DEFAULT_COUNTRY, validateAddressForm } from "../../data/checkout";
 import {
   AccountBtn,
   AccountCard,
   AccountEmptyState,
   AccountField,
   AccountInput,
-  AccountSectionHeader,
+  AccountPhoneInput,
   AccountSelect,
 } from "./AccountUI";
 import { ADDRESS_TYPE_OPTIONS } from "./accountUtils";
@@ -27,6 +27,7 @@ function AddressForm({ initial, onSubmit, onCancel, title }) {
     city: initial?.city ?? "",
     state: initial?.state ?? "",
     pincode: initial?.pincode ?? "",
+    country: initial?.country ?? DEFAULT_COUNTRY,
   });
   const [errors, setErrors] = useState({});
 
@@ -53,6 +54,7 @@ function AddressForm({ initial, onSubmit, onCancel, title }) {
       city: form.city.trim(),
       state: form.state,
       pincode: form.pincode.trim(),
+      country: form.country,
     });
   };
 
@@ -82,9 +84,8 @@ function AddressForm({ initial, onSubmit, onCancel, title }) {
           </AccountField>
 
           <AccountField id="phone" label="Phone" error={errors.phone}>
-            <AccountInput
+            <AccountPhoneInput
               id="phone"
-              type="tel"
               value={form.phone}
               onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
             />
@@ -117,6 +118,10 @@ function AddressForm({ initial, onSubmit, onCancel, title }) {
               value={form.pincode}
               onChange={(e) => updateField("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
             />
+          </AccountField>
+
+          <AccountField id="country" label="Country">
+            <AccountInput id="country" value={form.country} readOnly disabled aria-readonly="true" />
           </AccountField>
         </div>
 
@@ -152,18 +157,14 @@ export function AccountAddressesSection() {
   };
 
   return (
-    <div>
-      <AccountSectionHeader
-        title="Saved addresses"
-        description="Manage delivery locations for faster checkout across India."
-        action={
-          mode !== "add" && !editingAddress ? (
-            <AccountBtn variant="primary" onClick={() => setMode("add")} disabled={loading}>
-              Add new address
-            </AccountBtn>
-          ) : null
-        }
-      />
+    <div className="account-section">
+      {mode !== "add" && !editingAddress ? (
+        <div className="mb-4 flex justify-end">
+          <AccountBtn variant="primary" onClick={() => setMode("add")} disabled={loading}>
+            Add new address
+          </AccountBtn>
+        </div>
+      ) : null}
 
       {error ? (
         <p className="mb-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 font-body text-sm text-amber-900/80">

@@ -57,7 +57,11 @@ export function setAuthToken(token) {
 }
 
 export async function apiFetch(path, options = {}) {
-  const headers = { "Content-Type": "application/json", ...options.headers };
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const headers = {
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    ...options.headers,
+  };
   const token = getAuthToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -76,6 +80,7 @@ export async function apiFetch(path, options = {}) {
     const err = new Error(data.error ?? "Request failed");
     err.status = res.status;
     err.errors = data.errors;
+    if (data.retryAfterSeconds != null) err.retryAfterSeconds = data.retryAfterSeconds;
     throw err;
   }
 

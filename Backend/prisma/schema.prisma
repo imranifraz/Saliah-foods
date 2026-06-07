@@ -49,10 +49,10 @@ model User {
   email        String   @unique
   phone        String   @default("")
   passwordHash String?
-  dateOfBirth  String   @default("")
-  profileNote  String   @default("")
   provider     String?
   providerId   String?
+  emailVerifiedAt DateTime?
+  avatarUrl      String   @default("")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -62,6 +62,19 @@ model User {
   wishlistItems     WishlistItem[]
   notificationPrefs NotificationPrefs?
   notifications     Notification[]
+  emailVerificationTokens EmailVerificationToken[]
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model AdminRefreshToken {
@@ -106,6 +119,7 @@ model Address {
   city         String
   state        String
   pincode      String
+  country      String   @default("India")
   isDefault    Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

@@ -58,7 +58,7 @@ export function CartDrawer() {
                   Add premium dates and wellness favourites to get started.
                 </p>
                 <Link
-                  to="/products/all"
+                  to="/products"
                   className="mt-6 rounded-full gradient-gold-premium px-6 py-3 font-body text-[10px] font-semibold uppercase tracking-[0.18em] text-white"
                   onClick={closeCart}
                 >

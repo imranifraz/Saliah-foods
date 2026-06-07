@@ -42,6 +42,7 @@ router.post("/", async (req, res, next) => {
         city: data.city,
         state: data.state,
         pincode: data.pincode,
+        country: data.country?.trim() || "India",
         isDefault,
       },
     });
@@ -96,6 +97,7 @@ router.patch("/:id", async (req, res, next) => {
         city: req.body.city ?? existing.city,
         state: req.body.state ?? existing.state,
         pincode: req.body.pincode ?? existing.pincode,
+        country: req.body.country?.trim() || existing.country || "India",
       },
     });
 

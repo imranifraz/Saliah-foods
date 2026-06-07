@@ -1,53 +1,31 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { productMenuCategories } from "../data/productMenu.js";
-import { getAllCatalogProducts } from "../data/productCatalog.js";
-import {
-  buildCategoryPills,
-  buildMenuCategories,
-  buildShopCategories,
-  fetchCatalog,
-} from "../services/catalogApi.js";
+import { fetchCatalog } from "../services/catalogApi.js";
 
 const CatalogContext = createContext(null);
 
-function buildStaticCatalog() {
-  const products = getAllCatalogProducts();
-  const categories = productMenuCategories.map((c) => ({
-    id: c.id,
-    label: c.label,
-    description: c.description,
-    image: c.featuredPromo?.image ?? "",
-    featuredPromo: c.featuredPromo ?? null,
-  }));
-
-  return {
-    categories,
-    products,
-    menuCategories: productMenuCategories,
-    categoryPills: buildCategoryPills(categories),
-    shopCategories: buildShopCategories(
-      categories,
-      Object.fromEntries(
-        categories.map((c) => [c.id, products.filter((p) => p.categoryId === c.id)])
-      )
-    ),
-    fromApi: false,
-  };
-}
+const EMPTY_CATALOG = {
+  categories: [],
+  products: [],
+  menuCategories: [],
+  categoryPills: [{ id: "all", label: "All Products" }],
+  shopCategories: [],
+  fromApi: false,
+};
 
 export function CatalogProvider({ children }) {
   const [catalog, setCatalog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const refreshCatalog = useCallback(async () => {
+  const refreshCatalog = useCallback(async ({ showLoading = false } = {}) => {
+    if (showLoading) setLoading(true);
     try {
       const data = await fetchCatalog();
       setCatalog({ ...data, fromApi: true });
       setError("");
     } catch (e) {
-      setCatalog((prev) => prev ?? buildStaticCatalog());
-      setError(e.message);
+      setCatalog((prev) => (prev?.fromApi ? prev : EMPTY_CATALOG));
+      setError(e.message ?? "Could not load products.");
     } finally {
       setLoading(false);
     }
@@ -65,8 +43,8 @@ export function CatalogProvider({ children }) {
         }
       } catch (e) {
         if (!cancelled) {
-          setCatalog((prev) => prev ?? buildStaticCatalog());
-          setError(e.message);
+          setCatalog(EMPTY_CATALOG);
+          setError(e.message ?? "Could not load products.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -107,7 +85,7 @@ export function CatalogProvider({ children }) {
           label: "All Products",
           description:
             "Discover our complete range of premium dates, wellness foods, and customer favourites.",
-          viewAllHref: "/products/all",
+          viewAllHref: "/products",
           products: [],
         };
       }
@@ -152,14 +130,15 @@ export function CatalogProvider({ children }) {
       categories: catalog?.categories ?? [],
       products: catalog?.products ?? [],
       menuCategories: catalog?.menuCategories ?? [],
-      categoryPills: catalog?.categoryPills ?? [{ id: "all", label: "All Products" }],
+      categoryPills: catalog?.categoryPills ?? EMPTY_CATALOG.categoryPills,
       shopCategories: catalog?.shopCategories ?? [],
       getCategoryById,
       getProductsForCategory,
       getProductBySlug,
       getRelatedProducts,
+      refreshCatalog,
     }),
-    [catalog, loading, error, getCategoryById, getProductsForCategory, getProductBySlug, getRelatedProducts]
+    [catalog, loading, error, getCategoryById, getProductsForCategory, getProductBySlug, getRelatedProducts, refreshCatalog]
   );
 
   return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;

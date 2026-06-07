@@ -171,15 +171,57 @@ export const SORT_OPTIONS = [
   { value: "rating", label: "Customer Rating" },
 ];
 
+export function getPriceRangeForPreset(preset, bounds) {
+  const { min, max } = bounds;
+
+  switch (preset) {
+    case "under-500":
+      return [min, Math.min(500, max)];
+    case "500-1000":
+      return [Math.max(min, 500), Math.min(1000, max)];
+    case "1000-plus":
+      return [Math.max(min, 1000), max];
+    case "all":
+    default:
+      return [min, max];
+  }
+}
+
+export function getPricePresetForRange([rangeMin, rangeMax], bounds) {
+  const presets = FILTER_OPTIONS.price.map((option) => option.value);
+
+  for (const preset of presets) {
+    const [presetMin, presetMax] = getPriceRangeForPreset(preset, bounds);
+    if (rangeMin === presetMin && rangeMax === presetMax) {
+      return preset;
+    }
+  }
+
+  return "custom";
+}
+
+export function getProductPriceBounds(products, step = 50) {
+  if (!products?.length) {
+    return { min: 0, max: 2000, step };
+  }
+
+  const prices = products.map((product) => product.priceValue ?? 0);
+  const rawMin = Math.min(...prices);
+  const rawMax = Math.max(...prices);
+  const min = Math.floor(rawMin / step) * step;
+  let max = Math.ceil(rawMax / step) * step;
+  if (max <= min) max = min + step;
+
+  return { min, max, step };
+}
+
 export function filterProducts(products, filters) {
   return products.filter((product) => {
     if (filters.category !== "all" && product.categoryId !== filters.category) return false;
 
-    if (filters.price !== "all") {
+    if (filters.priceMin != null && filters.priceMax != null) {
       const p = product.priceValue;
-      if (filters.price === "under-500" && p >= 500) return false;
-      if (filters.price === "500-1000" && (p < 500 || p > 1000)) return false;
-      if (filters.price === "1000-plus" && p < 1000) return false;
+      if (p < filters.priceMin || p > filters.priceMax) return false;
     }
 
     if (filters.benefits !== "all" && !product.benefits.includes(filters.benefits)) return false;

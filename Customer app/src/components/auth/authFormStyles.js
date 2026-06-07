@@ -28,6 +28,9 @@ export const authFooterLinkClass =
 export const authErrorBannerClass =
   "rounded-lg border border-red-200/80 bg-red-50/80 px-3.5 py-2.5 font-body text-sm leading-snug text-red-800/90";
 
+export const authSuccessBannerClass =
+  "rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-3.5 py-2.5 font-body text-sm leading-snug text-emerald-900/90";
+
 export const authFooterClass =
   "mt-5 border-t border-cream-200/70 pt-4 text-center font-body text-sm text-emerald-900/50";
 

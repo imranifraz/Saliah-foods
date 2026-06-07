@@ -29,7 +29,8 @@ export function saveProfileAddresses(userId, addresses) {
 
 export function formatAddressSummary(address) {
   const line2 = address.addressLine2 ? `, ${address.addressLine2}` : "";
-  return `${address.addressLine1}${line2}, ${address.city}, ${address.state} ${address.pincode}`;
+  const country = address.country?.trim() || "India";
+  return `${address.addressLine1}${line2}, ${address.city}, ${address.state} ${address.pincode}, ${country}`;
 }
 
 export function addressToCheckoutCustomer(address, paymentMethod) {
@@ -42,6 +43,7 @@ export function addressToCheckoutCustomer(address, paymentMethod) {
     city: address.city,
     state: address.state,
     pincode: address.pincode,
+    country: address.country ?? "India",
     paymentMethod,
     savedAddressId: address.id,
     addressLabel: address.label,
@@ -63,6 +65,7 @@ export function buildAddressFromUser(user) {
     city: "",
     state: "",
     pincode: "",
+    country: "India",
     isDefault: true,
   };
 }

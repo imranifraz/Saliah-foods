@@ -16,11 +16,31 @@ export function customerPublicAssetsDir() {
     return path.resolve(fromEnv);
   }
 
-  const candidate = path.resolve(repoRootDir(), "Customer app/public/assets");
-  if (fs.existsSync(candidate)) {
-    return candidate;
+  const root = repoRootDir();
+  const candidates = [
+    path.resolve(root, "Customer app/public/assets"),
+    path.resolve(root, "Customer app/public/assets-1"),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
   }
 
-  // Legacy fallback (incorrect nested path — kept only if someone copied assets there)
-  return path.resolve(__dirname, "../../Customer app/public/assets");
+  return candidates[0];
+}
+
+/** All known customer asset directories, newest first. */
+export function customerPublicAssetsDirs() {
+  const fromEnv = process.env.CUSTOMER_ASSETS_DIR?.trim();
+  if (fromEnv && fs.existsSync(fromEnv)) {
+    return [path.resolve(fromEnv)];
+  }
+
+  const root = repoRootDir();
+  return [
+    path.resolve(root, "Customer app/public/assets"),
+    path.resolve(root, "Customer app/public/assets-1"),
+  ].filter((dir) => fs.existsSync(dir));
 }

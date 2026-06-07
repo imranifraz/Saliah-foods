@@ -5,6 +5,7 @@ import { PageMeta } from "../components/pages/PageMeta";
 import { CheckoutAddressSection } from "../components/checkout/CheckoutAddressSection";
 import { CheckoutOrderSummary } from "../components/checkout/CheckoutOrderSummary";
 import { OrderSuccessPopup } from "../components/checkout/OrderSuccessPopup";
+import { EmailVerificationBanner } from "../components/auth/EmailVerificationBanner";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useOrders } from "../context/OrdersContext";
@@ -29,7 +30,7 @@ import {
 export function CheckoutPage() {
   const navigate = useNavigate();
   const reduce = useReducedMotion();
-  const { user } = useAuth();
+  const { user, emailVerified, resendVerificationEmail } = useAuth();
   const { items, subtotal, clearCart, closeCart } = useCart();
   const { addOrder } = useOrders();
   const { addresses, defaultAddress, addAddress, loading: addressesLoading } = useProfile();
@@ -85,7 +86,7 @@ export function CheckoutPage() {
   }, []);
 
   if (items.length === 0 && !completedOrder) {
-    return <Navigate to="/products/all" replace />;
+    return <Navigate to="/products" replace />;
   }
 
   if (!user && !completedOrder) {
@@ -99,6 +100,12 @@ export function CheckoutPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (!emailVerified) {
+      setErrors({ submit: "Verify your email before placing an order." });
+      return;
+    }
+
     const nextErrors = {};
 
     if (addressMode === "saved") {
@@ -246,7 +253,7 @@ export function CheckoutPage() {
         <PageMeta title="Order confirmed" description="Your Saliah Foods order has been placed successfully." />
         <OrderSuccessPopup
           order={completedOrder}
-          onClose={() => navigate("/products/all", { replace: true })}
+          onClose={() => navigate("/products", { replace: true })}
         />
       </>
     );
@@ -284,6 +291,15 @@ export function CheckoutPage() {
                   : "Online payment is not available yet."}
             </p>
           </motion.header>
+
+          {!emailVerified && user?.email ? (
+            <EmailVerificationBanner
+              email={user.email}
+              onResend={resendVerificationEmail}
+              className="mt-6"
+              compact
+            />
+          ) : null}
 
           <form onSubmit={handleSubmit} className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px] lg:items-start lg:gap-10">
             <div className="space-y-6">
@@ -332,18 +348,20 @@ export function CheckoutPage() {
 
               <motion.button
                 type="submit"
-                disabled={submitting || (!razorpayConfigured && !testPaymentsAllowed)}
+                disabled={submitting || !emailVerified || (!razorpayConfigured && !testPaymentsAllowed)}
                 className="pdp-btn-primary w-full rounded-full py-4 font-body text-[11px] font-semibold uppercase tracking-[0.2em] text-white disabled:opacity-60 sm:w-auto sm:px-12"
                 whileHover={reduce || submitting ? undefined : { y: -2 }}
                 whileTap={reduce || submitting ? undefined : { scale: 0.985 }}
               >
                 {submitting
                   ? "Processing payment…"
-                  : razorpayConfigured
-                    ? "Pay with Razorpay"
-                    : testPaymentsAllowed
-                      ? "Pay online (test)"
-                      : "Payment unavailable"}
+                  : !emailVerified
+                    ? "Verify email to pay"
+                    : razorpayConfigured
+                      ? "Pay with Razorpay"
+                      : testPaymentsAllowed
+                        ? "Pay online (test)"
+                        : "Payment unavailable"}
               </motion.button>
             </div>
 

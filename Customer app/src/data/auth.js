@@ -59,16 +59,41 @@ export function validateLoginForm({ email, password }) {
   return errors;
 }
 
-export function validateRegisterForm({ fullName, email, phone, password, confirmPassword }) {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^[6-9]\d{9}$/;
+
+export function validateRegisterField(name, { fullName, email, phone, password, confirmPassword }) {
+  switch (name) {
+    case "fullName":
+      if (!fullName?.trim()) return "Full name is required";
+      return undefined;
+    case "email":
+      if (!email?.trim()) return "Email is required";
+      if (!EMAIL_RE.test(email.trim())) return "Enter a valid email";
+      return undefined;
+    case "phone":
+      if (!phone?.trim()) return "Phone number is required";
+      if (!PHONE_RE.test(phone.replace(/\s/g, ""))) return "Enter a valid 10-digit mobile number";
+      return undefined;
+    case "password":
+      if (!password) return "Password is required";
+      if (password.length < 8) return "Password must be at least 8 characters";
+      return undefined;
+    case "confirmPassword":
+      if (!confirmPassword) return "Please confirm your password";
+      if (password !== confirmPassword) return "Passwords do not match";
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
+export function validateRegisterForm(form) {
   const errors = {};
-  if (!fullName.trim()) errors.fullName = "Full name is required";
-  if (!email.trim()) errors.email = "Email is required";
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Enter a valid email";
-  if (!phone.trim()) errors.phone = "Phone number is required";
-  else if (!/^[6-9]\d{9}$/.test(phone.replace(/\s/g, ""))) errors.phone = "Enter a valid 10-digit mobile number";
-  if (!password) errors.password = "Password is required";
-  else if (password.length < 6) errors.password = "Password must be at least 6 characters";
-  if (password !== confirmPassword) errors.confirmPassword = "Passwords do not match";
+  for (const name of ["fullName", "email", "phone", "password", "confirmPassword"]) {
+    const message = validateRegisterField(name, form);
+    if (message) errors[name] = message;
+  }
   return errors;
 }
 
@@ -106,8 +131,6 @@ export function updateUserRecord(userId, updates) {
     fullName: updates.fullName?.trim() ?? users[index].fullName,
     email: nextEmail ?? users[index].email,
     phone: updates.phone?.trim() ?? users[index].phone,
-    dateOfBirth: updates.dateOfBirth !== undefined ? updates.dateOfBirth : users[index].dateOfBirth,
-    profileNote: updates.profileNote !== undefined ? updates.profileNote?.trim() ?? "" : users[index].profileNote,
   };
 
   users[index] = updated;
@@ -118,8 +141,6 @@ export function updateUserRecord(userId, updates) {
     fullName: updated.fullName,
     email: updated.email,
     phone: updated.phone,
-    dateOfBirth: updated.dateOfBirth ?? "",
-    profileNote: updated.profileNote ?? "",
     provider: updated.provider,
   };
 
@@ -137,8 +158,8 @@ export function changeUserPassword(userId, { currentPassword, newPassword }) {
     if (user.password !== currentPassword) return { ok: false, error: "Current password is incorrect" };
   }
 
-  if (!newPassword || newPassword.length < 6) {
-    return { ok: false, error: "New password must be at least 6 characters" };
+  if (!newPassword || newPassword.length < 8) {
+    return { ok: false, error: "New password must be at least 8 characters" };
   }
 
   users[index] = { ...user, password: newPassword };
@@ -160,7 +181,19 @@ export function validateChangePasswordForm({ currentPassword, newPassword, confi
   const errors = {};
   if (hasPassword && !currentPassword) errors.currentPassword = "Current password is required";
   if (!newPassword) errors.newPassword = "New password is required";
-  else if (newPassword.length < 6) errors.newPassword = "Password must be at least 6 characters";
+  else if (newPassword.length < 8) errors.newPassword = "Password must be at least 8 characters";
+  if (newPassword !== confirmPassword) errors.confirmPassword = "Passwords do not match";
+  return errors;
+}
+
+export function validateOtpResetPasswordForm({ otp, newPassword, confirmPassword }) {
+  const errors = {};
+  if (!otp?.trim()) errors.otp = "Verification code is required";
+  else if (!/^\d{6}$/.test(otp.trim())) errors.otp = "Enter the 6-digit verification code";
+  if (!newPassword) errors.newPassword = "New password is required";
+  else if (newPassword.length < 8) errors.newPassword = "Password must be at least 8 characters";
+  else if (!/[A-Za-z]/.test(newPassword)) errors.newPassword = "Password must include at least one letter";
+  else if (!/\d/.test(newPassword)) errors.newPassword = "Password must include at least one number";
   if (newPassword !== confirmPassword) errors.confirmPassword = "Passwords do not match";
   return errors;
 }
@@ -176,8 +209,6 @@ export function upsertSocialUser({ provider, fullName, email, phone, providerId 
       fullName: existing.fullName,
       email: existing.email,
       phone: existing.phone ?? phone ?? "",
-      dateOfBirth: existing.dateOfBirth ?? "",
-      profileNote: existing.profileNote ?? "",
       provider: existing.provider ?? provider,
     };
     return { ok: true, user: session };
@@ -189,8 +220,6 @@ export function upsertSocialUser({ provider, fullName, email, phone, providerId 
     email: normalizedEmail,
     phone: phone?.trim() ?? "",
     password: null,
-    dateOfBirth: "",
-    profileNote: "",
     provider,
     providerId: providerId ?? null,
   };
@@ -202,8 +231,6 @@ export function upsertSocialUser({ provider, fullName, email, phone, providerId 
     fullName: newUser.fullName,
     email: newUser.email,
     phone: newUser.phone,
-    dateOfBirth: "",
-    profileNote: "",
     provider,
   };
 

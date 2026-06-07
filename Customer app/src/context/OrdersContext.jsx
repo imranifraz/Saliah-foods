@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { useNotifications } from "./NotificationsContext";
+import { useNotifications } from "./notificationsCtx.js";
 import { isActiveOrder } from "../data/orders";
 import { cancelOrderApi, fetchOrdersApi } from "../services/orderApi.js";
 import { fetchMyReviewItemsApi, submitReviewApi } from "../services/reviewApi.js";

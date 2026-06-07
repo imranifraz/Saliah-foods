@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./AuthContext";
+import { NotificationsContext } from "./notificationsCtx.js";
 import { DEFAULT_NOTIFICATION_PREFS } from "../data/notifications";
 import {
   dismissNotificationsApi,
@@ -9,7 +10,7 @@ import {
   updateNotificationPrefsApi,
 } from "../services/notificationApi";
 
-const NotificationsContext = createContext(null);
+export { useNotifications } from "./notificationsCtx.js";
 
 export function NotificationsProvider({ children }) {
   const { user } = useAuth();
@@ -151,10 +152,4 @@ export function NotificationsProvider({ children }) {
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
-}
-
-export function useNotifications() {
-  const context = useContext(NotificationsContext);
-  if (!context) throw new Error("useNotifications must be used within NotificationsProvider");
-  return context;
 }

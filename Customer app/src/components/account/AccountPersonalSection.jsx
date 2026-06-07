@@ -1,46 +1,141 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { validateProfileForm } from "../../data/auth";
+import { uploadProfileAvatarApi } from "../../services/authApi.js";
+import { formatMemberSince, formatSignInMethod } from "./accountUtils";
 import {
   AccountAlert,
   AccountBtn,
   AccountCard,
   AccountField,
   AccountInput,
-  AccountSectionHeader,
-  AccountTextarea,
+  AccountPhoneInput,
 } from "./AccountUI";
+import { AccountDeleteSection } from "./AccountDeleteSection";
+import { AccountProfileAvatar } from "./AccountProfileAvatar";
+import { AccountProfilePhotoUpload } from "./AccountProfilePhotoUpload";
 
-export function AccountPersonalSection() {
-  const navigate = useNavigate();
-  const { user, updateProfile, deleteAccount } = useAuth();
-  const [form, setForm] = useState({
+function profileFromUser(user) {
+  return {
     fullName: user?.fullName ?? "",
     email: user?.email ?? "",
     phone: user?.phone ?? "",
-    dateOfBirth: user?.dateOfBirth ?? "",
-    profileNote: user?.profileNote ?? "",
-  });
+  };
+}
+
+function AccountProfileSummary({ user }) {
+  return (
+    <div className="account-profile-summary">
+      <AccountProfileAvatar name={user?.fullName} avatarUrl={user?.avatarUrl} size="lg" />
+      <div className="account-profile-summary__body">
+        <p className="account-profile-summary__name">{user?.fullName || "Your profile"}</p>
+        {user?.email ? <p className="account-profile-summary__line">{user.email}</p> : null}
+        {user?.phone ? <p className="account-profile-summary__line">+91 {user.phone}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function AccountProfileMeta({ user, emailVerified }) {
+  return (
+    <div className="account-profile-meta">
+      <div className="account-profile-meta__item">
+        <p className="account-profile-meta__label">Member since</p>
+        <p className="account-profile-meta__value">{formatMemberSince(user?.createdAt)}</p>
+      </div>
+      <div className="account-profile-meta__item">
+        <p className="account-profile-meta__label">Email status</p>
+        <p className="account-profile-meta__value">
+          {emailVerified ? (
+            <span className="account-profile-meta__badge account-profile-meta__badge--verified">Verified</span>
+          ) : (
+            <span className="account-profile-meta__badge account-profile-meta__badge--pending">Not verified</span>
+          )}
+        </p>
+      </div>
+      <div className="account-profile-meta__item">
+        <p className="account-profile-meta__label">Sign-in method</p>
+        <p className="account-profile-meta__value">{formatSignInMethod(user?.provider)}</p>
+      </div>
+    </div>
+  );
+}
+
+export function AccountPersonalSection() {
+  const { user, updateProfile, emailVerified, hasPassword } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(() => profileFromUser(user));
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const [photoError, setPhotoError] = useState("");
 
-  const initials = (form.fullName || "S")
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  useEffect(() => {
+    if (!editing) {
+      setForm(profileFromUser(user));
+    }
+  }, [user, editing]);
 
   const update = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
     setMessage("");
     setError("");
+  };
+
+  const startEdit = () => {
+    setForm(profileFromUser(user));
+    setErrors({});
+    setMessage("");
+    setError("");
+    setPhotoError("");
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setForm(profileFromUser(user));
+    setErrors({});
+    setError("");
+    setPhotoError("");
+    setEditing(false);
+  };
+
+  const handleAvatarUpload = async (file) => {
+    setPhotoError("");
+    setAvatarUploading(true);
+    try {
+      const upload = await uploadProfileAvatarApi(file);
+      const result = await updateProfile({ avatarUrl: upload.url });
+      if (!result.ok) {
+        setPhotoError(result.error);
+        return;
+      }
+      setMessage("Profile photo updated.");
+    } catch (err) {
+      setPhotoError(err.message ?? "Could not upload profile photo");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    setPhotoError("");
+    setAvatarUploading(true);
+    try {
+      const result = await updateProfile({ avatarUrl: "" });
+      if (!result.ok) {
+        setPhotoError(result.error);
+        return;
+      }
+      setMessage("Profile photo removed.");
+    } catch (err) {
+      setPhotoError(err.message ?? "Could not remove profile photo");
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -58,144 +153,112 @@ export function AccountPersonalSection() {
       return;
     }
     setMessage("Your profile has been updated.");
-  };
-
-  const handleDeleteAccount = async () => {
-    setDeleteError("");
-    const result = await deleteAccount();
-    if (!result.ok) {
-      setDeleteError(result.error ?? "Could not delete your account. Please try again.");
-      return;
-    }
-    navigate("/", { replace: true });
+    setEditing(false);
   };
 
   return (
-    <div>
-      <AccountSectionHeader
-        title="Personal details"
-        description="Manage your contact information for orders, delivery updates, and account security."
-      />
-
-      <div className="account-summary mb-6">
-        <div className="flex items-center gap-4">
-          <span className="account-summary__avatar" aria-hidden>{initials}</span>
-          <div>
-            <p className="font-display text-lg text-emerald-900">{form.fullName || "Your profile"}</p>
-            <p className="mt-1 font-body text-sm text-emerald-900/50">{form.email}</p>
-            {form.phone ? (
-              <p className="mt-0.5 font-body text-xs text-emerald-900/40">+91 {form.phone}</p>
-            ) : null}
-          </div>
-        </div>
-        <p className="font-body text-[11px] uppercase tracking-[0.14em] text-emerald-900/35">
-          Saliah member
-        </p>
-      </div>
-
+    <div className="account-section">
       <AccountCard>
-        <form onSubmit={handleSubmit}>
-          <div className="account-form-grid">
-            <AccountField id="profile-name" label="Full name" error={errors.fullName} className="account-field--full sm:col-span-2">
-              <AccountInput
-                id="profile-name"
-                value={form.fullName}
-                onChange={(e) => update("fullName", e.target.value)}
-                autoComplete="name"
-              />
-            </AccountField>
-
-            <AccountField id="profile-email" label="Email address" error={errors.email}>
-              <AccountInput
-                id="profile-email"
-                type="email"
-                value={form.email}
-                onChange={(e) => update("email", e.target.value)}
-                autoComplete="email"
-              />
-            </AccountField>
-
-            <AccountField id="profile-phone" label="Mobile number" error={errors.phone}>
-              <AccountInput
-                id="profile-phone"
-                type="tel"
-                value={form.phone}
-                onChange={(e) => update("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
-                autoComplete="tel"
-                placeholder="10-digit mobile"
-              />
-            </AccountField>
-
-            <AccountField id="profile-dob" label="Date of birth" error={errors.dateOfBirth}>
-              <AccountInput
-                id="profile-dob"
-                type="date"
-                value={form.dateOfBirth}
-                onChange={(e) => update("dateOfBirth", e.target.value)}
-              />
-            </AccountField>
-
-            <AccountField id="profile-note" label="About you (optional)" className="account-field--full sm:col-span-2">
-              <AccountTextarea
-                id="profile-note"
-                value={form.profileNote}
-                onChange={(e) => update("profileNote", e.target.value)}
-                placeholder="Dietary preferences, gifting notes, or delivery instructions"
-                maxLength={280}
-              />
-            </AccountField>
-          </div>
-
-          <div className="mt-6 space-y-3">
-            {error ? <AccountAlert type="error">{error}</AccountAlert> : null}
-            {message ? <AccountAlert type="success">{message}</AccountAlert> : null}
-            <AccountBtn variant="primary" type="submit" className="w-full sm:w-auto">
-              Save changes
-            </AccountBtn>
-          </div>
-        </form>
-      </AccountCard>
-
-      <AccountCard className="account-danger-zone mt-6">
-        <h3 className="font-display text-base text-emerald-900">Delete account</h3>
-        <p className="mt-1.5 font-body text-sm leading-relaxed text-emerald-900/50">
-          Permanently remove your Saliah account, saved addresses, orders, and wishlist from this device. This cannot
-          be undone.
-        </p>
-
-        {deleteError ? (
-          <div className="mt-4">
-            <AccountAlert type="error">{deleteError}</AccountAlert>
-          </div>
-        ) : null}
-
-        {confirmDelete ? (
-          <div className="mt-4 rounded-xl border border-red-100/80 bg-red-50/30 p-4">
-            <p className="font-body text-sm text-red-900/75">
-              Are you sure? You will be signed out and all account data on this device will be deleted.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <AccountBtn variant="danger" className="account-btn--sm" onClick={handleDeleteAccount}>
-                Yes, delete my account
-              </AccountBtn>
-              <AccountBtn
-                variant="ghost"
-                className="account-btn--sm"
-                onClick={() => {
-                  setConfirmDelete(false);
-                  setDeleteError("");
-                }}
-              >
-                Cancel
+        {!editing ? (
+          <>
+            <div className="account-profile-view-header">
+              <p className="account-profile-view-header__title">Your Saliah account details</p>
+              <AccountBtn variant="ghost" type="button" className="account-btn--sm" onClick={startEdit}>
+                Edit profile
               </AccountBtn>
             </div>
-          </div>
+
+            <AccountProfileSummary user={user} />
+
+            <AccountProfileMeta user={user} emailVerified={emailVerified} />
+
+            {!emailVerified ? (
+              <p className="mt-4 font-body text-sm text-emerald-900/50">
+                Verify your email to unlock checkout.{" "}
+                <Link to="/verify-email" className="font-medium text-emerald-800 underline-offset-2 hover:underline">
+                  Resend verification
+                </Link>
+              </p>
+            ) : null}
+
+            {!hasPassword && user?.provider && user.provider !== "local" ? (
+              <p className="mt-4 font-body text-sm text-emerald-900/50">
+                Add a password for email sign-in in{" "}
+                <Link to="/account?tab=password" className="font-medium text-emerald-800 underline-offset-2 hover:underline">
+                  Password & security
+                </Link>
+                .
+              </p>
+            ) : null}
+
+            {message ? (
+              <div className="mt-6">
+                <AccountAlert type="success">{message}</AccountAlert>
+              </div>
+            ) : null}
+          </>
         ) : (
-          <AccountBtn variant="danger" className="account-btn--sm mt-4" onClick={() => setConfirmDelete(true)}>
-            Delete account
-          </AccountBtn>
+          <form onSubmit={handleSubmit}>
+            <AccountProfilePhotoUpload
+              name={user?.fullName}
+              avatarUrl={user?.avatarUrl}
+              uploading={avatarUploading}
+              disabled={saving}
+              onUpload={handleAvatarUpload}
+              onRemove={handleAvatarRemove}
+            />
+            {photoError ? (
+              <div className="mb-4">
+                <AccountAlert type="error">{photoError}</AccountAlert>
+              </div>
+            ) : null}
+
+            <div className="account-form-grid">
+              <AccountField id="profile-name" label="Full name" error={errors.fullName} className="account-field--full sm:col-span-2">
+                <AccountInput
+                  id="profile-name"
+                  value={form.fullName}
+                  onChange={(e) => update("fullName", e.target.value)}
+                  autoComplete="name"
+                />
+              </AccountField>
+
+              <AccountField id="profile-email" label="Email address" error={errors.email}>
+                <AccountInput
+                  id="profile-email"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => update("email", e.target.value)}
+                  autoComplete="email"
+                />
+              </AccountField>
+
+              <AccountField id="profile-phone" label="Mobile number" error={errors.phone}>
+                <AccountPhoneInput
+                  id="profile-phone"
+                  value={form.phone}
+                  error={errors.phone}
+                  onChange={(e) => update("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                />
+              </AccountField>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {error ? <AccountAlert type="error">{error}</AccountAlert> : null}
+              <div className="flex flex-wrap gap-3">
+                <AccountBtn variant="primary" type="submit" className="w-full sm:w-auto" disabled={saving || avatarUploading}>
+                  {saving ? "Saving..." : "Save changes"}
+                </AccountBtn>
+                <AccountBtn variant="ghost" type="button" className="w-full sm:w-auto" onClick={cancelEdit} disabled={saving || avatarUploading}>
+                  Cancel
+                </AccountBtn>
+              </div>
+            </div>
+          </form>
         )}
       </AccountCard>
+
+      <AccountDeleteSection className="mt-6" />
     </div>
   );
 }

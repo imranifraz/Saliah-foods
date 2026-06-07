@@ -46,6 +46,15 @@ export async function updateProfileApi(body) {
   });
 }
 
+export async function uploadProfileAvatarApi(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+  return apiFetch("/api/auth/upload-avatar", {
+    method: "POST",
+    body: formData,
+  });
+}
+
 export async function changePasswordApi(body) {
   return apiFetch("/api/auth/password", {
     method: "PATCH",
@@ -55,6 +64,17 @@ export async function changePasswordApi(body) {
 
 export async function deleteAccountApi() {
   return apiFetch("/api/auth/account", { method: "DELETE" });
+}
+
+export async function verifyEmailApi(token) {
+  return apiFetch("/api/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export async function resendVerificationEmailApi() {
+  return apiFetch("/api/auth/resend-verification", { method: "POST" });
 }
 
 export function clearAuthToken() {

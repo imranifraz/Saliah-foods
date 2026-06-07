@@ -66,7 +66,7 @@ export function UserDetailPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
-  const [form, setForm] = useState({ fullName: "", phone: "", profileNote: "" });
+  const [form, setForm] = useState({ fullName: "", phone: "" });
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -80,7 +80,6 @@ export function UserDetailPage() {
         setForm({
           fullName: d.user.fullName,
           phone: d.user.phone,
-          profileNote: d.user.profileNote ?? "",
         });
       })
       .catch((e) => setError(e.message));
@@ -184,16 +183,10 @@ export function UserDetailPage() {
               value={user.hasPassword ? "Configured" : "Not set (social or invite)"}
             />
             <InfoRow label="Member since" value={formatMemberSince(user.createdAt)} />
-            {user.profileNote ? (
-              <div className="border-t border-[var(--admin-border)] pt-3">
-                <dt className="admin-label">Profile note</dt>
-                <dd className="mt-2 text-sm leading-relaxed text-[var(--admin-fg-muted)]">{user.profileNote}</dd>
-              </div>
-            ) : null}
           </dl>
         </AdminCard>
 
-        <AdminCard title="Edit customer" subtitle="Manage name, contact, and internal notes">
+        <AdminCard title="Edit customer" subtitle="Manage name and contact details">
           <form onSubmit={handleSave} className="space-y-4">
             <label className="block">
               <span className="admin-label">Full name</span>
@@ -211,16 +204,6 @@ export function UserDetailPage() {
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 className="admin-input"
                 placeholder="Optional"
-              />
-            </label>
-            <label className="block">
-              <span className="admin-label">Profile note</span>
-              <textarea
-                value={form.profileNote}
-                onChange={(e) => setForm({ ...form, profileNote: e.target.value })}
-                rows={3}
-                className="admin-input resize-none"
-                placeholder="Internal note for admin reference"
               />
             </label>
             {error ? (

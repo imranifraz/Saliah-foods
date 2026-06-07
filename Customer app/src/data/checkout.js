@@ -30,6 +30,8 @@ export const INDIAN_STATES = [
   "Delhi",
 ];
 
+export const DEFAULT_COUNTRY = "India";
+
 export const PAYMENT_METHODS = [
   {
     id: "razorpay",
@@ -84,6 +86,7 @@ const emptyForm = {
   city: "",
   state: "",
   pincode: "",
+  country: DEFAULT_COUNTRY,
   paymentMethod: "razorpay",
 };
 

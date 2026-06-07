@@ -44,9 +44,10 @@ export function toSessionUser(user) {
     email: user.email,
     phone: user.phone,
     role: "customer",
-    dateOfBirth: user.dateOfBirth ?? "",
-    profileNote: user.profileNote ?? "",
     provider: user.provider ?? "local",
+    emailVerified: Boolean(user.emailVerifiedAt),
+    avatarUrl: user.avatarUrl ?? "",
+    createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
   };
 }
 
@@ -57,7 +58,6 @@ export function toAdminSession(admin) {
     email: admin.email,
     phone: admin.phone ?? "",
     role: "admin",
-    dateOfBirth: "",
     profileNote: admin.profileNote ?? "",
     avatarUrl: admin.avatarUrl ?? "",
     provider: "local",

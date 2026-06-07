@@ -88,7 +88,7 @@ export function getCategoryById(categoryId) {
       id: "all",
       label: "All Products",
       description: "Discover our complete range of premium dates, wellness foods, and customer favourites.",
-      viewAllHref: "/products/all",
+      viewAllHref: "/products",
       products: [],
     };
   }

@@ -12,8 +12,13 @@ export function AuthFormField({
   placeholder,
   value,
   onChange,
+  onBlur,
   maxLength,
 }) {
+  const describedBy = [hint && !error ? `${id}-hint` : null, error ? `${id}-error` : null]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div className={className}>
       <label htmlFor={id} className={authLabelClass}>
@@ -26,12 +31,13 @@ export function AuthFormField({
         autoComplete={autoComplete}
         inputMode={inputMode}
         placeholder={placeholder}
-        className={authFieldClass}
+        className={`${authFieldClass}${error ? " border-red-300/80" : ""}`}
         value={value}
         onChange={onChange}
+        onBlur={onBlur}
         maxLength={maxLength}
         aria-invalid={Boolean(error)}
-        aria-describedby={hint ? `${id}-hint` : undefined}
+        aria-describedby={describedBy || undefined}
       />
       {hint && !error ? (
         <p id={`${id}-hint`} className="mt-1 font-body text-xs text-emerald-900/40">
@@ -39,7 +45,7 @@ export function AuthFormField({
         </p>
       ) : null}
       {error ? (
-        <p className="mt-1 font-body text-sm text-red-800/90" role="alert">
+        <p id={`${id}-error`} className="mt-1 font-body text-sm text-red-800/90" role="alert">
           {error}
         </p>
       ) : null}

@@ -1,28 +1,43 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api.js";
 import { AdminModalLayout } from "./AdminModalLayout.jsx";
 import { ProductForm, mapProductToForm } from "./ProductForm.jsx";
 import { ViewProductPanel, ProductVariantsPanel } from "./ViewProductPanel.jsx";
 import { LoadingState } from "./ui/LoadingState.jsx";
 
-export function ProductManageModal({ open, productId, mode = "view", categories, onClose, onUpdated }) {
+export function ProductManageModal({
+  open,
+  productId,
+  mode = "view",
+  categories,
+  onClose,
+  onUpdated,
+  onModeChange,
+}) {
   const [product, setProduct] = useState(null);
-  const [currentMode, setCurrentMode] = useState(mode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formBusy, setFormBusy] = useState(false);
-  const [openedInEditMode, setOpenedInEditMode] = useState(false);
+  const openedInEditModeRef = useRef(false);
+  const loadTokenRef = useRef(0);
+  const prevOpenRef = useRef(false);
+  const prevProductIdRef = useRef(null);
 
   useEffect(() => {
-    if (open) {
-      setCurrentMode(mode);
-      setOpenedInEditMode(mode === "edit");
+    const justOpened = open && !prevOpenRef.current;
+    const productChanged = open && productId != null && productId !== prevProductIdRef.current;
+
+    if (open && (justOpened || productChanged)) {
+      openedInEditModeRef.current = mode === "edit";
     }
-  }, [open, mode, productId]);
+
+    prevOpenRef.current = open;
+    prevProductIdRef.current = productId;
+  }, [open, productId, mode]);
 
   useEffect(() => {
-    if (currentMode !== "edit") setFormBusy(false);
-  }, [currentMode, productId]);
+    if (mode !== "edit") setFormBusy(false);
+  }, [mode, productId]);
 
   useEffect(() => {
     if (!open || !productId) {
@@ -31,18 +46,30 @@ export function ProductManageModal({ open, productId, mode = "view", categories,
       return;
     }
 
+    const loadToken = ++loadTokenRef.current;
     setLoading(true);
     setError("");
+
     apiFetch(`/api/admin/products/${productId}`)
-      .then((data) => setProduct(data.product))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (loadToken !== loadTokenRef.current) return;
+        setProduct(data.product);
+      })
+      .catch((err) => {
+        if (loadToken !== loadTokenRef.current) return;
+        setError(err.message);
+        setProduct(null);
+      })
+      .finally(() => {
+        if (loadToken !== loadTokenRef.current) return;
+        setLoading(false);
+      });
   }, [open, productId]);
 
   if (!open) return null;
 
-  const isEdit = currentMode === "edit";
-  const isPrices = currentMode === "prices";
+  const isEdit = mode === "edit";
+  const isPrices = mode === "prices";
   const title = isEdit ? "Edit product" : isPrices ? "Variant prices" : "Product details";
   const subtitle = isEdit
     ? "Update catalog information, images, and variants."
@@ -51,16 +78,16 @@ export function ProductManageModal({ open, productId, mode = "view", categories,
       : "Review catalog information, variants, and stock.";
 
   function handleCancelEdit() {
-    if (openedInEditMode) {
+    if (openedInEditModeRef.current) {
       onClose();
       return;
     }
-    setCurrentMode("view");
+    onModeChange?.("view");
   }
 
   function handleEditSuccess(updatedProduct) {
     setProduct(updatedProduct);
-    setCurrentMode("view");
+    onModeChange?.("view");
     setFormBusy(false);
     onUpdated?.();
   }
@@ -102,7 +129,11 @@ export function ProductManageModal({ open, productId, mode = "view", categories,
             <button type="button" onClick={onClose} className="btn-ghost w-full sm:w-auto">
               Close
             </button>
-            <button type="button" onClick={() => setCurrentMode("edit")} className="btn-primary w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => onModeChange?.("edit")}
+              className="btn-primary w-full sm:w-auto"
+            >
               Edit product
             </button>
           </div>

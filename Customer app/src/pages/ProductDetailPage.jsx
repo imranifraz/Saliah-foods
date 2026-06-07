@@ -9,7 +9,6 @@ import { ProductDetailRelatedSection } from "../components/products/ProductDetai
 import { ProductDetailStickyBar } from "../components/products/ProductDetailStickyBar";
 import { WishlistButton } from "../components/account/WishlistButton";
 import { useCart } from "../context/CartContext";
-import { useCatalog } from "../context/CatalogContext.jsx";
 import {
   getDefaultPackId,
   getFixedPackSizeLabel,
@@ -18,15 +17,17 @@ import {
   getProductGallery,
   requiresPackSelection,
 } from "../data/productDetail";
+import { fetchProductBySlug, fetchRelatedProducts } from "../services/catalogApi.js";
 
 export function ProductDetailPage() {
   const { productSlug } = useParams();
   const navigate = useNavigate();
   const reduce = useReducedMotion();
   const { addItem } = useCart();
-  const { loading: catalogLoading, getProductBySlug, getRelatedProducts } = useCatalog();
-  const product = getProductBySlug(productSlug ?? "");
-  const related = product ? getRelatedProducts(product) : [];
+  const [product, setProduct] = useState(null);
+  const [related, setRelated] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const packOptions = useMemo(
     () => (product && requiresPackSelection(product) ? getPremiumPackOptions(product) : []),
@@ -40,20 +41,55 @@ export function ProductDetailPage() {
   const [packError, setPackError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+    const slug = productSlug ?? "";
+
+    setLoading(true);
+    setError("");
+    setProduct(null);
+    setRelated([]);
+
+    Promise.all([
+      fetchProductBySlug(slug),
+      fetchRelatedProducts(slug).catch(() => []),
+    ])
+      .then(([nextProduct, nextRelated]) => {
+        if (cancelled) return;
+        setProduct(nextProduct);
+        setRelated(nextRelated);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setProduct(null);
+        setRelated([]);
+        setError(err.message ?? "Could not load product.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [productSlug]);
+
+  useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
     setShowStickyBar(false);
     setPackError("");
 
-    const nextProduct = getProductBySlug(productSlug ?? "");
-    const nextOptions =
-      nextProduct && requiresPackSelection(nextProduct) ? getPremiumPackOptions(nextProduct) : [];
+    if (!product) {
+      setSelectedPackId(null);
+      return;
+    }
 
+    const nextOptions = requiresPackSelection(product) ? getPremiumPackOptions(product) : [];
     if (nextOptions.length) {
-      setSelectedPackId(getDefaultPackId(nextProduct, nextOptions));
+      setSelectedPackId(getDefaultPackId(product, nextOptions));
     } else {
       setSelectedPackId(null);
     }
-  }, [productSlug]);
+  }, [productSlug, product]);
 
   useEffect(() => {
     const target = ctaRef.current;
@@ -66,9 +102,9 @@ export function ProductDetailPage() {
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [productSlug]);
+  }, [productSlug, product]);
 
-  if (catalogLoading) {
+  if (loading) {
     return (
       <div className="mx-auto max-w-[1480px] px-4 py-28 text-center sm:px-5 md:px-10">
         <p className="font-body text-sm text-emerald-900/55">Loading product…</p>
@@ -76,18 +112,22 @@ export function ProductDetailPage() {
     );
   }
 
-  if (!product) {
+  if (error || !product) {
     return (
       <div className="mx-auto max-w-[1480px] px-4 py-28 sm:px-5 md:px-10">
         <h1 className="font-display text-2xl font-medium text-emerald-900">Product not found</h1>
-        <Link to="/products/all" className="mt-4 inline-block font-body text-sm text-emerald-800 underline">
+        <p className="mt-3 font-body text-sm text-emerald-900/55">
+          This product could not be loaded from the server.
+        </p>
+        {error ? <p className="mt-2 font-body text-xs text-emerald-900/40">{error}</p> : null}
+        <Link to="/products" className="mt-4 inline-block font-body text-sm text-emerald-800 underline">
           Browse all products
         </Link>
       </div>
     );
   }
 
-  const rating = product.rating ?? 4.8;
+  const rating = product.rating ?? null;
   const reviewCount = product.reviewCount ?? 0;
   const categoryHref = `/products/${product.categoryId}`;
   const description = getProductDescription(product);
@@ -163,7 +203,7 @@ export function ProductDetailPage() {
 
   return (
     <>
-      <PageMeta title={product.name} description={description} />
+      <PageMeta title={product.name} description={description || product.tagline || product.name} />
 
       <div className="relative pb-24 pt-[calc(var(--site-header)+0.75rem)] md:pb-28 md:pt-[calc(var(--site-header)+1rem)]">
         <div className="pdp-atmosphere pointer-events-none absolute inset-0" aria-hidden />
@@ -175,7 +215,7 @@ export function ProductDetailPage() {
               Home
             </Link>
             <span className="mx-2">/</span>
-            <Link to="/products/all" className="transition-colors hover:text-emerald-800">
+            <Link to="/products" className="transition-colors hover:text-emerald-800">
               Products
             </Link>
             <span className="mx-2">/</span>
@@ -244,7 +284,9 @@ export function ProductDetailPage() {
                 </div>
               ) : null}
 
-              <p className="mt-6 font-body text-[13px] leading-relaxed text-emerald-900/48">{description}</p>
+              {description ? (
+                <p className="mt-6 font-body text-[13px] leading-relaxed text-emerald-900/48">{description}</p>
+              ) : null}
             </motion.div>
           </div>
 
@@ -252,7 +294,7 @@ export function ProductDetailPage() {
             <div className="pdp-bottom-stack__reviews" id="pdp-reviews">
               <ProductDetailReviewsSection
                 productSlug={product.slug}
-                fallbackRating={rating}
+                fallbackRating={rating ?? 0}
                 fallbackCount={reviewCount}
               />
             </div>

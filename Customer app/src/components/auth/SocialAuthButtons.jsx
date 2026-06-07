@@ -101,6 +101,7 @@ export function SocialAuthButtons({
   mode = "login",
   headingId = "auth-social-heading",
   buttonLayout = "column",
+  className = "",
 }) {
   const { loginWithSocial } = useAuth();
   const [error, setError] = useState("");
@@ -218,7 +219,7 @@ export function SocialAuthButtons({
   };
 
   return (
-    <div className="w-full">
+    <div className={`w-full ${className}`.trim()}>
       <p id={headingId} className={authSectionLabelClass}>
         {socialHeading}
       </p>

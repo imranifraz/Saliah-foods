@@ -7,7 +7,6 @@ import { InventoryHistoryModal } from "../components/InventoryHistoryModal.jsx";
 import { InventoryManageModal } from "../components/InventoryManageModal.jsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
-import { AdminFilterTabs } from "../components/ui/AdminFilterTabs.jsx";
 import { StatCard } from "../components/ui/StatCard.jsx";
 import { DataRow, DataCell } from "../components/ui/DataTable.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
@@ -298,7 +297,11 @@ export function InventoryPage() {
 
   const hasNonDefaultSort = sortValue !== "productName:asc";
   const filtersActive =
-    stockFilter !== "all" || statusFilter !== "all" || hasNonDefaultSort || Boolean(productFilter);
+    categoryFilter !== "all" ||
+    stockFilter !== "all" ||
+    statusFilter !== "all" ||
+    hasNonDefaultSort ||
+    Boolean(productFilter);
   const safePage = Math.min(page, totalPages);
   const showingFrom = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const showingTo = total === 0 ? 0 : Math.min(safePage * pageSize, total);
@@ -408,13 +411,12 @@ export function InventoryPage() {
     if (filtersActive) setFiltersOpen(true);
   }, [filtersActive]);
 
-  const categoryTabs = useMemo(
+  const categoryOptions = useMemo(
     () => [
-      { value: "all", label: "All", count: totalAllCategories },
+      { value: "all", label: `All categories (${totalAllCategories})` },
       ...categories.map((category) => ({
         value: category.id,
-        label: category.label,
-        count: categoryCounts[category.id] ?? 0,
+        label: `${category.label} (${categoryCounts[category.id] ?? 0})`,
       })),
     ],
     [categories, categoryCounts, totalAllCategories]
@@ -454,10 +456,11 @@ export function InventoryPage() {
   }
 
   function clearFilters() {
+    setCategoryFilter("all");
     setStockFilter("all");
     setStatusFilter("all");
     setSortValue("productName:asc");
-    syncUrlParams(query, categoryFilter, "all", "all", "productName:asc", 1, pageSize, productFilter, productLabel);
+    syncUrlParams(query, "all", "all", "all", "productName:asc", 1, pageSize, productFilter, productLabel);
   }
 
   function clearProductFilter() {
@@ -587,7 +590,6 @@ export function InventoryPage() {
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       ) : null}
 
-      <AdminFilterTabs items={categoryTabs} value={categoryFilter} onChange={setCategory} />
 
       <AdminCard
         title="Inventory"
@@ -655,7 +657,22 @@ export function InventoryPage() {
         }
       >
         {filtersOpen ? (
-          <div className="mb-4 flex flex-col gap-3 border-b border-[var(--admin-border)] pb-4 sm:flex-row sm:items-end sm:gap-3">
+          <div className="mb-4 flex flex-col gap-3 border-b border-[var(--admin-border)] pb-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
+            <div className="w-full sm:w-[12rem]">
+              <label className="admin-caption mb-1.5 block">Category</label>
+              <select
+                value={categoryFilter}
+                onChange={(event) => setCategory(event.target.value)}
+                className="admin-input"
+                aria-label="Filter by category"
+              >
+                {categoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="w-full sm:w-[11rem]">
               <label className="admin-caption mb-1.5 block">Stock</label>
               <select
@@ -984,6 +1001,9 @@ export function InventoryPage() {
         mode={manageProduct?.mode ?? "view"}
         categories={categories}
         onClose={() => setManageProduct(null)}
+        onModeChange={(nextMode) =>
+          setManageProduct((prev) => (prev ? { ...prev, mode: nextMode } : prev))
+        }
         onUpdated={load}
       />
 

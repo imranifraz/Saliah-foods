@@ -7,7 +7,6 @@ import { AdminCard } from "./ui/AdminCard.jsx";
 import { StatCard } from "./ui/StatCard.jsx";
 import { DataRow, DataCell } from "./ui/DataTable.jsx";
 import { LoadingState } from "./ui/LoadingState.jsx";
-import { AdminFilterTabs } from "./ui/AdminFilterTabs.jsx";
 import { ConfirmDialog } from "./ConfirmDialog.jsx";
 import { ProductThumb } from "./ui/ProductThumb.jsx";
 import { IconPackage, IconProducts } from "./icons/AdminIcons.jsx";
@@ -407,7 +406,7 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
 
   const customerStoreUrl = getCustomerStoreUrl();
 
-  const categoryTabs = useMemo(
+  const categoryOptions = useMemo(
     () => [
       { value: "all", label: "All categories" },
       ...categories.map((category) => ({ value: category.id, label: category.label })),
@@ -762,7 +761,6 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       ) : null}
 
-      <AdminFilterTabs items={categoryTabs} value={categoryFilter} onChange={setCategory} />
 
       <AdminCard
         title="Products"
@@ -842,6 +840,21 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
       >
         {filtersOpen ? (
           <div className="mb-4 grid gap-3 border-b border-[var(--admin-border)] pb-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label className="admin-caption mb-1.5 block">Category</label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategory(e.target.value)}
+                className="admin-input"
+                aria-label="Filter by category"
+              >
+                {categoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="admin-caption mb-1.5 block">Status</label>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="admin-input" aria-label="Filter by status">

@@ -3,7 +3,8 @@ import { ProductDetailFixedPackSize } from "./ProductDetailFixedPackSize";
 import { ProductDetailPackSelector } from "./ProductDetailPackSelector";
 import { ProductDetailTrustGrid } from "./ProductDetailTrustGrid";
 
-function StarRating({ rating = 4.8 }) {
+function StarRating({ rating }) {
+  if (rating == null) return null;
   const full = Math.floor(rating);
   const half = rating - full >= 0.5;
 
@@ -63,18 +64,20 @@ export function ProductDetailPurchasePanel({
 
   return (
     <section className="pdp-purchase-panel" aria-label="Purchase options">
-      <div className="pdp-purchase-panel__rating">
-        <StarRating rating={rating} />
-        <span className="pdp-purchase-panel__rating-text">
-          <strong>{rating.toFixed(1)}</strong>
-          {reviewCount > 0 ? (
+      {rating != null && reviewCount > 0 ? (
+        <div className="pdp-purchase-panel__rating">
+          <StarRating rating={rating} />
+          <span className="pdp-purchase-panel__rating-text">
+            <strong>{rating.toFixed(1)}</strong>
             <a href="#pdp-reviews" className="pdp-purchase-panel__review-count">
               {" "}
               ({reviewCount} review{reviewCount === 1 ? "" : "s"})
             </a>
-          ) : null}
-        </span>
-      </div>
+          </span>
+        </div>
+      ) : (
+        <p className="pdp-purchase-panel__rating-text font-body text-sm text-emerald-900/45">No reviews yet</p>
+      )}
 
       {needsPackSelection ? (
         <ProductDetailPackSelector

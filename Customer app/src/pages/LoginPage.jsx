@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { PageMeta } from "../components/pages/PageMeta";
 import { AuthSplitLayout } from "../components/auth/AuthSplitLayout";
@@ -15,12 +15,14 @@ import {
   authLabelClass,
   authSubmitClass,
   authSubtextClass,
+  authSuccessBannerClass,
 } from "../components/auth/authFormStyles";
 import { useAuth } from "../context/AuthContext";
 import { validateLoginForm } from "../data/auth";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const reduce = useReducedMotion();
   const { login, isAuthenticated } = useAuth();
   const [params] = useSearchParams();
@@ -64,6 +66,7 @@ export function LoginPage() {
   };
 
   const isCheckoutRedirect = redirectTo.startsWith("/checkout");
+  const passwordUpdated = location.state?.passwordUpdated;
 
   return (
     <>
@@ -89,6 +92,12 @@ export function LoginPage() {
             </header>
 
             <AuthSplitLayout mode="login" onSocialSuccess={() => navigate(redirectTo, { replace: true })}>
+              {passwordUpdated ? (
+                <p className={`${authSuccessBannerClass} mb-4`} role="status">
+                  Your password has been updated. Sign in with your new password.
+                </p>
+              ) : null}
+
               <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4" noValidate>
                 <div className="w-full">
                   <label htmlFor="email" className={authLabelClass}>
@@ -123,6 +132,15 @@ export function LoginPage() {
                   error={errors.password}
                   className="w-full"
                 />
+
+                <p className="-mt-1 text-right font-body text-sm">
+                  <Link
+                    to={`/login/forgot-password?redirect=${encodeURIComponent(redirectTo)}`}
+                    className={authFooterLinkClass}
+                  >
+                    Forgot password?
+                  </Link>
+                </p>
 
                 {formError ? (
                   <p className={authErrorBannerClass} role="alert">

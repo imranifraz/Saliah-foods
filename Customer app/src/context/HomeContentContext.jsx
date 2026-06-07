@@ -4,6 +4,7 @@ import { homepageImages } from "../data/homepage.js";
 
 const FALLBACK = {
   siteLogo: "/assets/application-logo.png",
+  siteLogoLight: "/assets/application-logo-white.webp",
   hero: {
     title: "Premium Dates & Natural Wellness Foods",
     subtitle:

@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 const TAB_ICONS = {
   personal: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
@@ -34,48 +32,42 @@ const TAB_ICONS = {
   ),
 };
 
-export function AccountSidebar({ tabs, activeTab, onSelect, wishlistCount }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const active = tabs.find((t) => t.id === activeTab) ?? tabs[0];
+function SidebarItem({ tab, isActive, onSelect, wishlistCount }) {
+  return (
+    <button
+      type="button"
+      className={`account-sidebar__item ${isActive ? "account-sidebar__item--active" : ""}`}
+      onClick={() => onSelect(tab.id)}
+      aria-current={isActive ? "page" : undefined}
+    >
+      <span className="account-sidebar__icon">{TAB_ICONS[tab.id]}</span>
+      <span className="account-sidebar__text">{tab.label}</span>
+      {tab.id === "wishlist" && wishlistCount > 0 ? (
+        <span className="account-sidebar__count">{wishlistCount}</span>
+      ) : null}
+    </button>
+  );
+}
 
+export function AccountSidebar({ tabs, activeTab, onSelect, wishlistCount }) {
   return (
     <>
-      <div className="account-nav-mobile lg:hidden">
-        <label className="account-label" htmlFor="account-nav-select">
-          Account section
-        </label>
-        <select
-          id="account-nav-select"
-          className="account-input account-select mt-1.5"
-          value={activeTab}
-          onChange={(e) => onSelect(e.target.value)}
-        >
-          {tabs.map((tab) => (
-            <option key={tab.id} value={tab.id}>
-              {tab.label}
-              {tab.id === "wishlist" && wishlistCount > 0 ? ` (${wishlistCount})` : ""}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <nav className="account-sidebar hidden lg:block" aria-label="Account sections">
-        <p className="account-sidebar__label">Your account</p>
-        <ul className="account-sidebar__list">
+      <nav className="account-nav-tabs lg:hidden" aria-label="Account sections">
+        <ul className="account-nav-tabs__list">
           {tabs.map((tab) => {
             const isActive = tab.id === activeTab;
             return (
-              <li key={tab.id}>
+              <li key={tab.id} className="account-nav-tabs__item-wrap">
                 <button
                   type="button"
-                  className={`account-sidebar__item ${isActive ? "account-sidebar__item--active" : ""}`}
+                  className={`account-nav-tabs__item ${isActive ? "account-nav-tabs__item--active" : ""}`}
                   onClick={() => onSelect(tab.id)}
                   aria-current={isActive ? "page" : undefined}
                 >
-                  <span className="account-sidebar__icon">{TAB_ICONS[tab.id]}</span>
-                  <span className="account-sidebar__text">{tab.label}</span>
+                  <span className="account-nav-tabs__icon">{TAB_ICONS[tab.id]}</span>
+                  <span className="account-nav-tabs__label">{tab.label}</span>
                   {tab.id === "wishlist" && wishlistCount > 0 ? (
-                    <span className="account-sidebar__count">{wishlistCount}</span>
+                    <span className="account-nav-tabs__count">{wishlistCount}</span>
                   ) : null}
                 </button>
               </li>
@@ -84,14 +76,24 @@ export function AccountSidebar({ tabs, activeTab, onSelect, wishlistCount }) {
         </ul>
       </nav>
 
-      <button
-        type="button"
-        className="account-nav-drawer-trigger hidden"
-        aria-expanded={mobileOpen}
-        onClick={() => setMobileOpen((v) => !v)}
-      >
-        {active.label}
-      </button>
+      <nav className="account-sidebar hidden lg:block" aria-label="Account sections">
+        <p className="account-sidebar__label">Your account</p>
+        <ul className="account-sidebar__list">
+          {tabs.map((tab) => {
+            const isActive = tab.id === activeTab;
+            return (
+              <li key={tab.id}>
+                <SidebarItem
+                  tab={tab}
+                  isActive={isActive}
+                  onSelect={onSelect}
+                  wishlistCount={wishlistCount}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
     </>
   );
 }

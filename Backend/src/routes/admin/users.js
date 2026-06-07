@@ -15,8 +15,6 @@ function formatUser(user, counts = {}) {
     phone: user.phone,
     role: "customer",
     provider: user.provider ?? "local",
-    dateOfBirth: user.dateOfBirth ?? "",
-    profileNote: user.profileNote ?? "",
     hasPassword: Boolean(user.passwordHash),
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
@@ -156,12 +154,11 @@ router.patch("/:id", async (req, res, next) => {
     const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ ok: false, error: "User not found" });
 
-    const { fullName, phone, profileNote } = req.body;
+    const { fullName, phone } = req.body;
     const data = {};
 
     if (fullName !== undefined) data.fullName = fullName.trim();
     if (phone !== undefined) data.phone = phone.trim();
-    if (profileNote !== undefined) data.profileNote = profileNote.trim();
 
     const user = await prisma.user.update({
       where: { id: existing.id },

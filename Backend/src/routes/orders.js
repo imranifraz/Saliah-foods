@@ -167,6 +167,14 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
+    if (!req.user.emailVerifiedAt) {
+      return res.status(403).json({
+        ok: false,
+        error: "Verify your email before placing an order",
+        code: "EMAIL_NOT_VERIFIED",
+      });
+    }
+
     const {
       items,
       customer,

@@ -29,12 +29,13 @@ const img = {
   brandLegacy: "/assets/brand-legacy.png",
 };
 
-/** Default review meta for product cards */
+/** Pass through review meta when present on static/home payloads. */
 function withReviews(product, reviewCount) {
+  const count = product.reviewCount ?? reviewCount ?? 0;
   return withHomeImagery({
     ...product,
-    rating: product.rating ?? 4.7 + (reviewCount % 3) * 0.1,
-    reviewCount: product.reviewCount ?? reviewCount,
+    reviewCount: count,
+    rating: count > 0 && product.rating != null ? product.rating : null,
   });
 }
 

@@ -15,7 +15,7 @@ export function OrderConfirmationPage() {
   }, [order]);
 
   if (!order) {
-    return <Navigate to="/products/all" replace />;
+    return <Navigate to="/products" replace />;
   }
 
   return (
@@ -23,7 +23,7 @@ export function OrderConfirmationPage() {
       <PageMeta title="Order confirmed" description="Your Saliah Foods order has been placed successfully." />
       <OrderSuccessPopup
         order={order}
-        onClose={() => navigate("/products/all", { replace: true })}
+        onClose={() => navigate("/products", { replace: true })}
       />
     </>
   );

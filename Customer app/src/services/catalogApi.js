@@ -19,34 +19,6 @@ function inferPackaging(packSize) {
   return PACKAGING_MAP[packSize] ?? "Pouch";
 }
 
-function formatBadge(tag, reviewCount, isBestSeller) {
-  if (isBestSeller) return "Bestseller";
-  const map = {
-    Premium: "Premium Quality",
-    "Natural Sweetness": "Naturally Sweet",
-    Seedless: "No Added Sugar",
-    Soft: "Premium Quality",
-    "Everyday Snack": "Naturally Sweet",
-    "No Added Sugar": "No Added Sugar",
-    Organic: "Organic",
-  };
-  return map[tag] ?? tag ?? null;
-}
-
-function inferBenefits(product) {
-  const benefits = new Set();
-  const tag = product.tag ?? "";
-  const tagline = (product.tagline ?? "").toLowerCase();
-
-  if (tag === "Seedless" || tagline.includes("natural")) benefits.add("No Added Sugar");
-  if (tag === "Natural Sweetness" || tagline.includes("sweet")) benefits.add("Natural Energy");
-  if (tag === "Premium" || tag === "Soft") benefits.add("Premium Quality");
-  if (tagline.includes("wellness") || tagline.includes("traditional")) benefits.add("Organic");
-  if (product.reviewCount > 150) benefits.add("High Fiber");
-  if (benefits.size === 0) benefits.add("Natural Energy");
-  return [...benefits];
-}
-
 function normalizeVariant(rawVariant, fallbackImage) {
   const priceFields = buildPriceFields(rawVariant.priceValue, rawVariant.mrpValue ?? undefined);
   const stockQuantity = Number(rawVariant.stockQuantity ?? 0);
@@ -98,8 +70,7 @@ export function normalizeApiProduct(raw) {
   const priceFields = buildPriceFields(priceValue, mrpValue);
   const packaging =
     defaultVariant?.packaging ?? raw.packaging ?? inferPackaging(defaultVariant?.packSize ?? raw.packSize);
-  const benefits =
-    Array.isArray(raw.benefits) && raw.benefits.length > 0 ? raw.benefits : inferBenefits(raw);
+  const benefits = Array.isArray(raw.benefits) ? raw.benefits : [];
 
   return {
     ...raw,
@@ -113,11 +84,13 @@ export function normalizeApiProduct(raw) {
     packSize: defaultVariant?.packSize ?? raw.packSize ?? "",
     packaging,
     benefits,
-    badge: raw.badge ?? formatBadge(raw.tag, raw.reviewCount ?? 0, raw.isBestSeller),
+    badge: raw.badge ?? null,
     inStock: variants.length ? variants.some((variant) => variant.inStock) : raw.inStock !== false,
     featured: Boolean(raw.featured),
     isNew: Boolean(raw.isNew),
     isBestSeller: Boolean(raw.isBestSeller),
+    reviewCount: Number(raw.reviewCount ?? 0),
+    rating: Number(raw.reviewCount ?? 0) > 0 && raw.rating != null ? Number(raw.rating) : null,
     approvedReviews: Array.isArray(raw.approvedReviews)
       ? raw.approvedReviews.map(normalizeApprovedReview)
       : [],
@@ -168,6 +141,17 @@ export function buildShopCategories(categories, productsByCategory) {
       featured: index < 3,
     };
   });
+}
+
+export async function fetchProductBySlug(slug) {
+  const data = await apiFetch(`/api/products/slug/${encodeURIComponent(slug)}`);
+  if (!data?.product) throw new Error("Product not found");
+  return normalizeApiProduct(data.product);
+}
+
+export async function fetchRelatedProducts(slug) {
+  const data = await apiFetch(`/api/products/${encodeURIComponent(slug)}/related`);
+  return (data.products ?? []).map(normalizeApiProduct);
 }
 
 export async function fetchCatalog() {

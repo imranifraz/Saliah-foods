@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Header } from "./components/layout/Header";
 import { Footer } from "./components/layout/Footer";
 import { StructuredData } from "./components/seo/StructuredData";
@@ -17,7 +17,10 @@ import { CheckoutPage } from "./pages/CheckoutPage";
 import { OrderConfirmationPage } from "./pages/OrderConfirmationPage";
 import { AccountPage } from "./pages/AccountPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 
 export default function App() {
   return (
@@ -37,13 +40,17 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/product/:productSlug" element={<ProductDetailRoute />} />
+                <Route path="/products" element={<ProductListingPage />} />
+                <Route path="/products/all" element={<Navigate to="/products" replace />} />
                 <Route path="/products/:categoryId" element={<ProductListingPage />} />
                 <Route path="/sourcing-and-quality" element={<SourcingQualityPage />} />
                 <Route path="/our-legacy" element={<OurLegacyPage />} />
                 <Route path="/about-us" element={<OurLegacyPage />} />
                 <Route path="/faq" element={<FaqPage />} />
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/login/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
                 <Route
                   path="/checkout"
                   element={
@@ -71,6 +78,7 @@ export default function App() {
                 <Route path="/contact" element={<ContactUsPage />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>
 

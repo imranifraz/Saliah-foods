@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { syncBestSellersFromSales } from "../src/lib/best-sellers.js";
 import { stockStatusFromQuantity, syncProductSummary } from "../src/lib/products.js";
 import { productUploadUrl, syncSeedProductImages } from "../src/lib/seedProductImages.js";
+import { categoryUploadUrl, syncSeedCategoryImages } from "../src/lib/seedCategoryImages.js";
 
 const prisma = new PrismaClient();
 
@@ -246,6 +247,22 @@ const products = [
   },
 ];
 
+function buildCategoryRecord(category) {
+  const { imageFile, featuredPromo, ...rest } = category;
+  const image = categoryUploadUrl(imageFile);
+
+  let promo = featuredPromo;
+  if (promo) {
+    const { imageFile: promoImageFile, ...promoRest } = promo;
+    promo = {
+      ...promoRest,
+      image: categoryUploadUrl(promoImageFile ?? imageFile),
+    };
+  }
+
+  return { ...rest, image, featuredPromo: promo };
+}
+
 const blogPosts = [
   {
     id: "kimia-dates-benefits",
@@ -342,54 +359,65 @@ async function main() {
     );
   }
 
+  const categoryImageSync = syncSeedCategoryImages();
+  console.log(
+    `Category images synced (${categoryImageSync.copied} copied, ${categoryImageSync.skipped} unchanged) from ${categoryImageSync.sourceDir}`
+  );
+  if (categoryImageSync.missing > 0) {
+    throw new Error(
+      `${categoryImageSync.missing} seed category image(s) missing. Run: npm run db:sync-seed-images after copying art to Backend/seed-assets/categories/`
+    );
+  }
+
   const categories = [
     {
       id: "dates",
       label: "Dates",
       description: "Everyday snacking and family favourites",
-      image: "/assets/premium-dates-category.webp",
+      imageFile: "premium-dates-category.webp",
       sortOrder: 1,
       featuredPromo: {
         title: "Everyday Date Collection",
         subtitle: "Naturally Sweet • Family Packs",
         cta: "Explore Collection",
-        image: "/assets/premium-dates-category.webp",
+        imageFile: "premium-dates-category.webp",
       },
     },
     {
       id: "premium-dates",
       label: "Premium Dates",
       description: "Soft, rich, and gift-worthy varieties",
-      image: "/assets/kimia-dates.webp",
+      imageFile: "kimia-dates.webp",
       sortOrder: 2,
       featuredPromo: {
         title: "Premium Medjool Collection",
         subtitle: "Naturally Sweet • Imported",
         cta: "Explore Collection",
-        image: "/assets/kimia-dates.webp",
+        imageFile: "kimia-dates.webp",
       },
     },
     {
       id: "wellness-traditional",
       label: "Wellness & Traditional",
       description: "Natural foods for daily wellness",
-      image: "/assets/wellness-foods-category.webp",
+      imageFile: "wellness-foods-category.webp",
       sortOrder: 3,
     },
     {
       id: "best-sellers",
       label: "Best Sellers",
       description: "Top products by units sold — updated automatically from orders",
-      image: "/assets/ajwa-dates.webp",
+      imageFile: "ajwa-dates.webp",
       sortOrder: 4,
     },
   ];
 
   for (const cat of categories) {
+    const record = buildCategoryRecord(cat);
     await prisma.category.upsert({
-      where: { id: cat.id },
-      create: cat,
-      update: cat,
+      where: { id: record.id },
+      create: record,
+      update: record,
     });
   }
 

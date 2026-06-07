@@ -71,16 +71,28 @@ export function ProductListingHero({ label, description, categoryId = "all", end
   );
 }
 
-export function ProductListingBreadcrumb({ label }) {
+export function ProductListingBreadcrumb({ label, categoryId = "all" }) {
+  const showCategory = categoryId !== "all";
+
   return (
     <nav className="mb-2.5 font-body text-[11px] uppercase tracking-[0.16em] text-emerald-900/35" aria-label="Breadcrumb">
       <Link to="/" className="transition-colors hover:text-emerald-800">
         Home
       </Link>
       <span className="mx-2">/</span>
-      <span>Products</span>
-      <span className="mx-2">/</span>
-      <span className="text-emerald-900/60">{label}</span>
+      {showCategory ? (
+        <Link to="/products" className="transition-colors hover:text-emerald-800">
+          Products
+        </Link>
+      ) : (
+        <span className="text-emerald-900/60">Products</span>
+      )}
+      {showCategory ? (
+        <>
+          <span className="mx-2">/</span>
+          <span className="text-emerald-900/60">{label}</span>
+        </>
+      ) : null}
     </nav>
   );
 }
