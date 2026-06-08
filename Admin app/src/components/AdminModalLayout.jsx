@@ -36,19 +36,18 @@ export function AdminModalLayout({
     <div
       className="admin-modal fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       role="presentation"
+      onClick={onClose}
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/60"
-        aria-label="Close dialog"
-        onClick={onClose}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-black/60"
       />
       <div
         className={`admin-modal__panel admin-card relative z-10 flex max-h-[100dvh] w-full ${maxWidthClass} flex-col overflow-hidden rounded-t-2xl ${maxHeightClass} sm:rounded-2xl`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-4 sm:px-5">
           <div className="min-w-0">

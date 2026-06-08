@@ -12,9 +12,9 @@ export function ProductManageModal({
   categories,
   onClose,
   onUpdated,
-  onModeChange,
 }) {
   const [product, setProduct] = useState(null);
+  const [currentMode, setCurrentMode] = useState(mode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formBusy, setFormBusy] = useState(false);
@@ -24,20 +24,26 @@ export function ProductManageModal({
   const prevProductIdRef = useRef(null);
 
   useEffect(() => {
-    const justOpened = open && !prevOpenRef.current;
-    const productChanged = open && productId != null && productId !== prevProductIdRef.current;
+    if (!open) {
+      prevOpenRef.current = false;
+      return;
+    }
 
-    if (open && (justOpened || productChanged)) {
+    const justOpened = !prevOpenRef.current;
+    const productChanged = productId != null && productId !== prevProductIdRef.current;
+
+    if (justOpened || productChanged) {
+      setCurrentMode(mode);
       openedInEditModeRef.current = mode === "edit";
     }
 
-    prevOpenRef.current = open;
+    prevOpenRef.current = true;
     prevProductIdRef.current = productId;
   }, [open, productId, mode]);
 
   useEffect(() => {
-    if (mode !== "edit") setFormBusy(false);
-  }, [mode, productId]);
+    if (currentMode !== "edit") setFormBusy(false);
+  }, [currentMode, productId]);
 
   useEffect(() => {
     if (!open || !productId) {
@@ -68,8 +74,8 @@ export function ProductManageModal({
 
   if (!open) return null;
 
-  const isEdit = mode === "edit";
-  const isPrices = mode === "prices";
+  const isEdit = currentMode === "edit";
+  const isPrices = currentMode === "prices";
   const title = isEdit ? "Edit product" : isPrices ? "Variant prices" : "Product details";
   const subtitle = isEdit
     ? "Update catalog information, images, and variants."
@@ -77,17 +83,21 @@ export function ProductManageModal({
       ? product?.name ?? "Review selling price and MRP for each variant."
       : "Review catalog information, variants, and stock.";
 
+  function handleEnterEditMode() {
+    setCurrentMode("edit");
+  }
+
   function handleCancelEdit() {
     if (openedInEditModeRef.current) {
       onClose();
       return;
     }
-    onModeChange?.("view");
+    setCurrentMode("view");
   }
 
   function handleEditSuccess(updatedProduct) {
     setProduct(updatedProduct);
-    onModeChange?.("view");
+    setCurrentMode("view");
     setFormBusy(false);
     onUpdated?.();
   }
@@ -129,11 +139,7 @@ export function ProductManageModal({
             <button type="button" onClick={onClose} className="btn-ghost w-full sm:w-auto">
               Close
             </button>
-            <button
-              type="button"
-              onClick={() => onModeChange?.("edit")}
-              className="btn-primary w-full sm:w-auto"
-            >
+            <button type="button" onClick={handleEnterEditMode} className="btn-primary w-full sm:w-auto">
               Edit product
             </button>
           </div>
