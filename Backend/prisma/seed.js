@@ -4,6 +4,8 @@ import { syncBestSellersFromSales } from "../src/lib/best-sellers.js";
 import { stockStatusFromQuantity, syncProductSummary } from "../src/lib/products.js";
 import { productUploadUrl, syncSeedProductImages } from "../src/lib/seedProductImages.js";
 import { categoryUploadUrl, syncSeedCategoryImages } from "../src/lib/seedCategoryImages.js";
+import { DEFAULT_GOOGLE_MAPS_URL, DEFAULT_MAP_EMBED_URL } from "../src/lib/contactCms.js";
+import { DEFAULT_FAQ_ITEMS } from "../src/lib/faqCms.js";
 
 const prisma = new PrismaClient();
 
@@ -624,24 +626,13 @@ async function main() {
     {
       slug: "faq",
       title: "FAQ",
-      subtitle: "Common questions about orders, products & support",
+      subtitle: "Quick answers about ordering, delivery, storage, and customer support.",
       pageType: "faq",
       body: {
-        faqItems: [
-          {
-            category: "Orders & Delivery",
-            questions: [
-              {
-                q: "How do I place an order?",
-                a: "Browse our products, add items to your cart, and complete checkout with your delivery address.",
-              },
-              {
-                q: "Do you deliver across India?",
-                a: "Yes — we dispatch to most pin codes across India.",
-              },
-            ],
-          },
-        ],
+        faqItems: DEFAULT_FAQ_ITEMS,
+        ctaText: "Still have a question?",
+        ctaButtonLabel: "Contact us",
+        ctaHref: "/contact",
       },
     },
     {
@@ -671,6 +662,11 @@ async function main() {
           "76A2C, Ariyakulam Village, Krishnapuram (P.O.), Dharmapuri (Taluk), Dharmapuri, Tamil Nadu 635202, India",
         hours: "Open 9:00 AM – 4:00 PM IST, all days",
         subjects: ["General enquiry", "Order support", "Wholesale / B2B", "Product feedback", "Other"],
+        formSuccessMessage:
+          "We have received your message and will respond within one business day.",
+        mapEmbedUrl: DEFAULT_MAP_EMBED_URL,
+        googleMapsUrl: DEFAULT_GOOGLE_MAPS_URL,
+        placeLabel: "Saliah Dates",
       },
     },
   ];
@@ -684,8 +680,22 @@ async function main() {
   }
 
   const paymentMethods = [
+    {
+      id: "razorpay",
+      label: "Razorpay",
+      description: "Pay securely using UPI, cards, net banking, or wallets",
+      enabled: false,
+      sortOrder: 0,
+    },
     { id: "cod", label: "Cash on Delivery", description: "Pay when your order arrives", enabled: true, sortOrder: 1 },
     { id: "upi", label: "UPI", description: "Pay via UPI at order confirmation", enabled: true, sortOrder: 2 },
+    {
+      id: "card",
+      label: "Debit / Credit Card",
+      description: "Pay by debit or credit card at order confirmation",
+      enabled: true,
+      sortOrder: 3,
+    },
   ];
 
   for (const m of paymentMethods) {
@@ -706,6 +716,21 @@ async function main() {
     where: { key: "checkout" },
     create: { key: "checkout", value: { codEnabled: true } },
     update: { value: { codEnabled: true } },
+  });
+
+  await prisma.storeSetting.upsert({
+    where: { key: "gst" },
+    create: {
+      key: "gst",
+      value: {
+        ratePercent: 5,
+        label: "GST (5%)",
+        gstin: "",
+        showOnProducts: true,
+        pricesIncludeGst: true,
+      },
+    },
+    update: {},
   });
 
   const adminEmail = "admin@saliahfoods.com";

@@ -7,12 +7,18 @@ import { ProfileProvider } from "../../context/ProfileContext";
 import { WishlistProvider } from "../../context/WishlistContext";
 import { CatalogProvider } from "../../context/CatalogContext.jsx";
 import { HomeContentProvider } from "../../context/HomeContentContext.jsx";
+import { ContactContentProvider } from "../../context/ContactContentContext.jsx";
+import { FaqContentProvider } from "../../context/FaqContentContext.jsx";
+import { GstSettingsProvider } from "../../context/GstSettingsContext.jsx";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
 export function AppProviders({ children }) {
   const tree = (
     <HomeContentProvider>
+      <ContactContentProvider>
+      <FaqContentProvider>
+      <GstSettingsProvider>
       <CatalogProvider>
       <AuthProvider>
         <NotificationsProvider>
@@ -26,6 +32,9 @@ export function AppProviders({ children }) {
         </NotificationsProvider>
       </AuthProvider>
     </CatalogProvider>
+      </GstSettingsProvider>
+      </FaqContentProvider>
+      </ContactContentProvider>
     </HomeContentProvider>
   );
 

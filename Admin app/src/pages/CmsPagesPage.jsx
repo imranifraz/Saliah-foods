@@ -60,7 +60,15 @@ export function CmsPagesPage() {
                   </p>
                 </div>
                 <Link
-                  to={p.slug === "homepage" ? "/cms/home" : `/cms/pages/${p.slug}`}
+                  to={
+                    p.slug === "homepage"
+                      ? "/cms/home"
+                      : p.slug === "contact"
+                        ? "/cms/contact"
+                        : p.slug === "faq"
+                          ? "/cms/faq"
+                          : `/cms/pages/${p.slug}`
+                  }
                   className="btn-primary shrink-0 text-xs"
                 >
                   Edit

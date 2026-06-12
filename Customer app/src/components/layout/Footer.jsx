@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { contactInfo } from "../../data/pages";
 import { useHomeContent } from "../../context/HomeContentContext.jsx";
+import { useContactContent } from "../../context/ContactContentContext.jsx";
 import { resolveMediaUrl } from "../../lib/api.js";
 import { OptimizedImage } from "../ui/OptimizedImage";
 
@@ -86,7 +86,8 @@ function FooterLink({ to, children, external = false }) {
 export function Footer() {
   const year = new Date().getFullYear();
   const { content: homeContent } = useHomeContent();
-  const { email, phone, phoneTel, hours, address } = contactInfo;
+  const { contact } = useContactContent();
+  const { email, phone, phoneTel, hours, address } = contact;
   const addressLine = address.split("\n")[0];
 
   return (

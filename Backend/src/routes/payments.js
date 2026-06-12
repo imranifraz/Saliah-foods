@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import Razorpay from "razorpay";
 import { Router } from "express";
-import { prisma } from "../lib/prisma.js";
+import { getCheckoutPaymentMethods } from "../lib/checkoutPayments.js";
 import {
   getRazorpayConfig,
   isRazorpayConfigured,
@@ -13,8 +13,8 @@ import { requireAuth } from "../middleware/auth.js";
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
 
-function getRazorpayClient() {
-  const { keyId, keySecret } = getRazorpayConfig();
+async function getRazorpayClient() {
+  const { keyId, keySecret } = await getRazorpayConfig();
   return new Razorpay({
     key_id: keyId,
     key_secret: keySecret,
@@ -43,18 +43,8 @@ function createTestPayment(userId, amount) {
 
 router.get("/methods", async (_req, res, next) => {
   try {
-    const methods = await prisma.paymentMethod.findMany({
-      where: { enabled: true },
-      orderBy: { sortOrder: "asc" },
-    });
-    const shipping = await prisma.storeSetting.findUnique({ where: { key: "shipping" } });
-    res.json({
-      ok: true,
-      methods,
-      shipping: shipping?.value ?? { freeShippingThreshold: 999, shippingFee: 99 },
-      razorpayConfigured: isRazorpayConfigured(),
-      testPaymentsAllowed: isTestPaymentsAllowed(),
-    });
+    const checkout = await getCheckoutPaymentMethods();
+    res.json({ ok: true, ...checkout });
   } catch (err) {
     next(err);
   }
@@ -62,7 +52,7 @@ router.get("/methods", async (_req, res, next) => {
 
 router.post("/test/verify", requireAuth, async (req, res, next) => {
   try {
-    if (!isTestPaymentsAllowed()) {
+    if (!(await isTestPaymentsAllowed())) {
       return res.status(403).json({ ok: false, error: "Test payments are not available" });
     }
 
@@ -99,8 +89,8 @@ router.post("/razorpay/order", requireAuth, async (req, res, next) => {
       return res.status(400).json({ ok: false, error: "Valid payment amount is required" });
     }
 
-    const { keyId } = getRazorpayConfig();
-    const client = getRazorpayClient();
+    const { keyId } = await getRazorpayConfig();
+    const client = await getRazorpayClient();
     const order = await client.orders.create({
       amount: Math.round(amount * 100),
       currency: "INR",
@@ -127,7 +117,7 @@ router.post("/razorpay/verify", requireAuth, async (req, res, next) => {
       return res.status(400).json({ ok: false, error: "Incomplete Razorpay payment response" });
     }
 
-    const { keySecret } = getRazorpayConfig();
+    const { keySecret } = await getRazorpayConfig();
     const expectedSignature = crypto
       .createHmac("sha256", keySecret)
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
@@ -137,7 +127,7 @@ router.post("/razorpay/verify", requireAuth, async (req, res, next) => {
       return res.status(400).json({ ok: false, error: "Razorpay payment verification failed" });
     }
 
-    const client = getRazorpayClient();
+    const client = await getRazorpayClient();
     const razorpayOrder = await client.orders.fetch(razorpayOrderId);
     const payment = {
       gateway: "razorpay",

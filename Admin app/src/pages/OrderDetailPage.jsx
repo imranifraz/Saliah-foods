@@ -29,6 +29,7 @@ export function OrderDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
 
   useEffect(() => {
     apiFetch(`/api/admin/orders/${id}`)
@@ -40,6 +41,24 @@ export function OrderDetailPage() {
       })
       .catch((e) => setError(e.message));
   }, [id]);
+
+  const manualPaymentMethods = new Set(["cod", "upi", "card"]);
+  const canMarkPaid =
+    manualPaymentMethods.has(order?.paymentMethod) &&
+    (order?.customer?.payment?.status ?? "pending") === "pending";
+
+  async function handleMarkPaid() {
+    setError("");
+    setMarkingPaid(true);
+    try {
+      const d = await apiFetch(`/api/admin/orders/${id}/payment/mark-paid`, { method: "PATCH" });
+      setOrder(d.order);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setMarkingPaid(false);
+    }
+  }
 
   async function handleSave(e) {
     e.preventDefault();
@@ -68,12 +87,13 @@ export function OrderDetailPage() {
   const c = order.customer ?? {};
   const payment = c.payment ?? {};
   const refund = getRefundDetails(order);
-  const paymentMethodLabel =
-    order.paymentMethod === "razorpay"
-      ? "Razorpay"
-      : order.paymentMethod === "upi"
-        ? "UPI"
-        : order.paymentMethod ?? "—";
+  const paymentMethodLabels = {
+    razorpay: "Razorpay",
+    upi: "UPI",
+    card: "Card",
+    cod: "Cash on delivery",
+  };
+  const paymentMethodLabel = paymentMethodLabels[order.paymentMethod] ?? order.paymentMethod ?? "—";
 
   return (
     <div>
@@ -124,18 +144,37 @@ export function OrderDetailPage() {
                 <div>
                   <dt className="text-xs text-emerald-900/50">Amount paid</dt>
                   <dd className="mt-1 font-medium">
-                    {formatRefundAmount(payment.verifiedAmount ?? order.total)}
+                    {payment.status === "paid"
+                      ? formatRefundAmount(payment.verifiedAmount ?? order.total)
+                      : "—"}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-emerald-900/50">Paid on</dt>
-                  <dd className="mt-1">{formatPaymentDateTime(payment.verifiedAt ?? order.createdAt)}</dd>
+                  <dd className="mt-1">
+                    {payment.verifiedAt ? formatPaymentDateTime(payment.verifiedAt) : "—"}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-emerald-900/50">Payment ID</dt>
                   <dd className="mt-1 break-all font-mono text-xs">{payment.razorpayPaymentId ?? "—"}</dd>
                 </div>
               </dl>
+              {canMarkPaid ? (
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={markingPaid}
+                    onClick={handleMarkPaid}
+                  >
+                    {markingPaid ? "Marking paid…" : "Mark payment as received"}
+                  </button>
+                  <p className="mt-2 text-xs text-emerald-900/45">
+                    Use after the customer pays by UPI, card, or cash on delivery.
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             {refund ? (

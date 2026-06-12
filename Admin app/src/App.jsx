@@ -23,6 +23,9 @@ import { BlogPostsPage } from "./pages/BlogPostsPage.jsx";
 import { BlogEditPage } from "./pages/BlogEditPage.jsx";
 import { PaymentsPage } from "./pages/PaymentsPage.jsx";
 import { TransactionsPage } from "./pages/TransactionsPage.jsx";
+import { ContactManagementPage } from "./pages/ContactManagementPage.jsx";
+import { ContactEnquiriesPage } from "./pages/ContactEnquiriesPage.jsx";
+import { FaqManagementPage } from "./pages/FaqManagementPage.jsx";
 
 export default function App() {
   return (
@@ -52,6 +55,9 @@ export default function App() {
             <Route path="admins/:id" element={<AdminDetailPage />} />
             <Route path="users/:id" element={<UserDetailPage />} />
             <Route path="reviews" element={<ReviewsPage />} />
+            <Route path="cms/contact" element={<ContactManagementPage />} />
+            <Route path="cms/faq" element={<FaqManagementPage />} />
+            <Route path="cms/enquiries" element={<ContactEnquiriesPage />} />
             <Route path="cms/pages" element={<CmsPagesPage />} />
             <Route path="cms/home" element={<CmsHomePage />} />
             <Route path="cms/pages/homepage" element={<CmsHomePage />} />

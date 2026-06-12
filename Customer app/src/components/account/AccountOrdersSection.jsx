@@ -4,6 +4,7 @@ import { useCart } from "../../context/CartContext";
 import { canCancelOrder, formatINR, formatOrderDate } from "../../data/orders";
 import { formatAddressSummary } from "../../data/profile";
 import { GST_LABEL } from "../../data/pricing";
+import { useGstSettings } from "../../context/GstSettingsContext.jsx";
 import { OrderTrackingTimeline } from "./OrderTrackingTimeline";
 import {
   AccountAlert,
@@ -259,6 +260,7 @@ function getReviewActionLabel(review) {
 }
 
 function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpenReview }) {
+  const { gstin } = useGstSettings();
   const [showDetails, setShowDetails] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
@@ -272,7 +274,9 @@ function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpe
       ? "Razorpay"
       : order.paymentMethod === "upi"
         ? "UPI"
-        : "Cash on Delivery";
+        : order.paymentMethod === "card"
+          ? "Debit / Credit Card"
+          : "Cash on Delivery";
 
   return (
     <article className="account-order-card">
@@ -363,7 +367,11 @@ function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpe
               Reorder
             </AccountBtn>
           ) : null}
-          <AccountBtn variant="ghost" className="account-btn--sm" onClick={() => downloadOrderInvoice(order)}>
+          <AccountBtn
+            variant="ghost"
+            className="account-btn--sm"
+            onClick={() => downloadOrderInvoice(order, { gstin })}
+          >
             Download invoice
           </AccountBtn>
           {canCancelOrder(order) && !showCancel ? (

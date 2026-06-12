@@ -1,9 +1,19 @@
-import { formatINR, calcOrderBreakdown, GST_LABEL } from "../../data/pricing";
+import { formatINR } from "../../data/pricing";
 import { getShippingFee, getDefaultShippingSettings } from "../../data/checkout";
+import { useGstSettings } from "../../context/GstSettingsContext.jsx";
+import { useCart } from "../../context/CartContext";
 import { OptimizedImage } from "../ui/OptimizedImage";
 import { ProductPrice } from "../ui/ProductPrice";
 
-export function CheckoutOrderSummary({ items, subtotal, shippingSettings, compact = false }) {
+export function CheckoutOrderSummary({
+  items,
+  subtotal,
+  shippingSettings,
+  compact = false,
+  editable = false,
+}) {
+  const { label: gstLabel, calcOrderBreakdown } = useGstSettings();
+  const { updateQuantity, removeItem } = useCart();
   const settings = shippingSettings ?? getDefaultShippingSettings();
   const shipping = getShippingFee(subtotal, settings);
   const breakdown = calcOrderBreakdown(subtotal, shipping);
@@ -40,7 +50,31 @@ export function CheckoutOrderSummary({ items, subtotal, shippingSettings, compac
                 </p>
               ) : null}
               <div className="mt-1 flex items-end justify-between gap-2">
-                <span className="font-body text-[11px] text-emerald-900/40">Qty {item.quantity}</span>
+                {editable ? (
+                  <div className="flex items-center rounded-full border border-cream-200/80 bg-cream-50/80">
+                    <button
+                      type="button"
+                      className="flex h-7 w-7 items-center justify-center font-body text-sm text-emerald-900/60 hover:text-emerald-900"
+                      aria-label={`Decrease quantity of ${item.name}`}
+                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                    >
+                      −
+                    </button>
+                    <span className="min-w-[1.25rem] text-center font-body text-[12px] font-medium text-emerald-900">
+                      {item.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      className="flex h-7 w-7 items-center justify-center font-body text-sm text-emerald-900/60 hover:text-emerald-900"
+                      aria-label={`Increase quantity of ${item.name}`}
+                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                ) : (
+                  <span className="font-body text-[11px] text-emerald-900/40">Qty {item.quantity}</span>
+                )}
                 <ProductPrice
                   priceValue={(item.priceValue ?? 0) * item.quantity}
                   mrpValue={item.mrpValue ? item.mrpValue * item.quantity : undefined}
@@ -48,6 +82,15 @@ export function CheckoutOrderSummary({ items, subtotal, shippingSettings, compac
                   showDiscountBadge={false}
                 />
               </div>
+              {editable ? (
+                <button
+                  type="button"
+                  className="mt-2 font-body text-[11px] text-emerald-900/35 underline-offset-2 hover:text-emerald-900/60 hover:underline"
+                  onClick={() => removeItem(item.id)}
+                >
+                  Remove
+                </button>
+              ) : null}
             </div>
           </li>
         ))}
@@ -59,7 +102,7 @@ export function CheckoutOrderSummary({ items, subtotal, shippingSettings, compac
           <span>{formatINR(breakdown.subtotal)}</span>
         </div>
         <div className="flex justify-between text-emerald-900/55">
-          <span>{GST_LABEL} (included)</span>
+          <span>{gstLabel} (included)</span>
           <span>{formatINR(breakdown.gstAmount)}</span>
         </div>
         <div className="flex justify-between text-emerald-900/55">

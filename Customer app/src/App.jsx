@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Header } from "./components/layout/Header";
 import { Footer } from "./components/layout/Footer";
 import { StructuredData } from "./components/seo/StructuredData";
+import { AnalyticsRouteListener } from "./components/analytics/AnalyticsRouteListener";
 import { RequireAuth } from "./components/auth/RequireAuth";
 import { AppProviders } from "./components/auth/AppProviders";
 import { HomePage } from "./pages/HomePage";
@@ -27,6 +28,7 @@ export default function App() {
     <BrowserRouter>
       <AppProviders>
             <StructuredData />
+            <AnalyticsRouteListener />
             <a
               href="#main"
               className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-emerald-800 focus:px-4 focus:py-2 focus:text-cream-50"

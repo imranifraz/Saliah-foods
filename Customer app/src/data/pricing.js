@@ -3,6 +3,17 @@
 export const GST_RATE = 0.05;
 export const GST_LABEL = "GST (5%)";
 
+export function getDefaultGstSettings() {
+  return {
+    ratePercent: GST_RATE * 100,
+    rate: GST_RATE,
+    label: GST_LABEL,
+    gstin: "",
+    showOnProducts: true,
+    pricesIncludeGst: true,
+  };
+}
+
 export function formatINR(amount) {
   return `₹${Math.round(amount).toLocaleString("en-IN")}`;
 }
@@ -63,9 +74,12 @@ export function splitGstFromInclusive(inclusiveTotal, rate = GST_RATE) {
   };
 }
 
-export function calcOrderBreakdown(subtotal, shipping = 0) {
-  const itemsGst = splitGstFromInclusive(subtotal);
-  const shippingGst = shipping > 0 ? splitGstFromInclusive(shipping) : { taxable: 0, gst: 0, inclusive: 0 };
+export function calcOrderBreakdown(subtotal, shipping = 0, gstSettings = getDefaultGstSettings()) {
+  const rate = Number(gstSettings.rate ?? GST_RATE);
+  const label = gstSettings.label ?? GST_LABEL;
+  const itemsGst = splitGstFromInclusive(subtotal, rate);
+  const shippingGst =
+    shipping > 0 ? splitGstFromInclusive(shipping, rate) : { taxable: 0, gst: 0, inclusive: 0 };
   const total = subtotal + shipping;
 
   return {
@@ -74,7 +88,7 @@ export function calcOrderBreakdown(subtotal, shipping = 0) {
     total,
     gstAmount: Math.round((itemsGst.gst + shippingGst.gst) * 100) / 100,
     taxableAmount: Math.round((itemsGst.taxable + shippingGst.taxable) * 100) / 100,
-    gstRate: GST_RATE,
-    gstLabel: GST_LABEL,
+    gstRate: rate,
+    gstLabel: label,
   };
 }

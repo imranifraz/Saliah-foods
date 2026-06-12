@@ -38,7 +38,45 @@ export const PAYMENT_METHODS = [
     label: "Razorpay",
     description: "Pay securely online using UPI, cards, net banking, or wallets",
   },
+  {
+    id: "cod",
+    label: "Cash on Delivery",
+    description: "Pay when your order arrives",
+  },
+  {
+    id: "upi",
+    label: "UPI",
+    description: "Pay via UPI at order confirmation",
+  },
+  {
+    id: "card",
+    label: "Debit / Credit Card",
+    description: "Pay by debit or credit card at order confirmation",
+  },
 ];
+
+export function getPaymentMethodLabel(methodId, methods = PAYMENT_METHODS) {
+  return methods.find((method) => method.id === methodId)?.label ?? methodId;
+}
+
+export function getCheckoutSubmitLabel(paymentMethod, { submitting, emailVerified, razorpayConfigured, testPaymentsAllowed }) {
+  if (submitting) {
+    return paymentMethod === "razorpay" ? "Processing payment…" : "Placing order…";
+  }
+  if (!emailVerified) return "Verify email to continue";
+  if (!paymentMethod) return "Select a payment method";
+
+  if (paymentMethod === "razorpay") {
+    if (razorpayConfigured) return "Pay with Razorpay";
+    if (testPaymentsAllowed) return "Pay online (test)";
+    return "Payment unavailable";
+  }
+
+  if (paymentMethod === "cod") return "Place order (Cash on delivery)";
+  if (paymentMethod === "upi") return "Place order (UPI)";
+  if (paymentMethod === "card") return "Place order (Card)";
+  return "Place order";
+}
 
 export const FREE_SHIPPING_THRESHOLD = 999;
 export const SHIPPING_FEE = 99;

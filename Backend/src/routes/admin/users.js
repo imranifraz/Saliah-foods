@@ -13,6 +13,7 @@ function formatUser(user, counts = {}) {
     fullName: user.fullName,
     email: user.email,
     phone: user.phone,
+    avatarUrl: user.avatarUrl ?? "",
     role: "customer",
     provider: user.provider ?? "local",
     hasPassword: Boolean(user.passwordHash),
@@ -30,6 +31,9 @@ router.get("/", async (req, res, next) => {
   try {
     const { q } = req.query;
     const where = {};
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const pageSize = Math.min(50, Math.max(1, Number.parseInt(req.query.pageSize, 10) || 25));
+    const skip = (page - 1) * pageSize;
 
     if (q?.trim()) {
       const search = q.trim();
@@ -40,13 +44,18 @@ router.get("/", async (req, res, next) => {
       ];
     }
 
-    const users = await prisma.user.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: { select: { orders: true, addresses: true, wishlistItems: true } },
-      },
-    });
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize,
+        include: {
+          _count: { select: { orders: true, addresses: true, wishlistItems: true } },
+        },
+      }),
+      prisma.user.count({ where }),
+    ]);
 
     res.json({
       ok: true,
@@ -57,6 +66,9 @@ router.get("/", async (req, res, next) => {
           wishlistCount: u._count.wishlistItems,
         })
       ),
+      total,
+      page,
+      pageSize,
     });
   } catch (err) {
     next(err);

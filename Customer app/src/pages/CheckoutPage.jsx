@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { PageMeta } from "../components/pages/PageMeta";
 import { CheckoutAddressSection } from "../components/checkout/CheckoutAddressSection";
+import { CheckoutPaymentSection } from "../components/checkout/CheckoutPaymentSection";
 import { CheckoutOrderSummary } from "../components/checkout/CheckoutOrderSummary";
 import { OrderSuccessPopup } from "../components/checkout/OrderSuccessPopup";
 import { EmailVerificationBanner } from "../components/auth/EmailVerificationBanner";
@@ -14,10 +15,11 @@ import { addressToCheckoutCustomer } from "../data/profile";
 import {
   getEmptyCheckoutForm,
   getDefaultShippingSettings,
+  getCheckoutSubmitLabel,
   getShippingFee,
   validateCheckoutForm,
 } from "../data/checkout";
-import { calcOrderBreakdown } from "../data/pricing";
+import { useGstSettings } from "../context/GstSettingsContext.jsx";
 import { createOrderApi } from "../services/orderApi.js";
 import {
   createRazorpayOrderApi,
@@ -26,12 +28,14 @@ import {
   verifyRazorpayPaymentApi,
   verifyTestPaymentApi,
 } from "../services/paymentApi.js";
+import { trackPurchase } from "../lib/analytics.js";
 
 export function CheckoutPage() {
   const navigate = useNavigate();
   const reduce = useReducedMotion();
   const { user, emailVerified, resendVerificationEmail } = useAuth();
   const { items, subtotal, clearCart, closeCart } = useCart();
+  const { calcOrderBreakdown } = useGstSettings();
   const { addOrder } = useOrders();
   const { addresses, defaultAddress, addAddress, loading: addressesLoading } = useProfile();
 
@@ -39,13 +43,19 @@ export function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [newForm, setNewForm] = useState({ ...getEmptyCheckoutForm(), addressLabel: "" });
   const [saveNewToProfile, setSaveNewToProfile] = useState(true);
-  const paymentMethod = "razorpay";
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
-  const [razorpayConfigured, setRazorpayConfigured] = useState(true);
+  const [razorpayConfigured, setRazorpayConfigured] = useState(false);
   const [testPaymentsAllowed, setTestPaymentsAllowed] = useState(false);
   const [shippingSettings, setShippingSettings] = useState(getDefaultShippingSettings);
+
+  useEffect(() => {
+    if (completedOrder) trackPurchase(completedOrder);
+  }, [completedOrder]);
 
   useEffect(() => {
     if (addressesLoading) return;
@@ -71,7 +81,13 @@ export function CheckoutPage() {
   useEffect(() => {
     fetchPaymentMethodsApi()
       .then((data) => {
-        setRazorpayConfigured(data.razorpayConfigured !== false);
+        const methods = data.methods ?? [];
+        setPaymentMethods(methods);
+        setPaymentMethod((current) => {
+          if (current && methods.some((method) => method.id === current)) return current;
+          return methods[0]?.id ?? "";
+        });
+        setRazorpayConfigured(data.razorpayConfigured === true);
         setTestPaymentsAllowed(data.testPaymentsAllowed === true);
         if (data.shipping) {
           setShippingSettings({
@@ -82,7 +98,11 @@ export function CheckoutPage() {
           });
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setPaymentMethods([]);
+        setPaymentMethod("");
+      })
+      .finally(() => setPaymentMethodsLoading(false));
   }, []);
 
   if (items.length === 0 && !completedOrder) {
@@ -179,49 +199,53 @@ export function CheckoutPage() {
       const pricing = calcOrderBreakdown(subtotal, shipping);
       let paymentVerificationToken = null;
 
-      if (testPaymentsAllowed) {
-        const paymentVerification = await verifyTestPaymentApi({ amount: pricing.total });
-        paymentVerificationToken = paymentVerification.verificationToken;
-      } else if (razorpayConfigured) {
-        await loadRazorpayCheckout();
-        const razorpayData = await createRazorpayOrderApi({
-          amount: pricing.total,
-        });
-
-        const paymentResponse = await new Promise((resolve, reject) => {
-          const razorpay = new window.Razorpay({
-            key: razorpayData.keyId,
-            order_id: razorpayData.order.id,
-            amount: razorpayData.order.amount,
-            currency: razorpayData.order.currency,
-            name: "Saliah Foods",
-            description: `Payment for ${items.length} item${items.length !== 1 ? "s" : ""}`,
-            prefill: {
-              name: customer.fullName,
-              email: customer.email,
-              contact: customer.phone,
-            },
-            notes: {
-              addressLabel: customer.addressLabel ?? "",
-            },
-            theme: {
-              color: "#16312a",
-            },
-            modal: {
-              ondismiss: () => reject(new Error("Payment was cancelled")),
-            },
-            handler: (response) => resolve(response),
+      if (paymentMethod === "razorpay") {
+        if (testPaymentsAllowed && !razorpayConfigured) {
+          const paymentVerification = await verifyTestPaymentApi({ amount: pricing.total });
+          paymentVerificationToken = paymentVerification.verificationToken;
+        } else if (razorpayConfigured) {
+          await loadRazorpayCheckout();
+          const razorpayData = await createRazorpayOrderApi({
+            amount: pricing.total,
           });
 
-          razorpay.on("payment.failed", (event) => {
-            reject(new Error(event.error?.description ?? "Online payment failed"));
+          const paymentResponse = await new Promise((resolve, reject) => {
+            const razorpay = new window.Razorpay({
+              key: razorpayData.keyId,
+              order_id: razorpayData.order.id,
+              amount: razorpayData.order.amount,
+              currency: razorpayData.order.currency,
+              name: "Saliah Foods",
+              description: `Payment for ${items.length} item${items.length !== 1 ? "s" : ""}`,
+              prefill: {
+                name: customer.fullName,
+                email: customer.email,
+                contact: customer.phone,
+              },
+              notes: {
+                addressLabel: customer.addressLabel ?? "",
+              },
+              theme: {
+                color: "#16312a",
+              },
+              modal: {
+                ondismiss: () => reject(new Error("Payment was cancelled")),
+              },
+              handler: (response) => resolve(response),
+            });
+
+            razorpay.on("payment.failed", (event) => {
+              reject(new Error(event.error?.description ?? "Online payment failed"));
+            });
+
+            razorpay.open();
           });
 
-          razorpay.open();
-        });
-
-        const paymentVerification = await verifyRazorpayPaymentApi(paymentResponse);
-        paymentVerificationToken = paymentVerification.verificationToken;
+          const paymentVerification = await verifyRazorpayPaymentApi(paymentResponse);
+          paymentVerificationToken = paymentVerification.verificationToken;
+        } else {
+          throw new Error("Online payment is not available right now.");
+        }
       }
 
       const data = await createOrderApi({
@@ -246,6 +270,14 @@ export function CheckoutPage() {
       setSubmitting(false);
     }
   };
+
+  const requiresOnlinePayment = paymentMethod === "razorpay";
+  const onlinePaymentReady = razorpayConfigured || testPaymentsAllowed;
+  const canSubmit =
+    !paymentMethodsLoading &&
+    Boolean(paymentMethod) &&
+    paymentMethods.length > 0 &&
+    (!requiresOnlinePayment || onlinePaymentReady);
 
   if (completedOrder) {
     return (
@@ -284,11 +316,11 @@ export function CheckoutPage() {
           >
             <h1 className="font-display text-[clamp(1.75rem,3vw,2.5rem)] font-medium text-emerald-900">Checkout</h1>
             <p className="mt-2 font-body text-sm text-emerald-900/45">
-              {razorpayConfigured
-                ? "Select a saved address or add a new one, then complete your online payment."
-                : testPaymentsAllowed
-                  ? "Select a saved address or add a new one, then complete a test online payment."
-                  : "Online payment is not available yet."}
+              {paymentMethodsLoading
+                ? "Loading checkout options…"
+                : paymentMethods.length
+                  ? "Select a delivery address and your preferred payment method."
+                  : "Checkout is unavailable until at least one payment method is enabled in admin."}
             </p>
           </motion.header>
 
@@ -317,19 +349,20 @@ export function CheckoutPage() {
                 errors={errors}
               />
 
-              <section className="rounded-2xl border border-cream-200/80 bg-white/90 p-5 md:p-6">
-                <h2 className="font-display text-lg text-emerald-900">Online payment</h2>
-                <div className="mt-4 rounded-xl border border-emerald-900/15 bg-emerald-900/[0.03] px-4 py-4">
-                  <p className="font-body text-sm font-medium text-emerald-900">Razorpay</p>
-                  <p className="mt-1 font-body text-[12px] leading-relaxed text-emerald-900/45">
-                    {razorpayConfigured
-                      ? "Pay securely using UPI, cards, net banking, or wallets. Cash on delivery is not available."
-                      : testPaymentsAllowed
-                        ? "Razorpay keys are not added yet. Test mode simulates a successful online payment for development."
-                        : "Payment gateway is not configured yet."}
-                  </p>
-                </div>
-              </section>
+              <CheckoutPaymentSection
+                methods={paymentMethods}
+                loading={paymentMethodsLoading}
+                value={paymentMethod}
+                onChange={(nextMethod) => {
+                  setPaymentMethod(nextMethod);
+                  if (errors.paymentMethod) {
+                    setErrors((prev) => ({ ...prev, paymentMethod: undefined }));
+                  }
+                }}
+                error={errors.paymentMethod}
+                razorpayConfigured={razorpayConfigured}
+                testPaymentsAllowed={testPaymentsAllowed}
+              />
 
               <div className="lg:hidden">
                 <CheckoutOrderSummary
@@ -337,6 +370,7 @@ export function CheckoutPage() {
                   subtotal={subtotal}
                   shippingSettings={shippingSettings}
                   compact
+                  editable
                 />
               </div>
 
@@ -348,20 +382,17 @@ export function CheckoutPage() {
 
               <motion.button
                 type="submit"
-                disabled={submitting || !emailVerified || (!razorpayConfigured && !testPaymentsAllowed)}
+                disabled={submitting || !emailVerified || !canSubmit || paymentMethodsLoading}
                 className="pdp-btn-primary w-full rounded-full py-4 font-body text-[11px] font-semibold uppercase tracking-[0.2em] text-white disabled:opacity-60 sm:w-auto sm:px-12"
                 whileHover={reduce || submitting ? undefined : { y: -2 }}
                 whileTap={reduce || submitting ? undefined : { scale: 0.985 }}
               >
-                {submitting
-                  ? "Processing payment…"
-                  : !emailVerified
-                    ? "Verify email to pay"
-                    : razorpayConfigured
-                      ? "Pay with Razorpay"
-                      : testPaymentsAllowed
-                        ? "Pay online (test)"
-                        : "Payment unavailable"}
+                {getCheckoutSubmitLabel(paymentMethod, {
+                  submitting,
+                  emailVerified,
+                  razorpayConfigured,
+                  testPaymentsAllowed,
+                })}
               </motion.button>
             </div>
 
@@ -370,6 +401,7 @@ export function CheckoutPage() {
                 items={items}
                 subtotal={subtotal}
                 shippingSettings={shippingSettings}
+                editable
               />
             </aside>
           </form>

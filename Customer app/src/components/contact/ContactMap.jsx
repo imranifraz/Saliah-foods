@@ -1,7 +1,16 @@
 import { getContactMapConfig } from "../../data/contactMap";
 
 export function ContactMap({ config: configProp }) {
-  const config = configProp ?? getContactMapConfig();
+  const fallback = getContactMapConfig();
+  const config = {
+    ...fallback,
+    ...(configProp ?? {}),
+    embedSrc: configProp?.embedSrc || fallback.embedSrc,
+    googleMapsUrl: configProp?.googleMapsUrl || fallback.googleMapsUrl,
+    placeLabel: configProp?.placeLabel || fallback.placeLabel,
+  };
+
+  if (!config.embedSrc) return null;
 
   return (
     <section className="contact-map" aria-labelledby="contact-map-title">

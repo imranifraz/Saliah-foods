@@ -46,6 +46,15 @@ export function getOrderStatusBadge(status) {
 
 export function getPaymentStatusLabel(order) {
   if (order.customer?.payment?.status === "pending_configuration") return "Payment pending";
+  if (order.customer?.payment?.status === "paid") {
+    if (order.paymentMethod === "cod") return "Paid on delivery";
+    if (order.paymentMethod === "upi") return "Paid via UPI";
+    if (order.paymentMethod === "card") return "Paid by card";
+    if (order.paymentMethod === "razorpay") return "Paid online";
+  }
+  if (order.customer?.payment?.status === "pending" && order.paymentMethod === "upi") return "UPI payment pending";
+  if (order.customer?.payment?.status === "pending" && order.paymentMethod === "card") return "Card payment pending";
+  if (order.customer?.payment?.status === "pending" && order.paymentMethod === "cod") return "Pay on delivery";
   if (order.customer?.payment?.status === "refunded") {
     const amount =
       order.customer.payment.refundAmount ??
@@ -62,7 +71,9 @@ export function getPaymentStatusLabel(order) {
   if (order.status === "cancelled") {
     return order.paymentMethod === "razorpay" ? "Refund initiated" : "Refunded";
   }
-  if (order.paymentMethod === "razorpay" || order.paymentMethod === "upi") return "Paid online";
+  if (order.paymentMethod === "razorpay") {
+    return "Paid online";
+  }
   if (order.status === "delivered") return "Paid on delivery";
   return "Pay on delivery";
 }
@@ -86,6 +97,7 @@ function formatInvoiceDate(value) {
 function getInvoicePaymentMethod(order) {
   if (order.paymentMethod === "razorpay") return "Razorpay";
   if (order.paymentMethod === "upi") return "UPI";
+  if (order.paymentMethod === "card") return "Debit / Credit Card";
   return "Cash on Delivery";
 }
 
@@ -104,7 +116,9 @@ async function loadImageAsDataUrl(url) {
   });
 }
 
-export async function downloadOrderInvoice(order) {
+export async function downloadOrderInvoice(order, options = {}) {
+  const invoiceGstin =
+    String(options.gstin ?? "").trim() || COMPANY_GST_NUMBER || "";
   const doc = new jsPDF({
     unit: "pt",
     format: "a4",
@@ -160,7 +174,7 @@ export async function downloadOrderInvoice(order) {
       .filter(Boolean),
     `Phone: ${contactInfo.phone}`,
     `Email: ${contactInfo.email}`,
-    `GSTIN: ${COMPANY_GST_NUMBER || "Not configured"}`,
+    `GSTIN: ${invoiceGstin || "Not configured"}`,
   ];
   doc.text(companyLines, margin, cursorY + 18, { lineHeightFactor: 1.45 });
 

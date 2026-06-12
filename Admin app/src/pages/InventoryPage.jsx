@@ -5,6 +5,7 @@ import { getCustomerStoreUrl } from "../config/adminApps.js";
 import { ProductManageModal } from "../components/ProductManageModal.jsx";
 import { InventoryHistoryModal } from "../components/InventoryHistoryModal.jsx";
 import { InventoryManageModal } from "../components/InventoryManageModal.jsx";
+import { InlineAvailableStockCell } from "../components/InlineAvailableStockCell.jsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { StatCard } from "../components/ui/StatCard.jsx";
@@ -131,25 +132,40 @@ function TableIconButton({ onClick, label, children, disabled = false }) {
   );
 }
 
-function StockPill({ inStock, isLowStock }) {
-  if (isLowStock) {
-    return (
-      <span className="inline-flex whitespace-nowrap rounded-full border border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--admin-link)]">
-        Low stock
-      </span>
-    );
-  }
+function IconStockToggle({ className = "h-4 w-4" }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+    </svg>
+  );
+}
+
+function StockStatusButton({ inStock, isLowStock, loading, onToggle }) {
+  const actionLabel = inStock ? "Mark out of stock" : "Mark in stock";
+  const label = isLowStock ? "Low stock" : inStock ? "In stock" : "Out of stock";
 
   return (
-    <span
-      className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
-        inStock
-          ? "border-[var(--admin-success-bg)] bg-[var(--admin-badge-bg)] text-[var(--admin-success)]"
-          : "border-[var(--admin-danger-bg)] bg-[var(--admin-danger-bg)] text-[var(--admin-danger)]"
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={loading}
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+        isLowStock
+          ? "border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] text-[var(--admin-link)] hover:opacity-90"
+          : inStock
+            ? "border-[var(--admin-success-bg)] bg-[var(--admin-badge-bg)] text-[var(--admin-success)] hover:opacity-90"
+            : "border-[var(--admin-danger-bg)] bg-[var(--admin-danger-bg)] text-[var(--admin-danger)] hover:opacity-90"
       }`}
+      aria-label={actionLabel}
+      title={actionLabel}
     >
-      {inStock ? "In stock" : "Out of stock"}
-    </span>
+      {loading ? "…" : (
+        <>
+          <IconStockToggle className="h-3.5 w-3.5" />
+          {label}
+        </>
+      )}
+    </button>
   );
 }
 
@@ -291,6 +307,8 @@ export function InventoryPage() {
   const [bulkWorking, setBulkWorking] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkStockTarget, setBulkStockTarget] = useState(null);
+  const [stockTarget, setStockTarget] = useState(null);
+  const [togglingStockId, setTogglingStockId] = useState(null);
   const [manageInventory, setManageInventory] = useState(null);
   const [manageProduct, setManageProduct] = useState(null);
   const [historyTarget, setHistoryTarget] = useState(null);
@@ -506,6 +524,26 @@ export function InventoryPage() {
       setError(err.message);
     } finally {
       setBulkWorking(false);
+    }
+  }
+
+  async function toggleVariantStock(item) {
+    setError("");
+    setTogglingStockId(item.id);
+    try {
+      await apiFetch("/api/admin/inventory/bulk", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ids: [item.id],
+          patch: { inStock: !item.inStock },
+        }),
+      });
+      setStockTarget(null);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setTogglingStockId(null);
     }
   }
 
@@ -897,11 +935,16 @@ export function InventoryPage() {
                           </Link>
                         </DataCell>
                         <DataCell className="font-semibold text-[var(--admin-fg)]">
-                          {item.availableQuantity ?? 0}
+                          <InlineAvailableStockCell item={item} onSaved={load} onError={setError} />
                         </DataCell>
                         <DataCell className="admin-muted">{item.reservedQuantity ?? 0}</DataCell>
                         <DataCell>
-                          <StockPill inStock={item.inStock} isLowStock={item.isLowStock} />
+                          <StockStatusButton
+                            inStock={item.inStock}
+                            isLowStock={item.isLowStock}
+                            loading={togglingStockId === item.id}
+                            onToggle={() => setStockTarget(item)}
+                          />
                         </DataCell>
                         <DataCell className="admin-muted whitespace-nowrap text-sm">
                           {formatUpdatedAt(item.updatedAt)}
@@ -1008,6 +1051,28 @@ export function InventoryPage() {
         open={Boolean(historyTarget)}
         item={historyTarget}
         onClose={() => setHistoryTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(stockTarget)}
+        title={stockTarget?.inStock ? "Mark out of stock?" : "Mark in stock?"}
+        description={
+          stockTarget
+            ? stockTarget.inStock
+              ? `Set "${stockTarget.sku}" to zero available stock? It will be unavailable on the shop.`
+              : `Restock "${stockTarget.sku}"? On-hand quantity will be set to at least 10 units (or reserved + 10 if higher).`
+            : ""
+        }
+        confirmLabel={stockTarget?.inStock ? "Mark out of stock" : "Mark in stock"}
+        cancelLabel="Cancel"
+        danger={Boolean(stockTarget?.inStock)}
+        loading={Boolean(togglingStockId)}
+        onClose={() => {
+          if (!togglingStockId) setStockTarget(null);
+        }}
+        onConfirm={() => {
+          if (stockTarget) toggleVariantStock(stockTarget);
+        }}
       />
 
       <ConfirmDialog

@@ -1,4 +1,4 @@
-import { GST_LABEL } from "../../data/pricing";
+import { useGstSettings } from "../../context/GstSettingsContext.jsx";
 
 /**
  * MRP (struck through) + selling price — standard Indian retail discount display.
@@ -14,6 +14,8 @@ export function ProductPrice({
   showDiscountBadge = true,
   showInclGst = false,
 }) {
+  const { label: gstLabel, showOnProducts } = useGstSettings();
+  const showGstNote = showInclGst && showOnProducts;
   const selling = price ?? (priceValue != null ? `₹${priceValue.toLocaleString("en-IN")}` : "");
   const list = mrp ?? (mrpValue != null ? `₹${mrpValue.toLocaleString("en-IN")}` : null);
   const hasDiscount = mrpValue != null && priceValue != null && mrpValue > priceValue;
@@ -34,8 +36,8 @@ export function ProductPrice({
     return (
       <div className={`product-price ${sizeClass} ${className}`.trim()}>
         <span className="product-price__selling">{selling}</span>
-        {showInclGst ? (
-          <span className="product-price__gst-note">Incl. {GST_LABEL}</span>
+        {showGstNote ? (
+          <span className="product-price__gst-note">Incl. {gstLabel}</span>
         ) : null}
       </div>
     );
@@ -50,8 +52,8 @@ export function ProductPrice({
         ) : null}
       </div>
       <span className="product-price__selling">{selling}</span>
-      {showInclGst ? (
-        <span className="product-price__gst-note">Incl. {GST_LABEL}</span>
+      {showGstNote ? (
+        <span className="product-price__gst-note">Incl. {gstLabel}</span>
       ) : null}
     </div>
   );

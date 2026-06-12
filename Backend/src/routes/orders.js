@@ -6,8 +6,10 @@ import { getAvailableQuantity } from "../lib/inventoryConstants.js";
 import { reserveVariantStock } from "../lib/inventoryStock.js";
 import { applyOrderCancellation, canCustomerCancel } from "../lib/orderCancel.js";
 import { refundOrderPayment } from "../lib/razorpayRefund.js";
+import { isPaymentMethodAllowed } from "../lib/checkoutPayments.js";
 import { isRazorpayConfigured, isTestPaymentsAllowed } from "../lib/razorpay.js";
 import { formatReview } from "../lib/reviews.js";
+import { sendManualPaymentInstructions } from "../lib/orderPaymentMail.js";
 import { notifyNewOrder, notifyOrderCancelled } from "../lib/notifications.js";
 import { requireAuth } from "../middleware/auth.js";
 
@@ -97,12 +99,12 @@ async function resolveVariant(tx, item) {
   return match ? { ...match, product } : null;
 }
 
-function verifyRazorpayPaymentToken(token, userId, expectedAmount) {
+async function verifyRazorpayPaymentToken(token, userId, expectedAmount) {
   if (!token) {
-    if (isTestPaymentsAllowed()) {
+    if (await isTestPaymentsAllowed()) {
       throw new Error("Complete the test payment before placing your order");
     }
-    if (!isRazorpayConfigured()) {
+    if (!(await isRazorpayConfigured())) {
       throw new Error("Online payment is not available yet. Please try again later.");
     }
     throw new Error("Online payment verification is required before placing the order");
@@ -119,7 +121,7 @@ function verifyRazorpayPaymentToken(token, userId, expectedAmount) {
     throw new Error("Invalid payment verification for this user");
   }
 
-  if (payload.mode === "test" && !isTestPaymentsAllowed()) {
+  if (payload.mode === "test" && !(await isTestPaymentsAllowed())) {
     throw new Error("Test payments are disabled on the server");
   }
 
@@ -191,15 +193,27 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ ok: false, error: "Invalid order payload" });
     }
 
-    const normalizedPaymentMethod = String(paymentMethod ?? customer.paymentMethod ?? "razorpay")
+    const normalizedPaymentMethod = String(paymentMethod ?? customer.paymentMethod ?? "")
       .trim()
       .toLowerCase();
 
-    if (normalizedPaymentMethod !== "razorpay") {
-      return res.status(400).json({ ok: false, error: "Only online payment via Razorpay is available" });
+    if (!normalizedPaymentMethod) {
+      return res.status(400).json({ ok: false, error: "Select a payment method" });
     }
 
-    const payment = verifyRazorpayPaymentToken(paymentVerificationToken, req.user.id, total);
+    if (!(await isPaymentMethodAllowed(normalizedPaymentMethod))) {
+      return res.status(400).json({ ok: false, error: "Selected payment method is not available" });
+    }
+
+    let payment;
+    if (normalizedPaymentMethod === "razorpay") {
+      payment = await verifyRazorpayPaymentToken(paymentVerificationToken, req.user.id, total);
+    } else {
+      payment = {
+        method: normalizedPaymentMethod,
+        status: "pending",
+      };
+    }
 
     const createdAt = new Date();
     const order = await prisma.$transaction(async (tx) => {
@@ -250,19 +264,25 @@ router.post("/", async (req, res, next) => {
           total,
           gstAmount: gstAmount ?? null,
           gstLabel: gstLabel ?? null,
-          paymentMethod: "razorpay",
+          paymentMethod: normalizedPaymentMethod,
           customer: {
             ...customer,
-            paymentMethod: "razorpay",
-            payment: {
-              gateway: "razorpay",
-              mode: payment.mode ?? "live",
-              razorpayOrderId: payment.razorpayOrderId,
-              razorpayPaymentId: payment.razorpayPaymentId,
-              verifiedAmount: payment.amount,
-              verifiedAt: createdAt.toISOString(),
-              status: payment.status ?? "paid",
-            },
+            paymentMethod: normalizedPaymentMethod,
+            payment:
+              normalizedPaymentMethod === "razorpay"
+                ? {
+                    gateway: "razorpay",
+                    mode: payment.mode ?? "live",
+                    razorpayOrderId: payment.razorpayOrderId,
+                    razorpayPaymentId: payment.razorpayPaymentId,
+                    verifiedAmount: payment.amount,
+                    verifiedAt: createdAt.toISOString(),
+                    status: payment.status ?? "paid",
+                  }
+                : {
+                    method: normalizedPaymentMethod,
+                    status: "pending",
+                  },
           },
           statusHistory: [{ status: "placed", at: createdAt.toISOString() }],
           items: {
@@ -277,6 +297,12 @@ router.post("/", async (req, res, next) => {
     });
 
     await syncBestSellersFromSales(prisma);
+
+    try {
+      await sendManualPaymentInstructions(order);
+    } catch (mailErr) {
+      console.error("[mail] Failed to send payment instructions:", mailErr);
+    }
 
     res.status(201).json({ ok: true, order: formatOrder(order) });
   } catch (err) {

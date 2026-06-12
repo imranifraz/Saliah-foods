@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { RichText } from "../ui/RichText.jsx";
 
 function FaqItem({ question, answer, isOpen, onToggle }) {
   const reduce = useReducedMotion();
@@ -33,7 +34,11 @@ function FaqItem({ question, answer, isOpen, onToggle }) {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <p className="pb-5 font-body text-sm leading-relaxed text-emerald-900/65">{answer}</p>
+            <RichText
+              as="div"
+              html={answer}
+              className="pb-5 font-body text-sm leading-relaxed text-emerald-900/65"
+            />
           </motion.div>
         ) : null}
       </AnimatePresence>

@@ -120,4 +120,5 @@ export const contactInfo = {
     "76A2C, Ariyakulam Village, Krishnapuram (P.O.),\nDharmapuri (Taluk), Dharmapuri,\nTamil Nadu 635202, India",
   hours: "Open 9:00 AM – 4:00 PM IST, all days",
   subjects: ["General enquiry", "Order support", "Wholesale / B2B", "Product feedback", "Other"],
+  formSuccessMessage: "We have received your message and will respond within one business day.",
 };

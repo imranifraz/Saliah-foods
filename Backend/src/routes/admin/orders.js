@@ -103,6 +103,55 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
+const MANUAL_PAYMENT_METHODS = new Set(["cod", "upi", "card"]);
+
+router.patch("/:id/payment/mark-paid", async (req, res, next) => {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: { items: true },
+    });
+    if (!order) return res.status(404).json({ ok: false, error: "Order not found" });
+
+    const paymentMethod = String(order.paymentMethod ?? "").toLowerCase();
+    if (!MANUAL_PAYMENT_METHODS.has(paymentMethod)) {
+      return res.status(400).json({
+        ok: false,
+        error: "Only cash on delivery, UPI, and card orders can be marked paid manually",
+      });
+    }
+
+    const customer = order.customer && typeof order.customer === "object" ? { ...order.customer } : {};
+    const payment =
+      customer.payment && typeof customer.payment === "object" ? { ...customer.payment } : {};
+
+    if (payment.status === "paid") {
+      return res.status(400).json({ ok: false, error: "Payment is already marked as paid" });
+    }
+
+    const verifiedAt = new Date().toISOString();
+    customer.payment = {
+      ...payment,
+      method: paymentMethod,
+      status: "paid",
+      verifiedAmount: order.total,
+      verifiedAt,
+      markedPaidBy: "admin",
+    };
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: { customer },
+      include: { items: true },
+    });
+
+    const productsById = await loadProductsById([updated]);
+    res.json({ ok: true, order: formatOrder(updated, productsById) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch("/:id", async (req, res, next) => {
   try {
     const order = await prisma.order.findUnique({

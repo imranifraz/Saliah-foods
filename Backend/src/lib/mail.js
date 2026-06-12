@@ -146,3 +146,60 @@ If you did not create this account, you can ignore this email.
   await transport.sendMail({ from, to: email, subject, text, html });
   return { delivered: true, devLogged: false };
 }
+
+function formatOrderMoney(amount) {
+  return `₹${Math.round(Number(amount ?? 0)).toLocaleString("en-IN")}`;
+}
+
+export async function sendOrderPaymentInstructionsEmail({
+  email,
+  fullName,
+  orderId,
+  total,
+  paymentMethod,
+  instructions,
+  contact,
+}) {
+  const greeting = fullName ? `Hi ${fullName},` : "Hi,";
+  const stepsText = instructions.steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+  const stepsHtml = instructions.steps
+    .map((step) => `<li style="margin:0 0 8px">${step}</li>`)
+    .join("");
+
+  const text = `${greeting}
+
+Thank you for your Saliah Foods order ${orderId}.
+
+${instructions.headline}
+Total payable: ${formatOrderMoney(total)}
+
+${stepsText}
+
+Need help? Email ${contact.email || "support@saliahfoods.com"}${contact.phone ? ` or call ${contact.phone}` : ""}.
+
+— Saliah Foods`;
+
+  const html = `<p>${greeting}</p>
+<p>Thank you for your Saliah Foods order <strong>${orderId}</strong>.</p>
+<p><strong>${instructions.headline}</strong><br>Total payable: <strong>${formatOrderMoney(total)}</strong></p>
+<ol style="padding-left:20px;line-height:1.6">${stepsHtml}</ol>
+<p>Need help? Email <a href="mailto:${contact.email || "support@saliahfoods.com"}">${contact.email || "support@saliahfoods.com"}</a>${contact.phone ? ` or call ${contact.phone}` : ""}.</p>
+<p>— Saliah Foods</p>`;
+
+  const from = process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim() || "noreply@saliahfoods.com";
+  const transport = getTransporter();
+
+  if (!transport) {
+    console.info(`[mail:dev] Payment instructions (${paymentMethod}) for ${email}:\n${text}`);
+    return { delivered: false, devLogged: true };
+  }
+
+  await transport.sendMail({
+    from,
+    to: email,
+    subject: instructions.subject,
+    text,
+    html,
+  });
+  return { delivered: true, devLogged: false };
+}

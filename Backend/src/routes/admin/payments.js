@@ -1,5 +1,11 @@
 import { Router } from "express";
 import { prisma } from "../../lib/prisma.js";
+import { getGstSettings, saveGstSettings } from "../../lib/gstSettings.js";
+import {
+  getRazorpaySettings,
+  maskRazorpayKeyId,
+  resolveRazorpayKeySecret,
+} from "../../lib/razorpay.js";
 import { requireAdmin } from "../../middleware/admin.js";
 
 const router = Router();
@@ -15,6 +21,7 @@ router.get("/", async (_req, res, next) => {
     ]);
 
     const settingsMap = Object.fromEntries(settings.map((s) => [s.key, s.value]));
+    const [razorpay, gst] = await Promise.all([getRazorpaySettings(), getGstSettings()]);
 
     res.json({
       ok: true,
@@ -23,6 +30,16 @@ router.get("/", async (_req, res, next) => {
         freeShippingThreshold: settingsMap.shipping?.freeShippingThreshold ?? 999,
         shippingFee: settingsMap.shipping?.shippingFee ?? 99,
         codEnabled: settingsMap.checkout?.codEnabled ?? true,
+      },
+      gst,
+      razorpay: {
+        configured: razorpay.configured,
+        active: razorpay.active,
+        enabled: razorpay.enabled,
+        keyId: razorpay.keyId,
+        maskedKeyId: maskRazorpayKeyId(razorpay.keyId),
+        keySecretSet: razorpay.keySecretSet,
+        source: razorpay.source,
       },
     });
   } catch (err) {
@@ -71,6 +88,82 @@ router.post("/methods", async (req, res, next) => {
     if (err.code === "P2002") {
       return res.status(409).json({ ok: false, error: "Payment method ID exists" });
     }
+    next(err);
+  }
+});
+
+router.put("/razorpay", async (req, res, next) => {
+  try {
+    const keyId = String(req.body.keyId ?? "").trim();
+    const keySecretInput = String(req.body.keySecret ?? "").trim();
+    const enabled = req.body.enabled !== false;
+
+    if (!keyId) {
+      return res.status(400).json({ ok: false, error: "Razorpay Key ID is required" });
+    }
+
+    const existing = await prisma.storeSetting.findUnique({ where: { key: "razorpay" } });
+    const existingValue =
+      existing?.value && typeof existing.value === "object" ? existing.value : {};
+    const keySecret = resolveRazorpayKeySecret({
+      keySecretInput,
+      existingDbSecret: existingValue.keySecret,
+      keyId,
+    });
+
+    if (!keySecret) {
+      return res.status(400).json({
+        ok: false,
+        error: "Razorpay Key Secret is required. Enter it here or configure RAZORPAY_KEY_SECRET on the server.",
+      });
+    }
+
+    await prisma.storeSetting.upsert({
+      where: { key: "razorpay" },
+      create: {
+        key: "razorpay",
+        value: { keyId, keySecret, enabled },
+      },
+      update: {
+        value: { keyId, keySecret, enabled },
+      },
+    });
+
+    await prisma.paymentMethod.upsert({
+      where: { id: "razorpay" },
+      create: {
+        id: "razorpay",
+        label: "Razorpay",
+        description: "Pay securely using UPI, cards, net banking, or wallets",
+        enabled: true,
+        sortOrder: 0,
+      },
+      update: { enabled },
+    });
+
+    const razorpay = await getRazorpaySettings();
+    res.json({
+      ok: true,
+      razorpay: {
+        configured: razorpay.configured,
+        active: razorpay.active,
+        enabled: razorpay.enabled,
+        keyId: razorpay.keyId,
+        maskedKeyId: maskRazorpayKeyId(razorpay.keyId),
+        keySecretSet: true,
+        source: razorpay.source,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put("/gst", async (req, res, next) => {
+  try {
+    const gst = await saveGstSettings(req.body ?? {});
+    res.json({ ok: true, gst });
+  } catch (err) {
     next(err);
   }
 });

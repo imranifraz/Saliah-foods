@@ -13,6 +13,7 @@ import categoryPublicRoutes from "./routes/categories.js";
 import paymentPublicRoutes from "./routes/payments.js";
 import notificationRoutes from "./routes/notifications.js";
 import reviewRoutes from "./routes/reviews.js";
+import contactRoutes from "./routes/contact.js";
 import adminRoutes from "./routes/admin/index.js";
 import { errorHandler, notFound } from "./middleware/error.js";
 import { customerPublicAssetsDir } from "./lib/paths.js";
@@ -54,6 +55,7 @@ app.use("/api/categories", categoryPublicRoutes);
 app.use("/api/payments", paymentPublicRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/contact", contactRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.use(notFound);

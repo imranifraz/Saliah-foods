@@ -158,7 +158,7 @@ export function AccountAddressesSection() {
 
   return (
     <div className="account-section">
-      {mode !== "add" && !editingAddress ? (
+      {addresses.length > 0 && mode !== "add" && !editingAddress ? (
         <div className="mb-4 flex justify-end">
           <AccountBtn variant="primary" onClick={() => setMode("add")} disabled={loading}>
             Add new address

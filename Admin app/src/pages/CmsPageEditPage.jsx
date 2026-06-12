@@ -4,10 +4,13 @@ import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import { RichTextEditor } from "../components/RichTextEditor.jsx";
 
 export function CmsPageEditPage() {
   const { slug } = useParams();
   if (slug === "homepage") return <Navigate to="/cms/home" replace />;
+  if (slug === "contact") return <Navigate to="/cms/contact" replace />;
+  if (slug === "faq") return <Navigate to="/cms/faq" replace />;
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [published, setPublished] = useState(true);
@@ -65,16 +68,24 @@ export function CmsPageEditPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="admin-label">Title</span>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} className="admin-input" />
-            </label>
-            <label className="block">
-              <span className="admin-label">Subtitle</span>
               <input
-                value={subtitle}
-                onChange={(e) => setSubtitle(e.target.value)}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 className="admin-input"
+                placeholder="Page title"
               />
             </label>
+            <div className="block sm:col-span-2">
+              <span id={`cms-subtitle-label-${slug}`} className="admin-label">Subtitle</span>
+              <RichTextEditor
+                id={`cms-subtitle-${slug}`}
+                labelId={`cms-subtitle-label-${slug}`}
+                value={subtitle}
+                onChange={setSubtitle}
+                placeholder="Short intro shown below the page title"
+                minHeight={80}
+              />
+            </div>
             <label className="flex items-center gap-2 sm:col-span-2">
               <input
                 type="checkbox"

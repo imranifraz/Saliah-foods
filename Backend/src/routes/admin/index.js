@@ -14,6 +14,8 @@ import analyticsRoutes from "./analytics.js";
 import reviewRoutes from "./reviews.js";
 import notificationRoutes from "./notifications.js";
 import searchRoutes from "./search.js";
+import contactRoutes from "./contact.js";
+import faqRoutes from "./faq.js";
 import { requireAdmin } from "../../middleware/admin.js";
 import { toAdminSession } from "../../lib/auth.js";
 
@@ -37,5 +39,7 @@ router.use("/analytics", analyticsRoutes);
 router.use("/reviews", reviewRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/search", searchRoutes);
+router.use("/contact", contactRoutes);
+router.use("/faq", faqRoutes);
 
 export default router;

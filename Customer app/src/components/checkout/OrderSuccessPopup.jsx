@@ -1,16 +1,22 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { PAYMENT_METHODS } from "../../data/checkout";
-import { formatINR, GST_LABEL } from "../../data/pricing";
+import { getPaymentMethodLabel } from "../../data/checkout";
+import { formatINR } from "../../data/pricing";
+import { useGstSettings } from "../../context/GstSettingsContext.jsx";
 
 export function OrderSuccessPopup({ order, onClose }) {
   const reduce = useReducedMotion();
-  const paymentLabel = PAYMENT_METHODS.find((m) => m.id === order.paymentMethod)?.label ?? order.paymentMethod;
+  const { label: gstLabel } = useGstSettings();
+  const paymentLabel = getPaymentMethodLabel(order.paymentMethod);
   const { customer } = order;
   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
-  const paymentPending = customer?.payment?.status === "pending_configuration";
+  const paymentPending =
+    customer?.payment?.status === "pending_configuration" || customer?.payment?.status === "pending";
   const testPayment = customer?.payment?.mode === "test";
+  const payOnDelivery = order.paymentMethod === "cod";
+  const payViaUpi = order.paymentMethod === "upi";
+  const payViaCard = order.paymentMethod === "card";
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -86,17 +92,29 @@ export function OrderSuccessPopup({ order, onClose }) {
               <span className="order-success-popup__label">{paymentPending ? "Total payable" : "Total paid"}</span>
               <span className="order-success-popup__total">{formatINR(order.total)}</span>
             </div>
-            {paymentPending ? (
+            {paymentPending && customer?.payment?.status === "pending_configuration" ? (
               <p className="order-success-popup__gst">
                 Order placed successfully. Payment is pending until Razorpay keys are configured.
               </p>
+            ) : paymentPending && payViaUpi ? (
+              <p className="order-success-popup__gst">
+                Order placed successfully. UPI payment instructions have been sent to {customer.email}.
+              </p>
+            ) : paymentPending && payViaCard ? (
+              <p className="order-success-popup__gst">
+                Order placed successfully. Card payment instructions have been sent to {customer.email}.
+              </p>
+            ) : paymentPending && payOnDelivery ? (
+              <p className="order-success-popup__gst">
+                Order placed successfully. Pay in cash when your order is delivered. A confirmation email has been sent to {customer.email}.
+              </p>
             ) : testPayment ? (
               <p className="order-success-popup__gst">
-                Test payment recorded successfully. {GST_LABEL} included · Confirmation sent to {customer.email}
+                Test payment recorded successfully. {order.gstLabel ?? gstLabel} included · Confirmation sent to {customer.email}
               </p>
             ) : order.gstAmount != null ? (
               <p className="order-success-popup__gst">
-                {GST_LABEL} included · Confirmation sent to {customer.email}
+                {order.gstLabel ?? gstLabel} included · Confirmation sent to {customer.email}
               </p>
             ) : (
               <p className="order-success-popup__gst">Confirmation sent to {customer.email}</p>

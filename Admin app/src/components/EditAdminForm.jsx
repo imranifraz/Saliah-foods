@@ -13,7 +13,6 @@ function emptyForm(admin) {
   return {
     fullName: admin?.fullName ?? "",
     phone: phoneLocalDigits(admin?.phone),
-    profileNote: admin?.profileNote ?? "",
     email: admin?.email ?? "",
     avatarUrl: admin?.avatarUrl ?? "",
   };
@@ -75,7 +74,6 @@ export function EditAdminForm({ admin, onCancel, onSuccess }) {
           fullName: form.fullName,
           email: form.email,
           phone: formatPhoneForStorage(form.phone),
-          profileNote: form.profileNote,
           avatarUrl: form.avatarUrl,
         }),
       });
@@ -150,16 +148,6 @@ export function EditAdminForm({ admin, onCancel, onSuccess }) {
             title="Enter a valid 10-digit mobile number"
           />
         </div>
-      </label>
-
-      <label className="block">
-        <span className="admin-label">Profile note</span>
-        <textarea
-          value={form.profileNote}
-          onChange={(e) => setForm({ ...form, profileNote: e.target.value })}
-          rows={3}
-          className="admin-input mt-1.5 w-full resize-none"
-        />
       </label>
 
       <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-2 border-t border-[var(--admin-border)] bg-[var(--admin-surface)] px-4 pb-1 pt-3 sm:-mx-5 sm:flex-row sm:justify-end sm:px-5 sm:pb-0">

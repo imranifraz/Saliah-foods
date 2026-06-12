@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { formatHomeCmsPage } from "../lib/home-cms.js";
+import { formatContactCmsPage } from "../lib/contactCms.js";
+import { formatFaqCmsPage } from "../lib/faqCms.js";
 
 const router = Router();
 
@@ -37,7 +39,13 @@ router.get("/pages/:slug", async (req, res, next) => {
       where: { slug: req.params.slug, published: true },
     });
     if (!page) return res.status(404).json({ ok: false, error: "Page not found" });
-    res.json({ ok: true, page });
+    const formatted =
+      page.slug === "contact" || page.pageType === "contact"
+        ? formatContactCmsPage(page)
+        : page.slug === "faq" || page.pageType === "faq"
+          ? formatFaqCmsPage(page)
+          : page;
+    res.json({ ok: true, page: formatted });
   } catch (err) {
     next(err);
   }

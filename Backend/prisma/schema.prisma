@@ -337,6 +337,20 @@ model CmsPage {
   updatedAt DateTime @updatedAt
 }
 
+model ContactMessage {
+  id        String    @id @default(cuid())
+  name      String
+  email     String
+  phone     String    @default("")
+  subject   String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([readAt, createdAt])
+}
+
 model PaymentMethod {
   id          String  @id
   label       String

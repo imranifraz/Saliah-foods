@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { AnimatePresence, motion } from "framer-motion";
 import { CartDrawer } from "../components/cart/CartDrawer";
 import { generateOrderId, getShippingFee, saveLastOrder } from "../data/checkout";
-import { calcOrderBreakdown } from "../data/pricing";
+import { useGstSettings } from "./GstSettingsContext.jsx";
+import { trackAddToCart } from "../lib/analytics.js";
 
 const STORAGE_KEY = "saliah-cart";
 
@@ -38,6 +39,7 @@ function CartToast({ message }) {
 }
 
 export function CartProvider({ children }) {
+  const { calcOrderBreakdown } = useGstSettings();
   const [items, setItems] = useState(loadCart);
   const [toast, setToast] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -83,6 +85,7 @@ export function CartProvider({ children }) {
     });
 
     setToast({ message: `${item.name} added to cart` });
+    trackAddToCart(item);
   }, []);
 
   const removeItem = useCallback((id) => {
@@ -131,7 +134,7 @@ export function CartProvider({ children }) {
       setIsOpen(false);
       return order;
     },
-    [items]
+    [items, calcOrderBreakdown]
   );
 
   const value = useMemo(

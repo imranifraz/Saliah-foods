@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Reveal } from "../ui/Reveal";
+import { RichText } from "../ui/RichText.jsx";
 
 export function PageShell({ breadcrumb, title, subtitle, children }) {
   return (
@@ -19,9 +20,11 @@ export function PageShell({ breadcrumb, title, subtitle, children }) {
               {title}
             </h1>
             {subtitle ? (
-              <p className="mt-3 font-body text-base leading-relaxed text-emerald-900/65 md:text-lg">
-                {subtitle}
-              </p>
+              <RichText
+                as="p"
+                html={subtitle}
+                className="mt-3 font-body text-base leading-relaxed text-emerald-900/65 md:text-lg"
+              />
             ) : null}
           </header>
         </Reveal>

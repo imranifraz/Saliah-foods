@@ -1,5 +1,5 @@
 function resolveApiBase() {
-  // Dev always uses Vite proxy (/api → :3001) — avoids CORS and wrong host issues
+  // Dev always uses Vite proxy (/api → :3000) — avoids CORS and wrong host issues
   if (import.meta.env.DEV) return "";
   const env = import.meta.env.VITE_API_URL;
   if (env === "" || env === "/") return "";

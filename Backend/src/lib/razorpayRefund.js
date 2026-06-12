@@ -2,8 +2,8 @@ import crypto from "node:crypto";
 import Razorpay from "razorpay";
 import { getRazorpayConfig, isRazorpayConfigured, isTestPaymentsAllowed } from "./razorpay.js";
 
-function getRazorpayClient() {
-  const { keyId, keySecret } = getRazorpayConfig();
+async function getRazorpayClient() {
+  const { keyId, keySecret } = await getRazorpayConfig();
   return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
 
@@ -38,7 +38,7 @@ export async function refundOrderPayment(order) {
   const isTestPayment =
     payment.mode === "test" || String(paymentId ?? "").startsWith("pay_test_");
 
-  if (isTestPayment && isTestPaymentsAllowed()) {
+  if (isTestPayment && (await isTestPaymentsAllowed())) {
     return {
       ok: true,
       mode: "test",
@@ -48,11 +48,11 @@ export async function refundOrderPayment(order) {
     };
   }
 
-  if (!isRazorpayConfigured() || !paymentId || isTestPayment) {
+  if (!(await isRazorpayConfigured()) || !paymentId || isTestPayment) {
     throw new Error("This payment cannot be refunded automatically yet");
   }
 
-  const client = getRazorpayClient();
+  const client = await getRazorpayClient();
   const refund = await client.payments.refund(paymentId, {
     amount: Math.round(amount * 100),
     notes: {
