@@ -9,6 +9,7 @@ import { getRememberMePreference, getRememberedCredentials, setRememberMePrefere
 export function LoginPage() {
   const { user, login, sessionExpired } = useAuth();
   const { theme } = useAdminTheme();
+  const logoVariant = theme === "dark" ? "dark" : "light";
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -72,10 +73,10 @@ export function LoginPage() {
           Password updated successfully. Sign in with your new password.
         </p>
       ) : null}
-      <form onSubmit={handleSubmit} className="admin-card admin-login-card w-full">
+      <form onSubmit={handleSubmit} className="admin-login-card w-full">
         <header className="admin-login-card__header">
-          <div className="mb-1 flex justify-center lg:justify-start">
-            <AdminLogo size="form" showTagline />
+          <div className="mb-1 flex justify-center md:justify-start">
+            <AdminLogo size="form" showTagline variant={logoVariant} />
           </div>
           <p className="admin-login-card__eyebrow">Welcome back</p>
           <h2 className="admin-login-card__title">Admin sign in</h2>
@@ -180,7 +181,7 @@ export function LoginPage() {
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => handleRememberMeChange(e.target.checked)}
-              className="admin-login-card__remember-input h-4 w-4 rounded border-[var(--admin-border-strong)] text-[#1c5733] focus:ring-[#188749]"
+              className="admin-login-card__remember-input h-4 w-4 rounded border-[var(--admin-border-strong)]"
             />
             <span className="text-sm text-[var(--admin-fg-muted)]">Remember me</span>
           </label>

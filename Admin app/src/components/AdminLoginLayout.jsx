@@ -4,14 +4,14 @@ import { AdminThemeToggle } from "./AdminThemeToggle.jsx";
 export function AdminLoginLayout({ theme, children }) {
   return (
     <div
-      className="admin-shell admin-login-page grid min-h-screen min-h-dvh grid-cols-1 lg:grid-cols-[45fr_55fr]"
+      className="admin-shell admin-login-page grid min-h-screen min-h-dvh grid-cols-1 md:grid-cols-[45fr_55fr]"
       data-admin-theme={theme}
     >
       <div className="admin-login-page__toggle fixed right-4 top-4 z-30 sm:right-6 sm:top-5 lg:right-8 lg:top-6">
         <AdminThemeToggle className="admin-login-page__theme-toggle shadow-sm" />
       </div>
 
-      <aside className="admin-login-brand relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-12 lg:pb-10 xl:p-14 xl:pb-12">
+      <aside className="admin-login-brand relative hidden overflow-hidden md:flex md:flex-col md:justify-between md:p-10 md:pb-8 lg:p-12 lg:pb-10 xl:p-14 xl:pb-12">
         <img
           src="/date-based-products-category.webp"
           alt=""
@@ -37,7 +37,7 @@ export function AdminLoginLayout({ theme, children }) {
         </p>
       </aside>
 
-      <div className="admin-login-panel relative flex flex-col items-center justify-center px-4 pb-8 pt-16 sm:px-6 sm:pb-10 sm:pt-[4.75rem] lg:px-10 lg:py-12 xl:px-14">
+      <div className="admin-login-panel relative flex flex-col items-center justify-center px-4 pb-8 pt-16 sm:px-6 sm:pb-10 sm:pt-[4.75rem] md:px-8 md:py-10 lg:px-10 lg:py-12 xl:px-14">
         <div className="admin-login-panel__glow pointer-events-none absolute inset-0" aria-hidden />
         <div className="relative z-10 w-full max-w-md">{children}</div>
       </div>

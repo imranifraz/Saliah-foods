@@ -8,15 +8,16 @@ import { ForgotPasswordForm } from "../components/ForgotPasswordForm.jsx";
 export function ForgotPasswordPage() {
   const { user } = useAuth();
   const { theme } = useAdminTheme();
+  const logoVariant = theme === "dark" ? "dark" : "light";
 
   if (user?.role === "admin") return <Navigate to="/" replace />;
 
   return (
     <AdminLoginLayout theme={theme}>
-      <div className="admin-card admin-login-card w-full">
+      <div className="admin-login-card w-full">
         <header className="admin-login-card__header">
-          <div className="mb-1 flex justify-center lg:justify-start">
-            <AdminLogo size="form" showTagline />
+          <div className="mb-1 flex justify-center md:justify-start">
+            <AdminLogo size="form" showTagline variant={logoVariant} />
           </div>
           <p className="admin-login-card__eyebrow">Account recovery</p>
           <h2 className="admin-login-card__title">Reset with OTP</h2>
