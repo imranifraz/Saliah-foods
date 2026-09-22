@@ -2,8 +2,8 @@ import { Router } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { syncBestSellersFromSales } from "../../lib/best-sellers.js";
 import { applyOrderCancellation, canAdminCancel } from "../../lib/orderCancel.js";
-import { PRE_FULFILL_STATUSES, FULFILL_STATUSES } from "../../lib/inventoryConstants.js";
-import { fulfillOrderInventory } from "../../lib/inventoryStock.js";
+import { PRE_FULFILL_STATUSES, FULFILL_STATUSES, hasOrderInventoryBeenFulfilled } from "../../lib/inventoryConstants.js";
+import { fulfillOrderInventory, releaseOrderInventory } from "../../lib/inventoryStock.js";
 import { notifyOrderCancelled, notifyOrderStatusChange } from "../../lib/notifications.js";
 import { requireAdmin } from "../../middleware/admin.js";
 
@@ -26,6 +26,8 @@ function formatOrder(order, productsById = new Map()) {
     subtotal: order.subtotal,
     shipping: order.shipping,
     total: order.total,
+    discountTotal: order.discountTotal ?? 0,
+    appliedOffers: order.appliedOffers ?? null,
     gstAmount: order.gstAmount,
     gstLabel: order.gstLabel,
     paymentMethod: order.paymentMethod,
@@ -44,6 +46,9 @@ function formatOrder(order, productsById = new Map()) {
       priceValue: item.priceValue,
       mrpValue: item.mrpValue,
       quantity: item.quantity,
+      lineDiscount: item.lineDiscount ?? 0,
+      bogoApplied: Boolean(item.bogoApplied),
+      lineTotal: Math.max(0, (item.priceValue ?? 0) * (item.quantity ?? 0) - (item.lineDiscount ?? 0)),
       categoryId: item.productId ? productsById.get(item.productId)?.categoryId ?? null : null,
       categoryLabel: item.productId ? productsById.get(item.productId)?.categoryLabel ?? null : null,
     })),
@@ -176,12 +181,14 @@ router.patch("/:id", async (req, res, next) => {
       }
 
       const reason = String(cancelReason ?? "").trim();
+      const noteText =
+        trackingNote !== undefined ? String(trackingNote).trim() : "";
       const previousStatus = order.status;
       const updated = await prisma.$transaction(async (tx) => {
         await applyOrderCancellation(tx, order, {
           reason,
           cancelledBy: "admin",
-          note: reason || "Cancelled by admin",
+          note: noteText || reason || "Cancelled by admin",
         });
 
         const data = {};
@@ -215,13 +222,15 @@ router.patch("/:id", async (req, res, next) => {
 
     const data = {};
     const history = Array.isArray(order.statusHistory) ? [...order.statusHistory] : [];
+    const noteText =
+      trackingNote !== undefined ? String(trackingNote).trim() : String(order.trackingNote ?? "").trim();
 
     if (status !== undefined && nextStatus !== order.status) {
       data.status = nextStatus;
       history.push({
         status: nextStatus,
         at: new Date().toISOString(),
-        note: "Updated by admin",
+        note: noteText || "Updated by admin",
       });
       data.statusHistory = history;
     }
@@ -236,7 +245,8 @@ router.patch("/:id", async (req, res, next) => {
         status !== undefined &&
         nextStatus !== order.status &&
         FULFILL_STATUSES.has(nextStatus) &&
-        PRE_FULFILL_STATUSES.has(order.status)
+        PRE_FULFILL_STATUSES.has(order.status) &&
+        !hasOrderInventoryBeenFulfilled(order)
       ) {
         await fulfillOrderInventory(tx, order);
       }
@@ -255,6 +265,38 @@ router.patch("/:id", async (req, res, next) => {
     const productsById = await loadProductsById([updated]);
     res.json({ ok: true, order: formatOrder(updated, productsById) });
   } catch (err) {
+    next(err);
+  }
+});
+
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: { items: true },
+    });
+    if (!order) return res.status(404).json({ ok: false, error: "Order not found" });
+
+    await prisma.$transaction(async (tx) => {
+      // Release reserved stock for open orders; cancelled orders already released.
+      // Fail the delete if release fails so reservations are never orphaned.
+      if (PRE_FULFILL_STATUSES.has(order.status)) {
+        await releaseOrderInventory(tx, order);
+      }
+
+      await tx.order.delete({ where: { id: order.id } });
+    });
+
+    await syncBestSellersFromSales(prisma);
+
+    res.json({ ok: true, deletedId: order.id });
+  } catch (err) {
+    if (err?.message && /reserved|stock|inventory|variant/i.test(err.message)) {
+      return res.status(409).json({
+        ok: false,
+        error: `Could not delete order because inventory could not be released: ${err.message}`,
+      });
+    }
     next(err);
   }
 });

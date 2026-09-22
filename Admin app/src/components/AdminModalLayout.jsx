@@ -32,11 +32,15 @@ export function AdminModalLayout({
 
   if (!open) return null;
 
+  function handleBackdropPointer(event) {
+    if (event.target === event.currentTarget) onClose();
+  }
+
   return (
     <div
       className="admin-modal fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       role="presentation"
-      onClick={onClose}
+      onMouseDown={handleBackdropPointer}
     >
       <div
         aria-hidden
@@ -47,6 +51,7 @@ export function AdminModalLayout({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        onMouseDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-4 sm:px-5">

@@ -5,8 +5,10 @@ import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { DataTable, DataRow, DataCell } from "../components/ui/DataTable.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 export function BlogPostsPage() {
+  const toast = useAdminToast();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,9 +29,11 @@ export function BlogPostsPage() {
     if (!confirm("Delete this blog post?")) return;
     try {
       await apiFetch(`/api/admin/cms/blog/${id}`, { method: "DELETE" });
+      toast.success("Blog post deleted");
       load();
     } catch (err) {
       setError(err.message);
+      toast.error("Could not delete post", err.message);
     }
   }
 

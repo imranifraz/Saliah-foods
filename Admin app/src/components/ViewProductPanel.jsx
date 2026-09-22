@@ -134,7 +134,12 @@ export function ViewProductPanel({ product }) {
       ) : null}
 
       {product.fullDescription ? (
-        <p className="text-sm leading-relaxed text-[var(--admin-fg-muted)]">{product.fullDescription}</p>
+        <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-2)] p-3">
+          <p className="admin-caption">Product details</p>
+          <pre className="mt-2 whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--admin-fg-muted)]">
+            {product.fullDescription}
+          </pre>
+        </div>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
@@ -153,6 +158,11 @@ export function ViewProductPanel({ product }) {
         {product.isBestSeller ? (
           <span className="inline-flex rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-semibold text-[var(--admin-fg)]">
             Best seller
+          </span>
+        ) : null}
+        {product.bogoEnabled ? (
+          <span className="inline-flex rounded-full border border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] px-3 py-1 text-xs font-semibold text-[var(--admin-link)]">
+            Buy 1 Get 1 Free
           </span>
         ) : null}
         {product.badge ? (
@@ -177,8 +187,12 @@ export function ViewProductPanel({ product }) {
 
       {product.benefits?.length ? (
         <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-2)] p-3">
-          <p className="admin-caption">Benefits</p>
-          <p className="mt-1 text-sm text-[var(--admin-fg)]">{product.benefits.join(", ")}</p>
+          <p className="admin-caption">Highlights</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-[var(--admin-fg)]">
+            {product.benefits.map((benefit) => (
+              <li key={benefit}>{benefit}</li>
+            ))}
+          </ul>
         </div>
       ) : null}
 

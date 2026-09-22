@@ -8,7 +8,9 @@ import { OptimizedImage } from "../ui/OptimizedImage";
 export function CartDrawer() {
   const reduce = useReducedMotion();
   const navigate = useNavigate();
-  const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, totalCount } = useCart();
+  const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, discountTotal, totalCount, pricedItems } =
+    useCart();
+  const displayItems = pricedItems?.length ? pricedItems : items;
 
   return (
     <AnimatePresence>
@@ -68,7 +70,7 @@ export function CartDrawer() {
             ) : (
               <>
                 <ul className="flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5" role="list">
-                  {items.map((item) => (
+                  {displayItems.map((item) => (
                     <li
                       key={item.id}
                       className="flex gap-3 rounded-xl border border-cream-200/70 bg-white/80 p-3 shadow-[0_2px_12px_rgba(22,49,42,0.04)]"
@@ -100,12 +102,25 @@ export function CartDrawer() {
                             {item.packSize}
                           </p>
                         ) : null}
+                        {item.bogoApplied ? (
+                          <p className="mt-1 font-body text-[11px] font-medium text-emerald-700">
+                            Buy 1 Get 1 — {item.freeQty} free
+                          </p>
+                        ) : item.bogoEnabled ? (
+                          <p className="mt-1 font-body text-[11px] text-emerald-900/45">
+                            Buy 1 Get 1 Free available
+                          </p>
+                        ) : null}
                         <div className="mt-1">
                           <ProductPrice
-                            priceValue={item.priceValue}
-                            mrpValue={item.mrpValue}
-                            price={item.price}
-                            mrp={item.mrp}
+                            priceValue={item.lineSubtotal ?? item.priceValue}
+                            mrpValue={
+                              item.bogoApplied
+                                ? item.lineGross
+                                : item.mrpValue
+                                  ? item.mrpValue * item.quantity
+                                  : undefined
+                            }
                             size="sm"
                             showDiscountBadge={false}
                           />
@@ -147,6 +162,16 @@ export function CartDrawer() {
                 </ul>
 
                 <div className="border-t border-cream-200/70 bg-white/60 px-5 py-4">
+                  {discountTotal > 0 ? (
+                    <div className="mb-2 flex items-baseline justify-between">
+                      <span className="font-body text-[11px] uppercase tracking-[0.14em] text-emerald-700/70">
+                        Offer savings
+                      </span>
+                      <span className="font-body text-sm font-medium text-emerald-700">
+                        −{formatINR(discountTotal)}
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="flex items-baseline justify-between">
                     <span className="font-body text-[11px] uppercase tracking-[0.14em] text-emerald-900/45">
                       Subtotal

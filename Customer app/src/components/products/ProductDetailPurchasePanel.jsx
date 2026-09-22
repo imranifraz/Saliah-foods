@@ -50,8 +50,11 @@ export function ProductDetailPurchasePanel({
   displayMrpValue,
   displayPrice,
   displayMrp,
+  discountPercent,
   priceKey,
   isOutOfStock,
+  bogoEnabled = false,
+  offerLabel = "Buy 1 Get 1 Free",
   onAddToCart,
   onBuyNow,
   ctaRef,
@@ -61,9 +64,21 @@ export function ProductDetailPurchasePanel({
     displayMrpValue != null && displayPriceValue != null && displayMrpValue > displayPriceValue;
   const selling = displayPrice ?? formatInr(displayPriceValue);
   const list = displayMrp ?? formatInr(displayMrpValue);
+  const saveAmount =
+    hasDiscount && displayMrpValue != null && displayPriceValue != null
+      ? displayMrpValue - displayPriceValue
+      : null;
+  const saveLabel =
+    discountPercent != null && discountPercent > 0
+      ? `${Math.round(discountPercent)}% off`
+      : saveAmount != null
+        ? `Save ${formatInr(saveAmount)}`
+        : null;
 
   return (
     <section className="pdp-purchase-panel" aria-label="Purchase options">
+      <div className="pdp-purchase-panel__sheen" aria-hidden />
+
       {rating != null && reviewCount > 0 ? (
         <div className="pdp-purchase-panel__rating">
           <StarRating rating={rating} />
@@ -76,7 +91,7 @@ export function ProductDetailPurchasePanel({
           </span>
         </div>
       ) : (
-        <p className="pdp-purchase-panel__rating-text font-body text-sm text-emerald-900/45">No reviews yet</p>
+        <p className="pdp-purchase-panel__rating-muted">Be the first to review this product</p>
       )}
 
       {needsPackSelection ? (
@@ -98,23 +113,31 @@ export function ProductDetailPurchasePanel({
         animate={reduce ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
       >
-        <span className="pdp-purchase-panel__price-current">{selling}</span>
-        {hasDiscount && list ? (
-          <span className="pdp-purchase-panel__price-mrp">{list}</span>
-        ) : null}
+        <div className="pdp-purchase-panel__price-row">
+          <span className="pdp-purchase-panel__price-current">{selling}</span>
+          {hasDiscount && list ? (
+            <span className="pdp-purchase-panel__price-mrp">{list}</span>
+          ) : null}
+          {saveLabel ? <span className="pdp-purchase-panel__save">{saveLabel}</span> : null}
+        </div>
         {isOutOfStock ? (
           <span className="pdp-purchase-panel__stock pdp-purchase-panel__stock--out">Out of stock</span>
         ) : (
-          <span className="pdp-purchase-panel__stock">In stock</span>
+          <span className="pdp-purchase-panel__stock">Ready to ship</span>
         )}
+        {bogoEnabled && !isOutOfStock ? (
+          <p className="mt-2 font-body text-[12px] font-medium text-emerald-800">
+            {offerLabel} — add 2 of the same pack, pay for 1.
+          </p>
+        ) : null}
       </motion.div>
 
       <div ref={ctaRef} className="pdp-purchase-panel__actions">
         <motion.button
           type="button"
           className={`pdp-btn-cart ${isOutOfStock ? "cursor-not-allowed opacity-50" : ""}`}
-          whileHover={reduce ? undefined : { y: -1 }}
-          whileTap={reduce ? undefined : { scale: 0.985 }}
+          whileHover={reduce || isOutOfStock ? undefined : { y: -1 }}
+          whileTap={reduce || isOutOfStock ? undefined : { scale: 0.985 }}
           onClick={onAddToCart}
           disabled={isOutOfStock}
         >
@@ -124,14 +147,16 @@ export function ProductDetailPurchasePanel({
         <motion.button
           type="button"
           className={`pdp-btn-buy ${isOutOfStock ? "cursor-not-allowed opacity-50" : ""}`}
-          whileHover={reduce ? undefined : { y: -1 }}
-          whileTap={reduce ? undefined : { scale: 0.985 }}
+          whileHover={reduce || isOutOfStock ? undefined : { y: -1 }}
+          whileTap={reduce || isOutOfStock ? undefined : { scale: 0.985 }}
           onClick={onBuyNow}
           disabled={isOutOfStock}
         >
           {isOutOfStock ? "Unavailable" : "Buy now"}
         </motion.button>
       </div>
+
+      <p className="pdp-purchase-panel__assurance">Secure checkout · Freshly packed · Pan-India delivery</p>
 
       <div className="pdp-purchase-panel__divider" aria-hidden />
 

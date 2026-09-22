@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { getBlogPostPath } from "../../data/blog";
+import {
+  BLOG_COVER_IMAGE_HEIGHT,
+  BLOG_COVER_IMAGE_WIDTH,
+} from "../../data/blogImageSpec.js";
 import { OptimizedImage } from "../ui/OptimizedImage";
 
 export function BlogPostCard({ post, index = 0, variant = "grid" }) {
@@ -19,11 +23,13 @@ export function BlogPostCard({ post, index = 0, variant = "grid" }) {
         <div className="blog-post-card__media">
           <OptimizedImage
             src={post.img}
-            alt=""
+            alt={post.title}
+            pictureClassName="absolute inset-0 block h-full w-full"
             className="blog-post-card__image"
-            width={600}
-            height={400}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            width={BLOG_COVER_IMAGE_WIDTH}
+            height={BLOG_COVER_IMAGE_HEIGHT}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+            priority={index < 3}
           />
           <div className="blog-post-card__shine" aria-hidden />
           <span className="blog-post-card__category">{post.category}</span>

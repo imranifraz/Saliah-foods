@@ -32,7 +32,7 @@ const TAB_ICONS = {
   ),
 };
 
-function SidebarItem({ tab, isActive, onSelect, wishlistCount }) {
+function SidebarItem({ tab, isActive, onSelect, wishlistCount, notificationCount }) {
   return (
     <button
       type="button"
@@ -45,11 +45,14 @@ function SidebarItem({ tab, isActive, onSelect, wishlistCount }) {
       {tab.id === "wishlist" && wishlistCount > 0 ? (
         <span className="account-sidebar__count">{wishlistCount}</span>
       ) : null}
+      {tab.id === "notifications" && notificationCount > 0 ? (
+        <span className="account-sidebar__count">{notificationCount > 9 ? "9+" : notificationCount}</span>
+      ) : null}
     </button>
   );
 }
 
-export function AccountSidebar({ tabs, activeTab, onSelect, wishlistCount }) {
+export function AccountSidebar({ tabs, activeTab, onSelect, wishlistCount, notificationCount = 0 }) {
   return (
     <>
       <nav className="account-nav-tabs lg:hidden" aria-label="Account sections">
@@ -68,6 +71,11 @@ export function AccountSidebar({ tabs, activeTab, onSelect, wishlistCount }) {
                   <span className="account-nav-tabs__label">{tab.label}</span>
                   {tab.id === "wishlist" && wishlistCount > 0 ? (
                     <span className="account-nav-tabs__count">{wishlistCount}</span>
+                  ) : null}
+                  {tab.id === "notifications" && notificationCount > 0 ? (
+                    <span className="account-nav-tabs__count">
+                      {notificationCount > 9 ? "9+" : notificationCount}
+                    </span>
                   ) : null}
                 </button>
               </li>
@@ -88,6 +96,7 @@ export function AccountSidebar({ tabs, activeTab, onSelect, wishlistCount }) {
                   isActive={isActive}
                   onSelect={onSelect}
                   wishlistCount={wishlistCount}
+                  notificationCount={notificationCount}
                 />
               </li>
             );

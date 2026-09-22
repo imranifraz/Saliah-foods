@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch, clearAuthSession, validatePasswordStrength } from "../lib/api.js";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 function PasswordVisibilityToggle({ visible, onToggle, fieldLabel }) {
   return (
@@ -64,6 +65,7 @@ function PasswordField({ label, fieldLabel, value, onChange, autoComplete, place
 }
 
 export function ChangePasswordForm({ onCancel, showCancel = true, onForgotPassword }) {
+  const toast = useAdminToast();
   const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -79,12 +81,14 @@ export function ChangePasswordForm({ onCancel, showCancel = true, onForgotPasswo
 
     if (newPassword !== confirmPassword) {
       setError("New passwords do not match");
+      toast.error("Could not update password", "New passwords do not match");
       return;
     }
 
     const policy = validatePasswordStrength(newPassword);
     if (!policy.ok) {
       setError(policy.error);
+      toast.error("Could not update password", policy.error);
       return;
     }
 
@@ -95,12 +99,15 @@ export function ChangePasswordForm({ onCancel, showCancel = true, onForgotPasswo
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       setSuccess(data.message ?? "Password updated.");
+      toast.success("Password updated");
       clearAuthSession();
       window.setTimeout(() => {
         navigate("/login", { replace: true, state: { passwordUpdated: true } });
       }, 1800);
     } catch (err) {
-      setError(err.message ?? "Could not update password");
+      const message = err.message ?? "Could not update password";
+      setError(message);
+      toast.error("Could not update password", message);
     } finally {
       setBusy(false);
     }

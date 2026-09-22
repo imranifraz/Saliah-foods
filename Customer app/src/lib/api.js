@@ -32,7 +32,14 @@ export function resolveMediaUrl(path) {
     value = value.startsWith("uploads/") || value.startsWith("assets/") ? `/${value}` : `/${value}`;
   }
 
-  if (value.startsWith("/assets/") && /\.png$/i.test(value)) {
+  // Prefer WebP for catalog product shots only — never rewrite brand logos
+  // (logo PNGs may not have a matching .webp and would 404).
+  const isBrandLogo =
+    /\/assets\/(?:saliah-foods-logo|application-logo|application-logo-white|application-dark-logo)(?:[-.].*)?$/i.test(
+      value
+    ) || /\/assets\/.*logo.*\.png$/i.test(value);
+
+  if (value.startsWith("/assets/") && /\.png$/i.test(value) && !isBrandLogo) {
     value = value.replace(/\.png$/i, ".webp");
   }
 

@@ -22,6 +22,9 @@ export function OptimizedImage({
     setImgSrc(resolveMediaUrl(src));
   }, [src]);
 
+  // Force the browser to swap the decoded bitmap when the CMS carousel advances.
+  const imageKey = resolved || src || "empty";
+
   const webpCandidate =
     resolved && /\/assets\//i.test(resolved) && /\.png$/i.test(resolved)
       ? resolved.replace(/\.png$/i, ".webp")
@@ -58,6 +61,7 @@ export function OptimizedImage({
         <source srcSet={webpCandidate} type="image/webp" />
       ) : null}
       <img
+        key={imageKey}
         src={imgSrc || primarySrc}
         alt={alt}
         className={className}

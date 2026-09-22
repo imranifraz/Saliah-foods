@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
-import { AdminFilterTabs } from "../components/ui/AdminFilterTabs.jsx";
+import { AdminFilterDock, AdminFilterSegment } from "../components/ui/AdminFilterDock.jsx";
 import { StatCard } from "../components/ui/StatCard.jsx";
 import { DataTable, DataRow, DataCell } from "../components/ui/DataTable.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
@@ -137,9 +137,14 @@ export function TransactionsPage() {
         />
       </div>
 
-      <div className="mt-6">
-        <AdminFilterTabs items={filterItems} value={status} onChange={setStatus} />
-      </div>
+      <AdminFilterDock title="Find transactions" className="mt-6">
+        <AdminFilterSegment
+          label="Payment status"
+          options={filterItems}
+          value={status}
+          onChange={setStatus}
+        />
+      </AdminFilterDock>
 
       <AdminCard className="mt-6" title="Transaction history">
         <DataTable

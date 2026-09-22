@@ -3,6 +3,7 @@ import { useHomeContent } from "../../context/HomeContentContext.jsx";
 import { resolveMediaUrl } from "../../lib/api.js";
 import { OptimizedImage } from "../ui/OptimizedImage";
 import { Reveal } from "../ui/Reveal";
+import { RichText } from "../ui/RichText.jsx";
 
 export function BrandLegacy() {
   const { content } = useHomeContent();
@@ -23,9 +24,10 @@ export function BrandLegacy() {
             >
               {story.title}
             </h2>
-            <p className="mt-4 font-body text-[15px] leading-relaxed text-emerald-900/70 sm:mt-5 sm:text-base">
-              {story.body}
-            </p>
+            <RichText
+              html={story.body}
+              className="mt-4 font-body text-[15px] leading-relaxed text-emerald-900/70 sm:mt-5 sm:text-base"
+            />
             {story.ctaLabel ? (
               storyLink?.startsWith("/") ? (
                 <Link

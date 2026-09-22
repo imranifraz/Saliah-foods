@@ -108,6 +108,18 @@ export function HeaderAccountMenu({ onNavigate }) {
               Profile
             </Link>
 
+            <Link
+              to="/account?tab=notifications"
+              role="menuitem"
+              className="header-account-menu__item"
+              onClick={() => {
+                close();
+                onNavigate?.();
+              }}
+            >
+              Notifications
+            </Link>
+
             <button type="button" role="menuitem" className="header-account-menu__item header-account-menu__item--danger w-full text-left" onClick={handleSignOut}>
               Sign out
             </button>

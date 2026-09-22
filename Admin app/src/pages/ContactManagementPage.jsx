@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
 import { RichTextEditor } from "../components/RichTextEditor.jsx";
+import { ContactPagePreview } from "../components/ContactPagePreview.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 function emptySettings(page) {
   const body = page?.body ?? {};
@@ -26,11 +27,13 @@ function emptySettings(page) {
 }
 
 export function ContactManagementPage() {
+  const toast = useAdminToast();
   const [settings, setSettings] = useState(emptySettings());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -49,8 +52,8 @@ export function ContactManagementPage() {
     load();
   }, []);
 
-  async function handleSave(event) {
-    event.preventDefault();
+  async function saveSettings({ published, closePreview = false } = {}) {
+    const nextPublished = published ?? settings.published;
     setSaving(true);
     setSaved(false);
     setError("");
@@ -66,7 +69,7 @@ export function ContactManagementPage() {
         body: JSON.stringify({
           title: settings.title,
           subtitle: settings.subtitle,
-          published: settings.published,
+          published: nextPublished,
           body: {
             email: settings.email,
             phone: settings.phone,
@@ -83,21 +86,25 @@ export function ContactManagementPage() {
       });
       setSettings(emptySettings(data.page));
       setSaved(true);
+      toast.success("Contact page saved");
+      if (closePreview) setPreviewOpen(false);
     } catch (err) {
       setError(err.message);
+      toast.error("Could not save contact page", err.message);
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleSave(event) {
+    event.preventDefault();
+    await saveSettings({ published: settings.published });
   }
 
   if (loading) return <LoadingState />;
 
   return (
     <div className="space-y-6">
-      <Link to="/cms/pages" className="btn-ghost inline-flex px-0">
-        ← Web content
-      </Link>
-
       <PageHeader
         title="Contact page"
         subtitle="Manage customer-facing contact details and map links shown on the Contact Us page."
@@ -254,10 +261,32 @@ export function ContactManagementPage() {
           <p className="rounded-xl bg-emerald-800/10 px-4 py-3 text-sm text-emerald-800">Contact settings saved.</p>
         ) : null}
 
-        <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? "Saving…" : "Save contact settings"}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" className="btn-ghost" onClick={() => setPreviewOpen(true)} disabled={saving}>
+            Preview
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => saveSettings({ published: false })}
+            disabled={saving}
+          >
+            Save draft
+          </button>
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? "Saving…" : "Save contact settings"}
+          </button>
+        </div>
       </form>
+
+      <ContactPagePreview
+        open={previewOpen}
+        settings={settings}
+        saving={saving}
+        onClose={() => setPreviewOpen(false)}
+        onSaveDraft={() => saveSettings({ published: false, closePreview: true })}
+        onPublish={() => saveSettings({ published: true, closePreview: true })}
+      />
     </div>
   );
 }

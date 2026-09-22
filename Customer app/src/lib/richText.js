@@ -17,15 +17,72 @@ const ALLOWED_TAGS = new Set([
   "h2",
   "h3",
   "blockquote",
+  "span",
+  "font",
 ]);
 
-const ALIGN_TAGS = new Set(["p", "div", "h2", "h3", "li", "blockquote"]);
+const STYLE_TAGS = new Set(["p", "div", "h2", "h3", "li", "blockquote", "span"]);
 
-function readAlignStyle(match) {
+const FONT_SIZE_BY_ATTR = {
+  1: "12px",
+  2: "13px",
+  3: "16px",
+  4: "18px",
+  5: "22px",
+  6: "28px",
+  7: "32px",
+};
+
+const NAMED_FONT_SIZES = {
+  "x-small": "12px",
+  small: "13px",
+  medium: "16px",
+  large: "18px",
+  "x-large": "22px",
+  "xx-large": "28px",
+  "xxx-large": "32px",
+  "-webkit-xxx-large": "32px",
+};
+
+function normalizeFontSize(raw) {
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "");
+  if (!value) return "";
+  if (NAMED_FONT_SIZES[value]) return NAMED_FONT_SIZES[value];
+  const pxMatch = value.match(/^(\d+(?:\.\d+)?)px$/);
+  if (pxMatch) {
+    const px = Math.round(Number(pxMatch[1]));
+    if (px >= 10 && px <= 48) return `${px}px`;
+  }
+  return "";
+}
+
+function readSafeStyles(match) {
   const styleMatch = match.match(/style\s*=\s*("([^"]*)"|'([^']*)')/i);
-  const style = styleMatch?.[1] || styleMatch?.[2] || "";
+  const style = styleMatch?.[2] || styleMatch?.[3] || "";
+  if (!style) return "";
+
+  const parts = [];
+
   const alignMatch = style.match(/text-align\s*:\s*(left|center|right|justify)/i);
-  return alignMatch?.[1]?.toLowerCase() ?? "";
+  if (alignMatch) parts.push(`text-align: ${alignMatch[1].toLowerCase()}`);
+
+  const sizeMatch = style.match(/font-size\s*:\s*([^;]+)/i);
+  if (sizeMatch) {
+    const size = normalizeFontSize(sizeMatch[1]);
+    if (size) parts.push(`font-size: ${size}`);
+  }
+
+  if (/font-weight\s*:\s*(bold|[6-9]00)/i.test(style)) parts.push("font-weight: 700");
+  if (/font-style\s*:\s*italic/i.test(style)) parts.push("font-style: italic");
+  if (/text-decoration\s*:[^;]*underline/i.test(style)) parts.push("text-decoration: underline");
+  if (/text-decoration\s*:[^;]*line-through/i.test(style)) {
+    parts.push("text-decoration: line-through");
+  }
+
+  return parts.join("; ");
 }
 
 export function sanitizeRichHtml(input) {
@@ -41,7 +98,10 @@ export function sanitizeRichHtml(input) {
     const normalized = tag.toLowerCase();
     if (!ALLOWED_TAGS.has(normalized)) return "";
 
-    if (match.startsWith("</")) return `</${normalized}>`;
+    if (match.startsWith("</")) {
+      if (normalized === "font") return "</span>";
+      return `</${normalized}>`;
+    }
     if (normalized === "br") return "<br>";
 
     if (normalized === "a") {
@@ -52,8 +112,17 @@ export function sanitizeRichHtml(input) {
       return `<a href="${safeHref}" rel="noopener noreferrer" target="_blank">`;
     }
 
-    const align = ALIGN_TAGS.has(normalized) ? readAlignStyle(match) : "";
-    if (align) return `<${normalized} style="text-align: ${align}">`;
+    if (normalized === "font") {
+      const sizeAttr = match.match(/size\s*=\s*("([^"]*)"|'([^']*)'|([1-7]))/i);
+      const sizeKey = sizeAttr?.[2] || sizeAttr?.[3] || sizeAttr?.[4] || "3";
+      const px = FONT_SIZE_BY_ATTR[sizeKey] || "16px";
+      return `<span style="font-size: ${px}">`;
+    }
+
+    if (STYLE_TAGS.has(normalized)) {
+      const styles = readSafeStyles(match);
+      return styles ? `<${normalized} style="${styles}">` : `<${normalized}>`;
+    }
 
     return `<${normalized}>`;
   });
@@ -63,4 +132,14 @@ export function sanitizeRichHtml(input) {
 
 export function hasRichHtml(value) {
   return /<[a-z][\s\S]*>/i.test(String(value ?? ""));
+}
+
+export function richHtmlHasText(input) {
+  return (
+    String(input ?? "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim().length > 0
+  );
 }

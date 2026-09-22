@@ -467,7 +467,7 @@ async function main() {
         productType: "simple",
         status: "active",
         tagline: p.tagline,
-        fullDescription: "",
+        // Keep existing structured product details (overview/highlights/nutrition) on re-seed.
         tag: p.tag ?? null,
         img,
         images: [img],
@@ -478,7 +478,6 @@ async function main() {
         mrpValue,
         reviewCount: p.reviewCount ?? 0,
         packaging: p.packSize?.includes("Gift Box") ? "Gift Box" : "Pouch",
-        benefits: ["Natural Energy"],
         featured: index < 2,
         isNew: p.isNew ?? false,
       },
@@ -604,23 +603,49 @@ async function main() {
       },
     },
     {
-      slug: "about-us",
-      title: "About Us",
-      subtitle: "Rooted in dates. Built on natural goodness.",
-      pageType: "about",
+      slug: "our-legacy",
+      title: "Our Legacy",
+      subtitle: "Rooted in trust. Grown with legacy.",
+      pageType: "legacy",
       body: {
-        story: [
-          "Saliah Foods was founded on a simple belief: naturally good food should be accessible, honest, and enjoyable every day.",
-          "We serve families who value quality ingredients — whether for daily snacking, natural sweetness, or traditional wellness foods.",
+        metaDescription:
+          "Discover the Saliah legacy shaped by pioneering date palm farming in South India and decades of trust, care, and cultivation.",
+        heroEyebrow: "Our Legacy",
+        heroTitle: "Rooted in trust. Grown with legacy.",
+        heroText:
+          "A story of pioneering date palm cultivation, Arabian farming knowledge, and a lifelong promise to bring honest nourishment back home to India.",
+        heroImage: "/assets/brand-legacy.png",
+        heroImageAlt: "Saliah Foods legacy with premium dates and palm farm roots",
+        founderEyebrow: "Our Root",
+        founderTitle: "Built by a pioneer of date palm farming in South India.",
+        founderText:
+          "Our founder, S. Nizamuddeen, is widely recognized as a pioneer in date palm farming in India, celebrated as the first to cultivate date palms in South India. He previously worked at several date farms across Saudi Arabia before returning to India to grow his own dates.",
+        founderImage: "/assets/our-legacy-founder.png",
+        founderImageAlt: "Founder S. Nizamuddeen holding a fresh bunch of dates in the farm",
+        highlights: [
+          {
+            title: "South India's First Date Palm Pioneer",
+            text: "Paved the way for date cultivation in South India, inspiring countless farmers across the region.",
+          },
+          {
+            title: "Expertise From the Heart of Arabia",
+            text: "Gained years of hands-on experience working in Saudi Arabia's renowned date farms.",
+          },
+          {
+            title: "A Legacy of Passion & Purpose",
+            text: "What began as one man's dream has grown into a flourishing movement in sustainable farming.",
+          },
         ],
-        values: [
-          { title: "Quality First", text: "We never compromise on sourcing, freshness, or presentation." },
-          { title: "Natural Goodness", text: "Thoughtfully selected ingredients without unnecessary additives." },
+        storyLabel: "The Saliah Way",
+        storyQuote: "Behind every date we pack lies a journey of trust, care, and legacy.",
+        storyParagraphs: [
+          "Our story began over three decades ago, among lush date farms in Saudi Arabia. I spent years across fields, growing and cultivating prized dates. My dream was to bring date cultivation back home to the fertile soils of India.",
+          "Since 1992, I began to realise my vision. I was the first farmer to start a full-fledged date palm plantation in South India. At Saliah Dates, we have firm roots supporting farmers and harvest gardens of splendour.",
+          "Today, we carry sun-ripened Arabian and local date varieties, bursting with nutrients and goodness. Dates are a superfood that spans across cultures and traditions. Discover our delightful collection, one date at a time.",
         ],
-        stats: [
-          { value: "15+", label: "Premium & everyday varieties" },
-          { value: "Pan-India", label: "Delivery on select ranges" },
-        ],
+        signatureImage: "/assets/signature.webp",
+        signatureName: "Nizamuddeen",
+        signatureRole: "Founder",
       },
     },
     {
@@ -638,15 +663,66 @@ async function main() {
     {
       slug: "sourcing-quality",
       title: "Sourcing & Quality",
-      subtitle: "From trusted growers to your table",
+      subtitle:
+        "From trusted growers to your table — every batch is selected, graded, and packed with care.",
       pageType: "content",
       body: {
         intro:
-          "At Saliah Foods, quality begins at the source. We work with established growers and trusted suppliers.",
+          "At Saliah Foods, quality begins at the source. We work with established date growers and trusted suppliers who share our commitment to natural ingredients, careful handling, and consistent standards.",
         pillars: [
-          { title: "Trusted Origins", text: "Premium date varieties from regions known for flavour and texture." },
-          { title: "Careful Selection", text: "Each lot is inspected for freshness, size, and moisture." },
+          {
+            title: "Trusted Origins",
+            text: "Premium date varieties sourced from regions known for flavour, texture, and harvest quality — including Kimia, Ajwa, Safawi, and Zahidi.",
+          },
+          {
+            title: "Careful Selection",
+            text: "Each lot is inspected for freshness, size, moisture, and appearance before it moves to packing.",
+          },
+          {
+            title: "Hygienic Packing",
+            text: "Products are sealed in food-grade packaging designed to protect taste and shelf life from our facility to your home.",
+          },
+          {
+            title: "Batch Consistency",
+            text: "We maintain clear quality checkpoints so every pack meets the same Saliah Foods standard you expect.",
+          },
         ],
+        journeyTitle: "Our quality journey",
+        steps: [
+          {
+            step: "01",
+            title: "Source",
+            text: "Partner with growers and suppliers who meet our ingredient and handling standards.",
+          },
+          {
+            step: "02",
+            title: "Inspect",
+            text: "Visual and sensory checks on arrival — grading for size, softness, and overall condition.",
+          },
+          {
+            step: "03",
+            title: "Pack",
+            text: "Packed fresh in controlled conditions with clear labelling for weight and variety.",
+          },
+          {
+            step: "04",
+            title: "Dispatch",
+            text: "Orders shipped securely across India with careful handling in transit.",
+          },
+        ],
+        commitmentsTitle: "Our commitments",
+        commitments: [
+          "No artificial colours or flavours in our core date and wellness ranges",
+          "Transparent pack sizes and ingredient information on every label",
+          "Regular supplier review to maintain freshness and consistency",
+          "Customer feedback loop to improve selection and packing",
+        ],
+        bannerImage: "/assets/brand-legacy.png",
+        bannerAlt: "Saliah Foods quality selection of dates and wellness products",
+        ctaLabel: "Shop premium dates",
+        ctaHref: "/products/premium-dates",
+        metaDescription:
+          "Learn how Saliah Foods sources, inspects, and packs premium dates and natural wellness products.",
       },
     },
     {
@@ -679,6 +755,8 @@ async function main() {
     });
   }
 
+  await prisma.cmsPage.deleteMany({ where: { slug: "about-us" } });
+
   const paymentMethods = [
     {
       id: "razorpay",
@@ -708,8 +786,25 @@ async function main() {
 
   await prisma.storeSetting.upsert({
     where: { key: "shipping" },
-    create: { key: "shipping", value: { freeShippingThreshold: 999, shippingFee: 99 } },
-    update: { value: { freeShippingThreshold: 999, shippingFee: 99 } },
+    create: {
+      key: "shipping",
+      value: {
+        freeShippingThreshold: 999,
+        shippingFee: 99,
+        promoBarEnabled: true,
+        promoBarMessage: "Get FREE shipping on orders above ₹{threshold}",
+        promoBarHref: "/products",
+      },
+    },
+    update: {
+      value: {
+        freeShippingThreshold: 999,
+        shippingFee: 99,
+        promoBarEnabled: true,
+        promoBarMessage: "Get FREE shipping on orders above ₹{threshold}",
+        promoBarHref: "/products",
+      },
+    },
   });
 
   await prisma.storeSetting.upsert({

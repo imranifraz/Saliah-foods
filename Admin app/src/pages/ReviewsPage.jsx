@@ -3,9 +3,10 @@ import { useSearchParams } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
-import { AdminFilterTabs } from "../components/ui/AdminFilterTabs.jsx";
+import { AdminFilterDock, AdminFilterSegment } from "../components/ui/AdminFilterDock.jsx";
 import { DataTable, DataRow, DataCell } from "../components/ui/DataTable.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 const STATUS_TABS = [
   { value: "pending", label: "Pending" },
@@ -80,7 +81,8 @@ function matchesProductQuery(review, query) {
 }
 
 export function ReviewsPage() {
-  const [searchParams] = useSearchParams();
+  const toast = useAdminToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const productQuery = searchParams.get("q") ?? "";
   const [status, setStatus] = useState("pending");
   const [reviews, setReviews] = useState([]);
@@ -146,6 +148,7 @@ export function ReviewsPage() {
         }),
       });
       setFeedback(`Review ${data.review.status}.`);
+      toast.success(`Review ${data.review.status}`);
       if (status !== "all" && status !== nextStatus) {
         setSelectedReviewId(null);
       } else {
@@ -154,6 +157,7 @@ export function ReviewsPage() {
       load();
     } catch (err) {
       setError(err.message);
+      toast.error("Could not update review", err.message);
     } finally {
       setSaving(false);
     }
@@ -177,13 +181,24 @@ export function ReviewsPage() {
         </p>
       ) : null}
 
-      <AdminFilterTabs items={STATUS_TABS} value={status} onChange={setStatus} />
-
-      {productQuery.trim() ? (
-        <p className="mb-4 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-4 py-3 text-sm text-[var(--admin-fg)]">
-          Showing reviews matching <strong>{productQuery.trim()}</strong>
-        </p>
-      ) : null}
+      <AdminFilterDock
+        title="Find reviews"
+        className="mb-6"
+        chips={
+          productQuery.trim()
+            ? [
+                {
+                  key: "product",
+                  label: `Product: ${productQuery.trim()}`,
+                  onRemove: () => setSearchParams({}, { replace: true }),
+                },
+              ]
+            : []
+        }
+        onClearAll={productQuery.trim() ? () => setSearchParams({}, { replace: true }) : undefined}
+      >
+        <AdminFilterSegment label="Status" options={STATUS_TABS} value={status} onChange={setStatus} />
+      </AdminFilterDock>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
         <AdminCard title="Customer reviews">

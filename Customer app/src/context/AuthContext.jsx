@@ -13,6 +13,7 @@ import {
   verifyEmailApi,
   resendVerificationEmailApi,
 } from "../services/authApi.js";
+import { isEmailVerificationRequired } from "../lib/emailVerificationPolicy.js";
 
 const AuthContext = createContext(null);
 
@@ -193,7 +194,9 @@ export function AuthProvider({ children }) {
     }
   }, [user?.id]);
 
-  const emailVerified = Boolean(user?.emailVerified);
+  // In dev, allow bypass via VITE_REQUIRE_EMAIL_VERIFICATION=false in .env
+  // IMPORTANT: This env is baked at build time — restart Vite after changing it.
+  const emailVerified = !isEmailVerificationRequired() || Boolean(user?.emailVerified);
 
   const value = useMemo(
     () => ({

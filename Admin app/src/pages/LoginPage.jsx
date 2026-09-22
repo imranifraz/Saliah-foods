@@ -25,7 +25,6 @@ export function LoginPage() {
   useEffect(() => {
     const saved = getRememberedCredentials();
     if (saved.email) setEmail(saved.email);
-    if (saved.password) setPassword(saved.password);
     if (location.state?.passwordUpdated) {
       setPassword("");
       setRememberMePreference(false);
@@ -39,7 +38,6 @@ export function LoginPage() {
     setRememberMe(checked);
     if (!checked) {
       setRememberMePreference(false);
-      setPassword("");
     }
   }
 

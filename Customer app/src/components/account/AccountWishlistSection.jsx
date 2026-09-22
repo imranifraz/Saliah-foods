@@ -192,6 +192,7 @@ export function AccountWishlistSection() {
                   mrp: item.mrp,
                   mrpValue: item.mrpValue,
                   packSize: item.packSize ?? "",
+                  bogoEnabled: Boolean(item.bogoEnabled),
                 })
               }
               onRemove={() => handleRemove(item)}

@@ -13,6 +13,13 @@ export function isLowStockAvailable(available) {
   return available > 0 && available <= LOW_STOCK_THRESHOLD;
 }
 
+/** True if this order already passed through a fulfill status (prevents double stock deduct). */
+export function hasOrderInventoryBeenFulfilled(order) {
+  if (FULFILL_STATUSES.has(order?.status)) return true;
+  const history = Array.isArray(order?.statusHistory) ? order.statusHistory : [];
+  return history.some((entry) => FULFILL_STATUSES.has(entry?.status));
+}
+
 export function formatStockAdjustment(row) {
   return {
     id: row.id,
@@ -38,8 +45,9 @@ export function formatStockAdjustment(row) {
 export const STOCK_SOURCE_LABELS = {
   admin_manual: "Manual update",
   admin_bulk: "Bulk update",
+  admin_quick_stock: "Quick stock toggle",
   order_reserved: "Order reserved",
-  order_fulfilled: "Order fulfilled",
   order_cancelled: "Order cancelled",
+  order_fulfilled: "Order shipped",
   product_sync: "Product sync",
 };

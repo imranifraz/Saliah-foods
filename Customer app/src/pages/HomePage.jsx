@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Hero } from "../components/home/Hero";
 import { TrustStrip } from "../components/home/TrustStrip";
 import { ShopByCategory } from "../components/home/ShopByCategory";
@@ -29,6 +30,16 @@ function SectionFallback() {
 }
 
 export function HomePage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const q = searchParams.get("q")?.trim();
+    if (q) {
+      navigate(`/products?q=${encodeURIComponent(q)}`, { replace: true });
+    }
+  }, [navigate, searchParams]);
+
   return (
     <div className="overflow-x-clip">
       <Hero />

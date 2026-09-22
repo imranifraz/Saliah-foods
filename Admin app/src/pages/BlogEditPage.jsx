@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import { CmsImageUploadField } from "../components/CmsImageUploadField.jsx";
+import { RichTextEditor } from "../components/RichTextEditor.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 const empty = {
   id: "",
@@ -12,13 +15,22 @@ const empty = {
   category: "Wellness",
   readTime: "5 min read",
   author: "Saliah Editorial",
-  img: "/assets/kimia-dates.png",
+  img: "",
   dateISO: new Date().toISOString().slice(0, 10),
   featured: false,
-  contentJson: '[{"type":"p","text":""}]',
+  blocks: [{ type: "p", text: "" }],
 };
 
+function toBlocks(content) {
+  if (!Array.isArray(content) || !content.length) return [{ type: "p", text: "" }];
+  return content.map((item) => ({
+    type: item.type === "h2" ? "h2" : "p",
+    text: String(item.text ?? ""),
+  }));
+}
+
 export function BlogEditPage() {
+  const toast = useAdminToast();
   const { id } = useParams();
   const navigate = useNavigate();
   const isNew = id === "new";
@@ -26,6 +38,7 @@ export function BlogEditPage() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(!isNew);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (isNew) return;
@@ -42,22 +55,37 @@ export function BlogEditPage() {
           img: p.img,
           dateISO: p.dateISO,
           featured: p.featured,
-          contentJson: JSON.stringify(p.content, null, 2),
+          blocks: toBlocks(p.content),
         });
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id, isNew]);
 
+  function updateBlock(index, patch) {
+    setForm((current) => ({
+      ...current,
+      blocks: current.blocks.map((block, i) => (i === index ? { ...block, ...patch } : block)),
+    }));
+  }
+
   async function handleSave(e) {
     e.preventDefault();
     setError("");
     setSaved(false);
-    let content;
-    try {
-      content = JSON.parse(form.contentJson);
-    } catch {
-      setError("Invalid JSON in content");
+    setSaving(true);
+
+    const content = form.blocks
+      .map((block) => ({
+        type: block.type === "h2" ? "h2" : "p",
+        text: String(block.text ?? "").trim(),
+      }))
+      .filter((block) => block.text);
+
+    if (!content.length) {
+      setError("Add at least one content block.");
+      toast.error("Could not save post", "Add at least one content block.");
+      setSaving(false);
       return;
     }
 
@@ -79,6 +107,7 @@ export function BlogEditPage() {
           method: "POST",
           body: JSON.stringify({ ...payload, id: form.id || undefined }),
         });
+        toast.success("Blog post created");
         navigate("/cms/blog");
       } else {
         await apiFetch(`/api/admin/cms/blog/${id}`, {
@@ -86,9 +115,13 @@ export function BlogEditPage() {
           body: JSON.stringify(payload),
         });
         setSaved(true);
+        toast.success("Blog post saved");
       }
     } catch (err) {
       setError(err.message);
+      toast.error(isNew ? "Could not create post" : "Could not save post", err.message);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -96,16 +129,15 @@ export function BlogEditPage() {
 
   return (
     <div>
-      <Link to="/cms/blog" className="btn-ghost mb-2 inline-flex px-0">
-        ← Blog posts
-      </Link>
-
-      <PageHeader title={isNew ? "New blog post" : "Edit blog post"} />
+      <PageHeader
+        title={isNew ? "New blog post" : "Edit blog post"}
+        subtitle="Write journal articles shown on the customer Blog / Journal pages."
+      />
 
       <form onSubmit={handleSave} className="space-y-6">
         <AdminCard title="Post details">
           <div className="grid gap-4 sm:grid-cols-2">
-            {isNew && (
+            {isNew ? (
               <label className="block sm:col-span-2">
                 <span className="admin-label">URL slug (optional)</span>
                 <input
@@ -115,7 +147,7 @@ export function BlogEditPage() {
                   placeholder="auto-from-title"
                 />
               </label>
-            )}
+            ) : null}
             <label className="block sm:col-span-2">
               <span className="admin-label">Title</span>
               <input
@@ -167,14 +199,6 @@ export function BlogEditPage() {
                 className="admin-input"
               />
             </label>
-            <label className="block sm:col-span-2">
-              <span className="admin-label">Cover image path</span>
-              <input
-                value={form.img}
-                onChange={(e) => setForm({ ...form, img: e.target.value })}
-                className="admin-input"
-              />
-            </label>
             <label className="flex items-center gap-2 sm:col-span-2">
               <input
                 type="checkbox"
@@ -186,27 +210,92 @@ export function BlogEditPage() {
           </div>
         </AdminCard>
 
-        <AdminCard title="Article content (JSON blocks)">
-          <textarea
-            value={form.contentJson}
-            onChange={(e) => setForm({ ...form, contentJson: e.target.value })}
-            rows={14}
-            className="admin-input font-mono text-xs"
-            spellCheck={false}
+        <AdminCard
+          title="Cover image"
+          subtitle="Shown on the blog listing card and article hero."
+        >
+          <CmsImageUploadField
+            label="Cover image"
+            value={form.img}
+            onChange={(img) => setForm({ ...form, img })}
+            hint="Prefer a square image (about 1000×1000). The file uploads as-is — no crop step."
+            previewClassName="aspect-square w-full max-w-sm object-cover"
+            emptyClassName="aspect-square w-full max-w-sm"
+            fileNamePrefix="blog-cover"
           />
         </AdminCard>
 
-        {error && (
+        <AdminCard title="Article content" subtitle="Add headings and formatted paragraphs (bold, lists, links).">
+          <div className="space-y-4">
+            {form.blocks.map((block, index) => (
+              <div key={index} className="rounded-xl border border-emerald-900/10 bg-cream-50/40 p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <select
+                    value={block.type}
+                    onChange={(e) => updateBlock(index, { type: e.target.value })}
+                    className="admin-input w-auto min-w-[10rem]"
+                  >
+                    <option value="p">Paragraph</option>
+                    <option value="h2">Heading</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="btn-ghost px-0 text-xs text-red-700"
+                    disabled={form.blocks.length <= 1}
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        blocks: current.blocks.filter((_, i) => i !== index),
+                      }))
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+                {block.type === "h2" ? (
+                  <input
+                    value={block.text}
+                    onChange={(e) => updateBlock(index, { text: e.target.value })}
+                    className="admin-input w-full"
+                    placeholder="Heading text"
+                  />
+                ) : (
+                  <RichTextEditor
+                    id={`blog-block-${index}`}
+                    value={block.text}
+                    onChange={(text) => updateBlock(index, { text })}
+                    placeholder="Paragraph text — bold, italic, lists, and links supported"
+                    minHeight={120}
+                  />
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() =>
+                setForm((current) => ({
+                  ...current,
+                  blocks: [...current.blocks, { type: "p", text: "" }],
+                }))
+              }
+            >
+              + Add block
+            </button>
+          </div>
+        </AdminCard>
+
+        {error ? (
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </p>
-        )}
-        {saved && (
+        ) : null}
+        {saved ? (
           <p className="rounded-xl bg-emerald-800/10 px-4 py-3 text-sm text-emerald-800">Saved.</p>
-        )}
+        ) : null}
 
-        <button type="submit" className="btn-primary">
-          {isNew ? "Publish post" : "Save changes"}
+        <button type="submit" className="btn-primary" disabled={saving}>
+          {saving ? "Saving…" : isNew ? "Publish post" : "Save changes"}
         </button>
       </form>
     </div>

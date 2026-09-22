@@ -45,62 +45,54 @@ function ProductPreviewCard({ product, href, onClose, compact = false, index = 0
     <motion.div variants={compact ? undefined : cardVariants} custom={index} className="min-w-0">
       <Link
         to={href}
-        className={`group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/60 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-cream-200 hover:bg-white hover:shadow-[0_16px_40px_rgba(22,49,42,0.12)] ${
-          compact ? "rounded-xl" : ""
-        }`}
+        className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-white/70 bg-white/70 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-cream-200 hover:bg-white hover:shadow-[0_12px_28px_rgba(22,49,42,0.1)]"
         onClick={onClose}
       >
         <div
-          className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-b from-cream-100/90 to-cream-50/40 ${
-            compact ? "h-[4.5rem] p-3" : "h-[7.5rem] p-5"
+          className={`relative overflow-hidden bg-gradient-to-b from-cream-100/80 to-cream-50/30 ${
+            compact ? "aspect-[5/4] p-2" : "aspect-[5/4] p-2.5"
           }`}
         >
           <OptimizedImage
             src={product.img}
             alt={product.name}
-            className="max-h-full max-w-full object-contain transition-transform duration-300 ease-out group-hover:scale-[1.06]"
-            width={compact ? 96 : 160}
-            height={compact ? 96 : 160}
+            className="h-full w-full object-contain transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+            width={compact ? 120 : 180}
+            height={compact ? 96 : 144}
           />
         </div>
 
-        <div className={`mx-3 border-t border-cream-200/70 ${compact ? "mx-2.5" : ""}`} aria-hidden />
-
-        <div className={`flex flex-1 flex-col ${compact ? "gap-1 p-2.5" : "gap-1.5 p-3.5"}`}>
+        <div className={`flex flex-col ${compact ? "gap-0.5 px-2.5 pb-2.5 pt-2" : "gap-1 px-2.5 pb-2.5 pt-2"}`}>
           {badge ? (
-            <span className="inline-flex w-fit rounded-full bg-emerald-900/[0.06] px-2 py-0.5 font-body text-[9px] font-medium uppercase tracking-[0.14em] text-emerald-800/65">
+            <span className="inline-flex w-fit max-w-full truncate rounded-full bg-emerald-900/[0.06] px-1.5 py-0.5 font-body text-[8px] font-medium uppercase tracking-[0.12em] text-emerald-800/65">
               {badge}
             </span>
           ) : null}
 
           <p
             className={`font-display leading-snug text-emerald-900 transition-colors duration-300 group-hover:text-emerald-800 ${
-              compact ? "text-[11px] line-clamp-2" : "text-[13px] line-clamp-2"
+              compact ? "text-[11px] line-clamp-2" : "text-[12px] line-clamp-2"
             }`}
           >
             {product.name}
           </p>
 
           {product.tagline ? (
-            <p
-              className={`font-body leading-snug text-emerald-900/45 ${
-                compact ? "text-[9px] line-clamp-1" : "text-[10px] line-clamp-2"
-              }`}
-            >
+            <p className="font-body text-[10px] leading-snug text-emerald-900/45 line-clamp-1">
               {product.tagline}
             </p>
           ) : null}
 
-          <div className={`mt-auto flex items-end justify-between gap-2 ${compact ? "pt-0.5" : "pt-1"}`}>
+          <div className="mt-1 flex items-baseline justify-between gap-2 border-t border-cream-200/60 pt-1.5">
             {product.packSize ? (
-              <span className="font-body text-[9px] uppercase tracking-[0.12em] text-emerald-900/35">
+              <span className="font-body text-[9px] uppercase tracking-[0.1em] text-emerald-900/35">
                 {product.packSize}
               </span>
             ) : (
               <span />
             )}
             <span
-              className={`font-display text-emerald-900 ${compact ? "text-[11px]" : "text-sm tracking-wide"}`}
+              className={`shrink-0 font-display text-emerald-900 ${compact ? "text-[11px]" : "text-[13px]"}`}
             >
               {product.price}
             </span>
@@ -121,13 +113,13 @@ function FeaturedPromo({ promo, href, onClose }) {
     >
       <div className="pointer-events-none absolute inset-0 marble-texture opacity-40" aria-hidden />
       <div className="relative flex flex-1 flex-col">
-        <div className="relative mb-4 flex flex-1 items-center justify-center overflow-hidden rounded-xl bg-cream-100/50 p-4">
+        <div className="relative mb-3 flex items-center justify-center overflow-hidden rounded-xl bg-cream-100/50 p-2.5">
           <OptimizedImage
             src={promo.image}
             alt=""
-            className="max-h-[7.5rem] w-full object-contain transition-transform duration-500 ease-out hover:scale-105"
+            className="max-h-[6rem] w-full object-contain transition-transform duration-500 ease-out hover:scale-105"
             width={200}
-            height={200}
+            height={160}
           />
         </div>
 
@@ -198,7 +190,7 @@ function CategorySidebar({ categories, activeId, onSelect }) {
   );
 }
 
-export function ProductMegaMenu({ onClose }) {
+export function ProductMegaMenu({ onClose, onMouseEnter, onMouseLeave }) {
   const { menuCategories } = useCatalog();
   const [activeId, setActiveId] = useState("");
   const active = menuCategories.find((c) => c.id === activeId) ?? menuCategories[0];
@@ -221,7 +213,9 @@ export function ProductMegaMenu({ onClose }) {
       initial="hidden"
       animate="show"
       exit="exit"
-      className="absolute inset-x-0 top-full z-[60] mt-4 hidden px-4 sm:px-5 md:px-10 xl:block"
+      className="absolute inset-x-0 top-full z-[60] hidden px-4 pt-4 sm:px-5 md:px-10 xl:block"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <div className="mx-auto w-full max-w-[1440px]">
         <div className="mega-glass shadow-mega-menu overflow-hidden rounded-[1.75rem]">
@@ -237,20 +231,20 @@ export function ProductMegaMenu({ onClose }) {
               />
             </nav>
 
-            <div className="flex min-w-0 flex-col px-5 py-5">
-              <div className="mb-4 shrink-0">
+            <div className="flex min-w-0 flex-col px-4 py-4">
+              <div className="mb-3 shrink-0">
                 <p className="font-body text-[9px] font-medium uppercase tracking-[0.2em] text-emerald-800/45">
                   Collection
                 </p>
-                <h3 className="mt-1 font-display text-xl tracking-tight text-emerald-900">{active.label}</h3>
-                <p className="mt-1 max-w-md font-body text-[13px] leading-relaxed tracking-wide text-emerald-900/50">
+                <h3 className="mt-0.5 font-display text-lg tracking-tight text-emerald-900">{active.label}</h3>
+                <p className="mt-0.5 max-w-md font-body text-xs leading-relaxed tracking-wide text-emerald-900/50">
                   {active.description}
                 </p>
               </div>
 
               <motion.div
                 key={activeId}
-                className="grid flex-1 grid-cols-4 gap-3"
+                className="grid grid-cols-4 gap-2.5"
                 variants={gridVariants}
                 initial="hidden"
                 animate="show"
@@ -269,7 +263,7 @@ export function ProductMegaMenu({ onClose }) {
                     <Link
                       to={active.viewAllHref}
                       onClick={onClose}
-                      className="group flex h-full min-h-[12.5rem] flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-900/10 bg-cream-100/30 p-4 text-center transition-all duration-300 hover:border-emerald-900/20 hover:bg-cream-100/60"
+                      className="group flex aspect-[5/4] flex-col items-center justify-center rounded-xl border border-dashed border-emerald-900/10 bg-cream-100/30 p-3 text-center transition-all duration-300 hover:border-emerald-900/20 hover:bg-cream-100/60"
                     >
                       <span className="font-display text-sm text-emerald-900/70 transition-colors group-hover:text-emerald-900">
                         Discover more
@@ -282,7 +276,7 @@ export function ProductMegaMenu({ onClose }) {
                 ) : null}
               </motion.div>
 
-              <div className="mt-4 flex shrink-0 items-center justify-between border-t border-cream-200/60 pt-4">
+              <div className="mt-3 flex shrink-0 items-center justify-between border-t border-cream-200/60 pt-3">
                 <p className="font-body text-[10px] tracking-wide text-emerald-900/40">
                   {previewProducts.length} curated picks
                 </p>

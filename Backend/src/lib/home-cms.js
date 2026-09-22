@@ -1,6 +1,8 @@
+import { sanitizeRichHtml, richHtmlHasText } from "./richText.js";
+
 /** Default homepage CMS content (customer site). */
 export const DEFAULT_HOME_CMS = {
-  siteLogo: "/assets/application-logo.png",
+  siteLogo: "/assets/saliah-foods-logo.png",
   hero: {
     title: "Premium Dates & Natural Wellness Foods",
     subtitle:
@@ -11,6 +13,8 @@ export const DEFAULT_HOME_CMS = {
     banners: [
       {
         id: "hero-1",
+        type: "image",
+        src: "/assets/hero-banner.png",
         image: "/assets/hero-banner.png",
         alt: "Saliah Foods premium dates with nuts, figs, and grapes on marble",
       },
@@ -69,21 +73,46 @@ function cleanCta(raw, fallback) {
   };
 }
 
+function inferMediaType(url, explicitType) {
+  const type = cleanString(explicitType).toLowerCase();
+  if (type === "video" || type === "image") return type;
+  const value = cleanString(url).toLowerCase();
+  if (/\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(value) || value.includes("/video")) return "video";
+  return "image";
+}
+
 function normalizeBanners(rawBanners, legacyHeroImage) {
   const list = Array.isArray(rawBanners) ? rawBanners : [];
   const normalized = list
-    .map((banner, index) => ({
-      id: cleanString(banner?.id, `banner-${index + 1}`),
-      image: cleanString(banner?.image),
-      alt: cleanString(banner?.alt, "Saliah Foods banner"),
-    }))
-    .filter((banner) => banner.image);
+    .map((banner, index) => {
+      const src = cleanString(banner?.src || banner?.image || banner?.video || banner?.url);
+      const type = inferMediaType(src, banner?.type || banner?.mediaType || banner?.kind);
+      return {
+        id: cleanString(banner?.id, `banner-${index + 1}`),
+        type,
+        src,
+        // Keep `image` for older clients; same URL for both image and video slides.
+        image: src,
+        alt: cleanString(banner?.alt, type === "video" ? "Saliah Foods banner video" : "Saliah Foods banner"),
+        poster: cleanString(banner?.poster),
+      };
+    })
+    .filter((banner) => banner.src);
 
   if (normalized.length > 0) return normalized;
 
   const legacy = cleanString(legacyHeroImage);
   if (legacy) {
-    return [{ id: "hero-1", image: legacy, alt: "Saliah Foods hero banner" }];
+    return [
+      {
+        id: "hero-1",
+        type: "image",
+        src: legacy,
+        image: legacy,
+        alt: "Saliah Foods hero banner",
+        poster: "",
+      },
+    ];
   }
 
   return DEFAULT_HOME_CMS.hero.banners;
@@ -94,11 +123,11 @@ function normalizeTestimonialItems(rawItems) {
   const normalized = list
     .map((item, index) => ({
       id: cleanString(item?.id, `testimonial-${index + 1}`),
-      quote: cleanString(item?.quote),
+      quote: sanitizeRichHtml(item?.quote),
       name: cleanString(item?.name, "Customer"),
       role: cleanString(item?.role),
     }))
-    .filter((item) => item.quote);
+    .filter((item) => richHtmlHasText(item.quote));
 
   return normalized.length > 0 ? normalized : DEFAULT_HOME_CMS.testimonials.items;
 }
@@ -116,10 +145,8 @@ export function normalizeHomeCmsBody(raw = {}) {
     siteLogo: cleanString(raw.siteLogo, DEFAULT_HOME_CMS.siteLogo),
     hero: {
       title: cleanString(heroRaw.title ?? raw.heroTitle, DEFAULT_HOME_CMS.hero.title),
-      subtitle: cleanString(
-        heroRaw.subtitle ?? raw.heroSubtitle,
-        DEFAULT_HOME_CMS.hero.subtitle
-      ),
+      subtitle:
+        sanitizeRichHtml(heroRaw.subtitle ?? raw.heroSubtitle) || DEFAULT_HOME_CMS.hero.subtitle,
       primaryCta: cleanCta(heroRaw.primaryCta ?? raw.primaryCta, DEFAULT_HOME_CMS.hero.primaryCta),
       secondaryCta: cleanCta(
         heroRaw.secondaryCta ?? raw.secondaryCta,
@@ -134,7 +161,7 @@ export function normalizeHomeCmsBody(raw = {}) {
     story: {
       eyebrow: cleanString(storyRaw.eyebrow, DEFAULT_HOME_CMS.story.eyebrow),
       title: cleanString(storyRaw.title ?? raw.storyTitle, DEFAULT_HOME_CMS.story.title),
-      body: cleanString(storyRaw.body ?? raw.storyBody, DEFAULT_HOME_CMS.story.body),
+      body: sanitizeRichHtml(storyRaw.body ?? raw.storyBody) || DEFAULT_HOME_CMS.story.body,
       image: cleanString(storyRaw.image ?? raw.storyImage, DEFAULT_HOME_CMS.story.image),
       imageAlt: cleanString(storyRaw.imageAlt, DEFAULT_HOME_CMS.story.imageAlt),
       ctaLabel: cleanString(storyRaw.ctaLabel, DEFAULT_HOME_CMS.story.ctaLabel),
@@ -143,7 +170,8 @@ export function normalizeHomeCmsBody(raw = {}) {
     testimonials: {
       eyebrow: cleanString(testimonialsRaw.eyebrow, DEFAULT_HOME_CMS.testimonials.eyebrow),
       title: cleanString(testimonialsRaw.title, DEFAULT_HOME_CMS.testimonials.title),
-      subtitle: cleanString(testimonialsRaw.subtitle, DEFAULT_HOME_CMS.testimonials.subtitle),
+      subtitle:
+        sanitizeRichHtml(testimonialsRaw.subtitle) || DEFAULT_HOME_CMS.testimonials.subtitle,
       items: normalizeTestimonialItems(testimonialsRaw.items),
     },
   };

@@ -1,9 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CartDrawer } from "../components/cart/CartDrawer";
 import { generateOrderId, getShippingFee, saveLastOrder } from "../data/checkout";
+import { applyOffersToCartItems } from "../data/offers";
 import { useGstSettings } from "./GstSettingsContext.jsx";
 import { trackAddToCart } from "../lib/analytics.js";
+
+const CartDrawer = lazy(() =>
+  import("../components/cart/CartDrawer").then((m) => ({ default: m.CartDrawer }))
+);
 
 const STORAGE_KEY = "saliah-cart";
 
@@ -78,10 +82,24 @@ export function CartProvider({ children }) {
       const index = prev.findIndex((entry) => itemKey(entry) === key);
       if (index >= 0) {
         const next = [...prev];
-        next[index] = { ...next[index], quantity: next[index].quantity + 1 };
+        next[index] = {
+          ...next[index],
+          ...item,
+          id: key,
+          quantity: next[index].quantity + 1,
+          bogoEnabled: Boolean(item.bogoEnabled ?? next[index].bogoEnabled),
+        };
         return next;
       }
-      return [...prev, { ...item, id: key, quantity: 1 }];
+      return [
+        ...prev,
+        {
+          ...item,
+          id: key,
+          quantity: 1,
+          bogoEnabled: Boolean(item.bogoEnabled),
+        },
+      ];
     });
 
     setToast({ message: `${item.name} added to cart` });
@@ -104,22 +122,24 @@ export function CartProvider({ children }) {
     setItems([]);
   }, []);
 
+  const offerSummary = useMemo(() => applyOffersToCartItems(items), [items]);
+  const pricedItems = offerSummary.lines;
   const totalCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
-
-  const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + (item.priceValue ?? 0) * item.quantity, 0),
-    [items]
-  );
+  const subtotal = offerSummary.subtotal;
+  const discountTotal = offerSummary.discountTotal;
+  const grossSubtotal = offerSummary.grossSubtotal;
 
   const placeOrder = useCallback(
     (customer) => {
-      const orderSubtotal = items.reduce((sum, item) => sum + (item.priceValue ?? 0) * item.quantity, 0);
+      const priced = applyOffersToCartItems(items);
+      const orderSubtotal = priced.subtotal;
       const shipping = getShippingFee(orderSubtotal);
       const pricing = calcOrderBreakdown(orderSubtotal, shipping);
       const order = {
         id: generateOrderId(),
-        items: items.map((item) => ({ ...item })),
+        items: priced.lines.map((item) => ({ ...item })),
         subtotal: orderSubtotal,
+        discountTotal: priced.discountTotal,
         shipping,
         total: pricing.total,
         gstAmount: pricing.gstAmount,
@@ -140,6 +160,7 @@ export function CartProvider({ children }) {
   const value = useMemo(
     () => ({
       items,
+      pricedItems,
       addItem,
       removeItem,
       updateQuantity,
@@ -147,6 +168,9 @@ export function CartProvider({ children }) {
       placeOrder,
       totalCount,
       subtotal,
+      discountTotal,
+      grossSubtotal,
+      appliedOffers: offerSummary.appliedOffers,
       isOpen,
       openCart,
       closeCart,
@@ -154,6 +178,7 @@ export function CartProvider({ children }) {
     }),
     [
       items,
+      pricedItems,
       addItem,
       removeItem,
       updateQuantity,
@@ -161,6 +186,9 @@ export function CartProvider({ children }) {
       placeOrder,
       totalCount,
       subtotal,
+      discountTotal,
+      grossSubtotal,
+      offerSummary.appliedOffers,
       isOpen,
       openCart,
       closeCart,
@@ -171,7 +199,9 @@ export function CartProvider({ children }) {
   return (
     <CartContext.Provider value={value}>
       {children}
-      <CartDrawer />
+      <Suspense fallback={null}>
+        <CartDrawer />
+      </Suspense>
       <AnimatePresence>{toast ? <CartToast message={toast.message} /> : null}</AnimatePresence>
     </CartContext.Provider>
   );

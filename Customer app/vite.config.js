@@ -66,21 +66,20 @@ export default defineConfig(({ mode }) => {
 
   return {
     server: {
-      port: 5173,
-      strictPort: true,
+      port: 5180,
+      strictPort: false,
       proxy: {
         "/api": {
-          target: "http://127.0.0.1:3001",
+          target: "http://localhost:3001",
           changeOrigin: true,
         },
         "/uploads": {
-          target: "http://127.0.0.1:3001",
+          target: "http://localhost:3001",
           changeOrigin: true,
         },
-        "/assets": {
-          target: "http://127.0.0.1:3001",
-          changeOrigin: true,
-        },
+        // Do not proxy /assets — serve from Customer app/public/assets via Vite.
+        // Backend still serves /assets in production; proxying in dev caused blank
+        // images whenever the API was slow or restarted.
       },
     },
     plugins: [
@@ -94,12 +93,29 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     build: {
+      modulePreload: {
+        polyfill: false,
+        resolveDependencies(filename, deps) {
+          // Invoice PDF libs must never preload on marketing pages.
+          return deps.filter(
+            (dep) =>
+              !dep.includes("pdf-") &&
+              !dep.includes("jspdf") &&
+              !dep.includes("html2canvas") &&
+              !dep.includes("purify")
+          );
+        },
+      },
       rollupOptions: {
         output: {
-          manualChunks: {
-            motion: ["framer-motion"],
-            router: ["react-router", "react-router-dom"],
-            vendor: ["react", "react-dom"],
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              if (id.includes("jspdf") || id.includes("html2canvas")) return;
+              if (id.includes("framer-motion")) return "motion";
+              if (id.includes("react-router")) return "router";
+              if (id.includes("@fontsource")) return "fonts";
+              if (id.includes("react-dom") || id.includes("/react/")) return "vendor";
+            }
           },
         },
       },

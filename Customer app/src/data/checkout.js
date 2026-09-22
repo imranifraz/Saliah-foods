@@ -91,6 +91,9 @@ export function getDefaultShippingSettings() {
   return {
     freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
     shippingFee: SHIPPING_FEE,
+    promoBarEnabled: true,
+    promoBarMessage: "Get FREE shipping on orders above ₹{threshold}",
+    promoBarHref: "/products",
   };
 }
 
@@ -134,13 +137,16 @@ export function getEmptyCheckoutForm() {
 
 export function validateCheckoutForm(form) {
   const errors = {};
+  const phoneDigits = String(form.phone ?? "")
+    .replace(/\D/g, "")
+    .replace(/^91(?=\d{10}$)/, "");
 
   if (!form.fullName.trim()) errors.fullName = "Full name is required";
   if (!form.email.trim()) errors.email = "Email is required";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = "Enter a valid email";
 
-  if (!form.phone.trim()) errors.phone = "Phone number is required";
-  else if (!/^[6-9]\d{9}$/.test(form.phone.replace(/\s/g, ""))) {
+  if (!phoneDigits) errors.phone = "Phone number is required";
+  else if (!/^[6-9]\d{9}$/.test(phoneDigits)) {
     errors.phone = "Enter a valid 10-digit mobile number";
   }
 

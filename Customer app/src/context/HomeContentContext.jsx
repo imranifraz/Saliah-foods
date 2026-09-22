@@ -2,9 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { fetchHomeCmsApi } from "../services/homeCmsApi.js";
 import { homepageImages } from "../data/homepage.js";
 
+const LOGO_CACHE_KEY = "saliah.siteBrand.logos";
+
 const FALLBACK = {
-  siteLogo: "/assets/application-logo.png",
-  siteLogoLight: "/assets/application-logo-white.webp",
+  siteLogo: "/assets/saliah-foods-logo.png",
+  siteLogoLight: "/assets/saliah-foods-logo.png",
   hero: {
     title: "Premium Dates & Natural Wellness Foods",
     subtitle:
@@ -15,6 +17,8 @@ const FALLBACK = {
     banners: [
       {
         id: "hero-1",
+        type: "image",
+        src: homepageImages.hero,
         image: homepageImages.hero,
         alt: "Saliah Foods premium dates with nuts, figs, and grapes on marble",
       },
@@ -61,17 +65,64 @@ const FALLBACK = {
   },
 };
 
+function readCachedLogos() {
+  try {
+    const raw = localStorage.getItem(LOGO_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const siteLogo = String(parsed?.siteLogo || "").trim();
+    if (!siteLogo) return null;
+    return {
+      siteLogo,
+      siteLogoLight: String(parsed?.siteLogoLight || siteLogo).trim() || siteLogo,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedLogos(siteLogo, siteLogoLight) {
+  const logo = String(siteLogo || "").trim();
+  if (!logo) return;
+  try {
+    localStorage.setItem(
+      LOGO_CACHE_KEY,
+      JSON.stringify({
+        siteLogo: logo,
+        siteLogoLight: String(siteLogoLight || logo).trim() || logo,
+      })
+    );
+  } catch {
+    // ignore private mode / quota
+  }
+}
+
+function getInitialContent() {
+  const cached = readCachedLogos();
+  if (!cached) {
+    // Avoid flashing the bundled default logo before CMS returns the uploaded one.
+    return { ...FALLBACK, siteLogo: "", siteLogoLight: "" };
+  }
+  return {
+    ...FALLBACK,
+    siteLogo: cached.siteLogo,
+    siteLogoLight: cached.siteLogoLight,
+  };
+}
+
 const HomeContentContext = createContext(null);
 
 export function HomeContentProvider({ children }) {
-  const [content, setContent] = useState(FALLBACK);
+  const [content, setContent] = useState(getInitialContent);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
       const data = await fetchHomeCmsApi();
       if (data?.page?.content) {
-        setContent(data.page.content);
+        const next = data.page.content;
+        writeCachedLogos(next.siteLogo, next.siteLogoLight);
+        setContent(next);
       }
     } catch {
       setContent(FALLBACK);

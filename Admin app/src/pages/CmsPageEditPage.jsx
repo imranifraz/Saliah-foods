@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
 import { RichTextEditor } from "../components/RichTextEditor.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 export function CmsPageEditPage() {
+  const toast = useAdminToast();
   const { slug } = useParams();
   if (slug === "homepage") return <Navigate to="/cms/home" replace />;
   if (slug === "contact") return <Navigate to="/cms/contact" replace />;
   if (slug === "faq") return <Navigate to="/cms/faq" replace />;
+  if (slug === "sourcing-quality") return <Navigate to="/cms/sourcing" replace />;
+  if (slug === "our-legacy" || slug === "about-us") return <Navigate to="/cms/legacy" replace />;
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [published, setPublished] = useState(true);
@@ -40,6 +44,7 @@ export function CmsPageEditPage() {
       body = JSON.parse(bodyJson);
     } catch {
       setError("Invalid JSON in page content");
+      toast.error("Could not save page", "Invalid JSON in page content");
       return;
     }
     try {
@@ -48,8 +53,10 @@ export function CmsPageEditPage() {
         body: JSON.stringify({ title, subtitle, published, body }),
       });
       setSaved(true);
+      toast.success("Page saved");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not save page", err.message);
     }
   }
 
@@ -57,10 +64,6 @@ export function CmsPageEditPage() {
 
   return (
     <div>
-      <Link to="/cms/pages" className="btn-ghost mb-2 inline-flex px-0">
-        ← Web content
-      </Link>
-
       <PageHeader title={title || slug} subtitle={`Edit page: /${slug}`} />
 
       <form onSubmit={handleSave} className="space-y-6">

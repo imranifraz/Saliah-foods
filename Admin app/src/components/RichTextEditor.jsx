@@ -8,6 +8,18 @@ const BLOCK_FORMATS = [
   { value: "blockquote", label: "Quote" },
 ];
 
+const FONT_SIZES = [
+  { value: "", label: "Size" },
+  { value: "12px", label: "12" },
+  { value: "14px", label: "14" },
+  { value: "16px", label: "16" },
+  { value: "18px", label: "18" },
+  { value: "20px", label: "20" },
+  { value: "24px", label: "24" },
+  { value: "28px", label: "28" },
+  { value: "32px", label: "32" },
+];
+
 const EMPTY_ACTIVE = {
   bold: false,
   italic: false,
@@ -20,6 +32,7 @@ const EMPTY_ACTIVE = {
   alignRight: false,
   alignJustify: false,
   formatBlock: "p",
+  fontSize: "",
 };
 
 function ToolbarDivider() {
@@ -182,6 +195,21 @@ function readFormatBlock() {
   return value || "p";
 }
 
+function readFontSize(editor) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return "";
+  let node = selection.anchorNode;
+  if (node?.nodeType === Node.TEXT_NODE) node = node.parentElement;
+  while (node && node !== editor) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const size = String(node.style?.fontSize || "").trim().toLowerCase();
+      if (size) return size.endsWith("px") ? size : size;
+    }
+    node = node.parentElement;
+  }
+  return "";
+}
+
 function getLinkUrlFromSelection() {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return "";
@@ -189,6 +217,17 @@ function getLinkUrlFromSelection() {
   if (node?.nodeType === Node.TEXT_NODE) node = node.parentElement;
   const anchor = node?.closest?.("a");
   return anchor?.getAttribute("href") ?? "";
+}
+
+function isTempFontSizeMarker(el) {
+  if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+  if (el.tagName === "FONT" && String(el.getAttribute("size") || "") === "7") return true;
+  const style = String(el.getAttribute("style") || "").toLowerCase();
+  return (
+    style.includes("xxx-large") ||
+    style.includes("xx-large") ||
+    style.includes("-webkit-xxx-large")
+  );
 }
 
 export function RichTextEditor({
@@ -280,6 +319,7 @@ export function RichTextEditor({
       alignRight: document.queryCommandState("justifyRight"),
       alignJustify: document.queryCommandState("justifyFull"),
       formatBlock: readFormatBlock(),
+      fontSize: readFontSize(editor),
     });
   }, [saveSelection]);
 
@@ -299,6 +339,9 @@ export function RichTextEditor({
   function runCommand(command, commandValue) {
     restoreSelection();
     editorRef.current?.focus();
+    if (["bold", "italic", "underline", "strikeThrough"].includes(command)) {
+      document.execCommand("styleWithCSS", false, false);
+    }
     document.execCommand(command, false, commandValue);
     emitChange();
     refreshActive();
@@ -307,6 +350,46 @@ export function RichTextEditor({
   function handleBlockChange(event) {
     const block = event.target.value;
     runCommand("formatBlock", block);
+  }
+
+  function applyFontSize(sizePx) {
+    restoreSelection();
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+    if (!sizePx) {
+      document.execCommand("removeFormat", false);
+      emitChange();
+      refreshActive();
+      return;
+    }
+
+    document.execCommand("styleWithCSS", false, true);
+    document.execCommand("fontSize", false, "7");
+
+    editor.querySelectorAll("font[size='7'], span").forEach((el) => {
+      if (!editor.contains(el) || !isTempFontSizeMarker(el)) return;
+      if (el.tagName === "FONT") {
+        const span = document.createElement("span");
+        span.style.fontSize = sizePx;
+        while (el.firstChild) span.appendChild(el.firstChild);
+        el.replaceWith(span);
+      } else {
+        el.style.fontSize = sizePx;
+      }
+    });
+
+    document.execCommand("styleWithCSS", false, false);
+    emitChange();
+    refreshActive();
+  }
+
+  function handleFontSizeChange(event) {
+    applyFontSize(event.target.value);
   }
 
   function openLinkPopover() {
@@ -356,6 +439,25 @@ export function RichTextEditor({
               {BLOCK_FORMATS.map((format) => (
                 <option key={format.value} value={format.value}>
                   {format.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="rich-text-editor__format-select">
+            <span className="sr-only">Font size</span>
+            <select
+              value={FONT_SIZES.some((size) => size.value === active.fontSize) ? active.fontSize : ""}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                saveSelection();
+              }}
+              onChange={handleFontSizeChange}
+              aria-label="Font size"
+            >
+              {FONT_SIZES.map((size) => (
+                <option key={size.value || "default"} value={size.value}>
+                  {size.label}
                 </option>
               ))}
             </select>

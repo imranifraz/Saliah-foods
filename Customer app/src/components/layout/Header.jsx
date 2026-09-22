@@ -8,12 +8,18 @@ import { useWishlist } from "../../context/WishlistContext";
 import { useHomeContent } from "../../context/HomeContentContext.jsx";
 import { resolveMediaUrl } from "../../lib/api.js";
 
-import { MobileProductMegaMenu } from "./ProductMegaMenu";
 import { HeaderAccountMenu } from "./HeaderAccountMenu";
+import { HeaderNotificationsBell } from "./HeaderNotificationsBell";
+import { HeaderSearch } from "./HeaderSearch";
 
 const ProductMegaMenu = lazy(() =>
   import("./ProductMegaMenu").then((m) => ({ default: m.ProductMegaMenu }))
 );
+const MobileProductMegaMenu = lazy(() =>
+  import("./ProductMegaMenu").then((m) => ({ default: m.MobileProductMegaMenu }))
+);
+
+const FALLBACK_LOGO = "/assets/saliah-foods-logo.png";
 
 export function Header() {
   const [scrolled, setScrolled] = useState(false);
@@ -27,10 +33,46 @@ export function Header() {
   const { totalCount, openCart, closeCart } = useCart();
   const { isAuthenticated, logout } = useAuth();
   const { count: wishlistCount } = useWishlist();
-  const { content: homeContent } = useHomeContent();
+  const { content, loading: homeLoading } = useHomeContent();
+  const logoPath = content?.siteLogo || (!homeLoading ? FALLBACK_LOGO : "");
+  const logoSrc = logoPath ? resolveMediaUrl(logoPath) : "";
+
+  const megaCloseTimerRef = useRef(null);
+
+  const clearMegaCloseTimer = () => {
+    if (megaCloseTimerRef.current) {
+      window.clearTimeout(megaCloseTimerRef.current);
+      megaCloseTimerRef.current = null;
+    }
+  };
+
+  const openMegaMenu = () => {
+    clearMegaCloseTimer();
+    setMegaOpen(true);
+  };
+
+  const scheduleCloseMegaMenu = () => {
+    clearMegaCloseTimer();
+    megaCloseTimerRef.current = window.setTimeout(() => {
+      setMegaOpen(false);
+      megaCloseTimerRef.current = null;
+    }, 160);
+  };
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    return () => clearMegaCloseTimer();
+  }, []);
+
+  useEffect(() => {
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 24);
+        ticking = false;
+      });
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
@@ -104,27 +146,34 @@ export function Header() {
       }`}
     >
       <motion.div
-        className={`mx-auto max-w-[1440px] px-4 transition-all duration-500 sm:px-5 md:px-10 ${
+        className={`mx-auto max-w-[1440px] px-4 transition-[background-color,box-shadow,border-radius] duration-300 sm:px-5 md:px-10 ${
           scrolled
-            ? "rounded-full bg-white/85 shadow-luxury backdrop-blur-md"
+            ? "rounded-full border border-cream-200/80 bg-white/95 shadow-luxury"
             : "bg-transparent"
         }`}
       >
         <div className="flex h-[var(--site-header-bar)] items-center justify-between gap-2 sm:gap-3 md:gap-4">
           <Link
             to="/"
-            className="relative z-10 flex h-full shrink-0 items-center max-w-[42%] sm:max-w-none"
+            className="relative z-10 flex h-full shrink-0 items-center"
             aria-label="Saliah Foods home"
           >
-            <img
-              src={resolveMediaUrl(homeContent.siteLogo) || "/assets/application-logo.png"}
-              alt="Saliah Foods"
-              className="block h-8 w-auto translate-y-[1px] rounded-lg sm:h-9 sm:translate-y-[1px] md:h-10 md:translate-y-[2px] lg:h-11 xl:h-12"
-              width={595}
-              height={131}
-              decoding="async"
-              fetchPriority="low"
-            />
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                alt="Saliah Foods"
+                width={150}
+                height={49}
+                className="block h-auto w-[110px] max-w-full bg-transparent object-contain object-left md:w-[150px]"
+                decoding="async"
+                fetchPriority="high"
+              />
+            ) : (
+              <span
+                className="block h-[36px] w-[110px] md:h-[49px] md:w-[150px]"
+                aria-hidden
+              />
+            )}
           </Link>
 
           <nav
@@ -141,6 +190,9 @@ export function Header() {
                   }`}
                   aria-expanded={megaOpen}
                   aria-haspopup="dialog"
+                  onMouseEnter={openMegaMenu}
+                  onMouseLeave={scheduleCloseMegaMenu}
+                  onFocus={openMegaMenu}
                   onClick={() => setMegaOpen((v) => !v)}
                 >
                   {item.label}
@@ -158,11 +210,16 @@ export function Header() {
           </nav>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-3">
-            <button type="button" className="hidden h-9 w-9 items-center justify-center rounded-full bg-emerald-900/5 text-emerald-900 sm:flex" aria-label="Search">
-              <IconSearch />
-            </button>
+            <HeaderSearch
+              onNavigate={() => {
+                closeCart();
+                setMenuOpen(false);
+                setMegaOpen(false);
+              }}
+            />
             {isAuthenticated ? (
               <>
+                <HeaderNotificationsBell onNavigate={closeCart} />
                 <Link
                   to="/account?tab=wishlist"
                   className="relative hidden h-9 w-9 items-center justify-center rounded-full bg-emerald-900/5 text-emerald-900 sm:flex"
@@ -207,7 +264,11 @@ export function Header() {
       <AnimatePresence>
         {megaOpen ? (
           <Suspense fallback={null}>
-            <ProductMegaMenu onClose={() => setMegaOpen(false)} />
+            <ProductMegaMenu
+              onClose={() => setMegaOpen(false)}
+              onMouseEnter={openMegaMenu}
+              onMouseLeave={scheduleCloseMegaMenu}
+            />
           </Suspense>
         ) : null}
       </AnimatePresence>
@@ -241,7 +302,9 @@ export function Header() {
                   </button>
                   {mobileProductsOpen ? (
                     <div className="px-2 pb-1">
-                      <MobileProductMegaMenu onClose={closeMenu} />
+                      <Suspense fallback={null}>
+                        <MobileProductMegaMenu onClose={closeMenu} />
+                      </Suspense>
                     </div>
                   ) : null}
                 </li>
@@ -255,6 +318,15 @@ export function Header() {
                 {isAuthenticated ? (
                   <>
                     <li className="mt-2 border-t border-cream-200/90 pt-2">
+                      <Link
+                        to="/account?tab=notifications"
+                        className="block rounded-xl px-4 py-3.5 font-body text-base font-medium text-emerald-900 hover:bg-cream-100"
+                        onClick={closeMenu}
+                      >
+                        Notifications
+                      </Link>
+                    </li>
+                    <li>
                       <Link
                         to="/account"
                         className="block rounded-xl px-4 py-3.5 font-body text-base font-medium text-emerald-900 hover:bg-cream-100"
@@ -318,15 +390,6 @@ function IconClose() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
       <path d="M6 6l12 12M18 6L6 18" />
-    </svg>
-  );
-}
-
-function IconSearch() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-      <circle cx="11" cy="11" r="7" />
-      <path d="M20 20l-4-4" />
     </svg>
   );
 }

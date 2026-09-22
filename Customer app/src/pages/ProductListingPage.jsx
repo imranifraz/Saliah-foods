@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useCatalog } from "../context/CatalogContext.jsx";
@@ -12,6 +12,7 @@ import {
   getPriceRangeForPreset,
   sortProducts,
 } from "../data/productCatalog";
+import { matchesProductSearch } from "../lib/productSearch.js";
 import {
   ProductListingSidebar,
   ProductListingMobileFilters,
@@ -27,16 +28,6 @@ const INITIAL_VISIBLE = 6;
 const LOAD_STEP = 6;
 const FEATURED_AFTER_INDEX = 2;
 
-function matchesSearch(product, query) {
-  if (!query.trim()) return true;
-  const q = query.trim().toLowerCase();
-  return (
-    product.name.toLowerCase().includes(q) ||
-    (product.tagline ?? "").toLowerCase().includes(q) ||
-    (product.categoryLabel ?? "").toLowerCase().includes(q)
-  );
-}
-
 function buildGridItems(products) {
   const items = [];
   products.forEach((product, i) => {
@@ -51,6 +42,7 @@ function buildGridItems(products) {
 export function ProductListingPage() {
   const { categoryId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const reduce = useReducedMotion();
   const {
     loading: catalogLoading,
@@ -62,12 +54,13 @@ export function ProductListingPage() {
     refreshCatalog,
   } = useCatalog();
 
+  const qFromUrl = searchParams.get("q") ?? "";
   const [activeCategory, setActiveCategory] = useState(categoryId ?? "all");
   const [benefits, setBenefits] = useState("all");
   const [packaging, setPackaging] = useState("all");
   const [availability, setAvailability] = useState("all");
   const [sortBy, setSortBy] = useState("featured");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(qFromUrl);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [price, setPrice] = useState("all");
   const [priceRange, setPriceRange] = useState([0, 2000]);
@@ -75,8 +68,12 @@ export function ProductListingPage() {
   useEffect(() => {
     setActiveCategory(categoryId ?? "all");
     setVisibleCount(INITIAL_VISIBLE);
-    setSearchQuery("");
   }, [categoryId]);
+
+  useEffect(() => {
+    setSearchQuery(qFromUrl);
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [qFromUrl]);
 
   const categoryMeta = categoryId ? getCategoryById(categoryId) : getCategoryById("all");
   const pageCopy = {
@@ -108,17 +105,27 @@ export function ProductListingPage() {
       availability,
     });
     const sorted = sortProducts(filtered, sortBy);
-    return sorted.filter((p) => matchesSearch(p, searchQuery));
+    return sorted.filter((p) => matchesProductSearch(p, searchQuery));
   }, [allProducts, priceRange, benefits, packaging, availability, sortBy, searchQuery]);
 
   const visibleProducts = filteredProducts.slice(0, visibleCount);
   const gridItems = useMemo(() => buildGridItems(visibleProducts), [visibleProducts]);
   const hasMore = visibleCount < filteredProducts.length;
 
+  const syncSearchParam = (value) => {
+    const next = new URLSearchParams(searchParams);
+    const trimmed = value.trim();
+    if (trimmed) next.set("q", trimmed);
+    else next.delete("q");
+    setSearchParams(next, { replace: true });
+  };
+
   const handleCategoryChange = (id) => {
     setActiveCategory(id);
     setVisibleCount(INITIAL_VISIBLE);
-    navigate(id === "all" ? "/products" : `/products/${id}`);
+    const q = searchQuery.trim();
+    const suffix = q ? `?q=${encodeURIComponent(q)}` : "";
+    navigate(id === "all" ? `/products${suffix}` : `/products/${id}${suffix}`);
   };
 
   const handleFilterChange = (key, value) => {
@@ -139,6 +146,7 @@ export function ProductListingPage() {
     setPackaging("all");
     setAvailability("all");
     setSearchQuery("");
+    syncSearchParam("");
     setSortBy("featured");
     setVisibleCount(INITIAL_VISIBLE);
   };
@@ -183,6 +191,7 @@ export function ProductListingPage() {
     searchQuery,
     onSearchChange: (v) => {
       setSearchQuery(v);
+      syncSearchParam(v);
       setVisibleCount(INITIAL_VISIBLE);
     },
     productCount: filteredProducts.length,

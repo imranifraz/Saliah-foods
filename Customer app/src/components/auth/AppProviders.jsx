@@ -8,32 +8,33 @@ import { WishlistProvider } from "../../context/WishlistContext";
 import { CatalogProvider } from "../../context/CatalogContext.jsx";
 import { HomeContentProvider } from "../../context/HomeContentContext.jsx";
 import { ContactContentProvider } from "../../context/ContactContentContext.jsx";
-import { FaqContentProvider } from "../../context/FaqContentContext.jsx";
 import { GstSettingsProvider } from "../../context/GstSettingsContext.jsx";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
+/**
+ * Keep root providers lean for LCP. Page-specific CMS (FAQ / Sourcing / Legacy)
+ * is provided on those routes only.
+ */
 export function AppProviders({ children }) {
   const tree = (
     <HomeContentProvider>
       <ContactContentProvider>
-      <FaqContentProvider>
-      <GstSettingsProvider>
-      <CatalogProvider>
-      <AuthProvider>
-        <NotificationsProvider>
-          <OrdersProvider>
-            <WishlistProvider>
-              <CartProvider>
-                <ProfileProvider>{children}</ProfileProvider>
-              </CartProvider>
-            </WishlistProvider>
-          </OrdersProvider>
-        </NotificationsProvider>
-      </AuthProvider>
-    </CatalogProvider>
-      </GstSettingsProvider>
-      </FaqContentProvider>
+        <GstSettingsProvider>
+          <CatalogProvider>
+            <AuthProvider>
+              <NotificationsProvider>
+                <OrdersProvider>
+                  <WishlistProvider>
+                    <CartProvider>
+                      <ProfileProvider>{children}</ProfileProvider>
+                    </CartProvider>
+                  </WishlistProvider>
+                </OrdersProvider>
+              </NotificationsProvider>
+            </AuthProvider>
+          </CatalogProvider>
+        </GstSettingsProvider>
       </ContactContentProvider>
     </HomeContentProvider>
   );

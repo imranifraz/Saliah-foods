@@ -36,13 +36,14 @@ export const adminMenuGroups = [
       { to: "/admins", label: "Admin Management", icon: IconAdmin },
       { to: "/reviews", label: "Review Moderation", icon: IconReview },
       { to: "/cms/enquiries", label: "Customer Enquiries", icon: IconMail },
+      { to: "/cms/newsletter", label: "Newsletter", icon: IconMail },
     ],
   },
   {
     label: "CMS",
     items: [
-      { to: "/cms/blog", label: "Blog Posts", icon: IconBlog },
       { to: "/cms/pages", label: "Web Content", icon: IconCms },
+      { to: "/cms/blog", label: "Blog Posts", icon: IconBlog },
     ],
   },
   {

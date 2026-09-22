@@ -57,21 +57,19 @@ export function CatalogProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const handleFocus = () => {
+    let lastFetch = Date.now();
+    const STALE_MS = 5 * 60 * 1000;
+
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastFetch < STALE_MS) return;
+      lastFetch = Date.now();
       refreshCatalog();
     };
 
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        refreshCatalog();
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [refreshCatalog]);

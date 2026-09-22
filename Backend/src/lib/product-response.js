@@ -91,6 +91,8 @@ export function formatProduct(product) {
     featured: Boolean(product.featured),
     isNew: Boolean(product.isNew),
     isBestSeller: Boolean(product.isBestSeller),
+    bogoEnabled: Boolean(product.bogoEnabled),
+    offerLabel: product.bogoEnabled ? "Buy 1 Get 1 Free" : null,
     variantCount: variants.length,
     defaultVariantId: defaultVariant?.id ?? variants[0]?.id ?? null,
     variants,

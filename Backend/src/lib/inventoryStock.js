@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { stockStatusFromQuantity, syncProductSummary } from "./products.js";
 import {
   getAvailableQuantity,
@@ -38,6 +39,16 @@ async function loadVariantWithProduct(variantId, tx) {
   });
 }
 
+/** Serialize stock updates so concurrent checkouts cannot oversell. */
+async function lockProductVariant(tx, variantId) {
+  const locked = await tx.$queryRaw(
+    Prisma.sql`SELECT id FROM "ProductVariant" WHERE id = ${variantId} FOR UPDATE`
+  );
+  if (!Array.isArray(locked) || locked.length === 0) {
+    throw new Error("Inventory item not found");
+  }
+}
+
 export async function applyVariantStockChange(
   tx,
   {
@@ -51,6 +62,8 @@ export async function applyVariantStockChange(
     note = "",
   }
 ) {
+  await lockProductVariant(tx, variantId);
+
   const existing = await tx.productVariant.findUnique({
     where: { id: variantId },
     include: { product: { select: productSelect } },
@@ -135,25 +148,52 @@ export async function setVariantStockQuantity(tx, variant, stockQuantity, { sour
   });
 }
 
-export async function reserveVariantStock(tx, variantId, quantity, orderId) {
-  const existing = await tx.productVariant.findUnique({ where: { id: variantId } });
-  if (!existing) throw new Error("Variant not found");
+/**
+ * Quick in/out-of-stock toggle that never drops on-hand below reserved.
+ * Out of stock → available becomes 0 (on-hand = reserved).
+ * In stock → ensure at least reserved + 10 sellable units.
+ */
+export async function applyProductInStockToggle(tx, productId, nextInStock, { admin = null } = {}) {
+  const variants = await tx.productVariant.findMany({
+    where: { productId },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
 
+  for (const variant of variants) {
+    const reserved = normalizeQuantity(variant.reservedQuantity);
+    const currentStock = normalizeQuantity(variant.stockQuantity);
+    const nextStock = nextInStock ? Math.max(currentStock, reserved + 10, 10) : reserved;
+
+    await applyVariantStockChange(tx, {
+      variantId: variant.id,
+      stockQuantity: nextStock,
+      source: "admin_quick_stock",
+      admin,
+      note: nextInStock ? "Marked in stock" : "Marked out of stock",
+    });
+  }
+
+  return syncProductSummary(tx, productId);
+}
+
+export async function reserveVariantStock(tx, variantId, quantity, orderId) {
   const qty = normalizeQuantity(quantity);
   if (qty < 1) throw new Error("Invalid quantity");
 
-  const available = getAvailableQuantity(existing);
-  if (available < qty) {
-    throw new Error("Insufficient available stock");
+  try {
+    return await applyVariantStockChange(tx, {
+      variantId,
+      reservedDelta: qty,
+      source: "order_reserved",
+      orderId,
+      note: `Reserved ${qty} unit(s) for order`,
+    });
+  } catch (err) {
+    if (err?.message === "Reserved quantity cannot exceed on-hand stock") {
+      throw new Error("Insufficient available stock");
+    }
+    throw err;
   }
-
-  return applyVariantStockChange(tx, {
-    variantId,
-    reservedDelta: qty,
-    source: "order_reserved",
-    orderId,
-    note: `Reserved ${qty} unit(s) for order`,
-  });
 }
 
 export async function releaseVariantReservation(tx, variantId, quantity, orderId) {

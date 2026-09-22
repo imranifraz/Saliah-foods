@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../lib/api.js";
 import { resolveAdminMediaUrl } from "../lib/mediaUrl.js";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 import {
   buildAutoSku,
+  buildStoryPayloadFromForm,
   createEmptyForm,
   createVariant,
   mapProductToForm,
   slugifySkuPart,
   validateProductImageFile,
 } from "../lib/productForm.js";
-import { ImageCropModal } from "./ImageCropModal.jsx";
 
 function parseOptionalAmount(value) {
   if (value === "" || value == null) return null;
@@ -27,18 +28,22 @@ function getVariantPricingError(variant, variantLabel) {
   return null;
 }
 
-function IconChevronUp() {
+function IconImageUpload() {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+      />
     </svg>
   );
 }
 
-function IconChevronDown() {
+function IconGrip() {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+      <path d="M7 4a1 1 0 11-2 0 1 1 0 012 0zm0 6a1 1 0 11-2 0 1 1 0 012 0zm0 6a1 1 0 11-2 0 1 1 0 012 0zm8-12a1 1 0 11-2 0 1 1 0 012 0zm0 6a1 1 0 11-2 0 1 1 0 012 0zm0 6a1 1 0 11-2 0 1 1 0 012 0z" />
     </svg>
   );
 }
@@ -59,7 +64,8 @@ function formFromImageItems(baseForm, imageItems) {
   return { ...baseForm, existingImages, imageFiles };
 }
 
-export function ProductForm({ productId, initial, categories, formId = "product-form", onBusyChange, onSuccess }) {
+export function ProductForm({ productId, initial, categories = [], formId = "product-form", onBusyChange, onSuccess }) {
+  const toast = useAdminToast();
   const isEditing = Boolean(productId);
   const defaultCategoryId = categories[0]?.id ?? "dates";
 
@@ -69,26 +75,22 @@ export function ProductForm({ productId, initial, categories, formId = "product-
   const [warn, setWarn] = useState("");
   const [saving, setSaving] = useState(false);
   const [imageItems, setImageItems] = useState(() => buildImageItemsFromForm(initial ?? createEmptyForm(defaultCategoryId)));
-  const [cropImage, setCropImage] = useState(null);
-  const cropObjectUrl = useRef(null);
+  const [pendingImageSaveHint, setPendingImageSaveHint] = useState(false);
+  const [dragIndex, setDragIndex] = useState(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState(null);
+  const [fileDragOver, setFileDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  const coverInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const previewUrls = useRef(new Set());
+  const errorRef = useRef(null);
 
-  useEffect(() => {
-    const nextForm = initial ?? createEmptyForm(defaultCategoryId);
-    setForm(nextForm);
-    setSlugManual(isEditing);
-    setError("");
-    setWarn("");
-    revokePreviewUrls();
-    setImageItems(buildImageItemsFromForm(nextForm));
-    closeCrop();
-  }, [initial, productId, isEditing, defaultCategoryId]);
-
+  // Hydrate once from `initial` on mount. Parent must remount with a stable `key`
+  // when switching products (ProductEditPage / CreateProductModal already do).
+  // Do NOT reset on `initial` identity or categories load — that wiped new images.
   useEffect(() => {
     return () => {
       revokePreviewUrls();
-      closeCrop();
     };
   }, []);
 
@@ -102,12 +104,11 @@ export function ProductForm({ productId, initial, categories, formId = "product-
     return url;
   }
 
-  function closeCrop() {
-    if (cropObjectUrl.current) {
-      URL.revokeObjectURL(cropObjectUrl.current);
-      cropObjectUrl.current = null;
-    }
-    setCropImage(null);
+  function showError(message) {
+    setError(message);
+    Promise.resolve().then(() => {
+      errorRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+    });
   }
 
   function handleNameChange(value) {
@@ -183,58 +184,188 @@ export function ProductForm({ productId, initial, categories, formId = "product-
       }
       const next = current.filter((_, itemIndex) => itemIndex !== index);
       setForm((prev) => formFromImageItems(prev, next));
+      setPendingImageSaveHint(true);
       return next;
     });
   }
 
-  function moveImageItem(index, direction) {
-    const targetIndex = index + direction;
+  function setCoverImage(index) {
+    if (index <= 0) return;
     setImageItems((current) => {
-      if (targetIndex < 0 || targetIndex >= current.length) return current;
+      if (index >= current.length) return current;
       const next = [...current];
-      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+      const [picked] = next.splice(index, 1);
+      next.unshift(picked);
       setForm((prev) => formFromImageItems(prev, next));
+      setPendingImageSaveHint(true);
       return next;
     });
   }
 
-  function openCropForFile(file) {
-    const validation = validateProductImageFile(file);
-    if (!validation.ok) {
-      setError(validation.error);
-      return;
-    }
-    setWarn(validation.warn ?? "");
-    closeCrop();
-    cropObjectUrl.current = URL.createObjectURL(file);
-    const slug = slugifySkuPart(form.slug || form.name) || "product";
-    setCropImage({
-      src: cropObjectUrl.current,
-      fileName: `${slug}-product.jpg`,
+  function reorderImageItems(fromIndex, toIndex) {
+    if (fromIndex == null || toIndex == null || fromIndex === toIndex) return;
+    setImageItems((current) => {
+      if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) {
+        return current;
+      }
+      const next = [...current];
+      const [picked] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, picked);
+      setForm((prev) => formFromImageItems(prev, next));
+      setPendingImageSaveHint(true);
+      return next;
     });
+  }
+
+  function preserveModalScroll(run) {
+    const scrollParent = document.querySelector(".admin-modal__panel .overflow-y-auto");
+    const scrollTop = scrollParent?.scrollTop ?? null;
+    run();
+    if (scrollParent != null && scrollTop != null) {
+      requestAnimationFrame(() => {
+        scrollParent.scrollTop = scrollTop;
+        requestAnimationFrame(() => {
+          scrollParent.scrollTop = scrollTop;
+        });
+      });
+    }
+  }
+
+  function addImageFiles(fileList, { asCover = false } = {}) {
+    const files = Array.from(fileList || []).filter((file) => file instanceof Blob);
+    if (!files.length) return;
+
+    const maxImages = 8;
+    const prepared = [];
+    for (const file of files) {
+      const validation = validateProductImageFile(file);
+      if (!validation.ok) {
+        showError(validation.error);
+        return;
+      }
+      if (validation.warn) setWarn(validation.warn);
+      let previewUrl = "";
+      try {
+        previewUrl = trackPreviewUrl(URL.createObjectURL(file));
+      } catch {
+        showError("Could not read one of the selected images. Try another file.");
+        return;
+      }
+      prepared.push({
+        type: "new",
+        file,
+        previewUrl,
+      });
+    }
+
+    setImageItems((current) => {
+      const room = Math.max(0, maxImages - current.length);
+      if (room <= 0) {
+        prepared.forEach((item) => {
+          URL.revokeObjectURL(item.previewUrl);
+          previewUrls.current.delete(item.previewUrl);
+        });
+        // Defer error so we are not calling setState inside this updater.
+        queueMicrotask(() => showError("You can upload at most 8 product images."));
+        return current;
+      }
+
+      const batch = prepared.slice(0, room);
+      if (batch.length < prepared.length) {
+        prepared.slice(batch.length).forEach((item) => {
+          URL.revokeObjectURL(item.previewUrl);
+          previewUrls.current.delete(item.previewUrl);
+        });
+        queueMicrotask(() =>
+          setWarn(`Only ${room} more image(s) can be added (max ${maxImages}). Extra files were ignored.`)
+        );
+      }
+
+      // Append by default so existing images stay. asCover only promotes new files to the front.
+      const next = asCover || current.length === 0 ? [...batch, ...current] : [...current, ...batch];
+      const capped = next.slice(0, maxImages);
+      setForm((prev) => formFromImageItems(prev, capped));
+      return capped;
+    });
+
+    setError("");
+    setPendingImageSaveHint(true);
+    setWarn((prev) =>
+      prepared.length > 1
+        ? `${prepared.length} images added. Click Save product to store them.`
+        : prev || "Image added. Click Save product to store it."
+    );
   }
 
   function handleImagePick(event) {
-    const file = event.target.files?.[0];
+    // FileList is live — copy before clearing the input or length becomes 0.
+    const files = Array.from(event.target.files || []);
     event.target.value = "";
-    if (file) openCropForFile(file);
+    event.target.blur();
+    if (!files.length) return;
+    preserveModalScroll(() => addImageFiles(files));
   }
 
-  async function handleCropConfirm(file) {
-    closeCrop();
-    const validation = validateProductImageFile(file);
-    if (!validation.ok) {
-      setError(validation.error);
-      return;
-    }
-    if (validation.warn) setWarn(validation.warn);
+  function handleCoverPick(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    event.target.blur();
+    // First selected file becomes cover; any additional files join the gallery.
+    if (!files.length) return;
+    preserveModalScroll(() => addImageFiles(files, { asCover: true }));
+  }
 
-    const previewUrl = trackPreviewUrl(URL.createObjectURL(file));
-    setImageItems((current) => {
-      const next = [...current, { type: "new", file, previewUrl }];
-      setForm((prev) => formFromImageItems(prev, next));
-      return next;
-    });
+  function handleGalleryPick(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    event.target.blur();
+    if (!files.length) return;
+    preserveModalScroll(() => addImageFiles(files, { asCover: false }));
+  }
+
+  function handleTileDragStart(index) {
+    if (formBusy) return;
+    setDragIndex(index);
+  }
+
+  function handleTileDragOver(event, index) {
+    if (formBusy || dragIndex == null) return;
+    event.preventDefault();
+    if (dropTargetIndex !== index) setDropTargetIndex(index);
+  }
+
+  function handleTileDrop(event, index) {
+    event.preventDefault();
+    if (formBusy) return;
+    reorderImageItems(dragIndex, index);
+    setDragIndex(null);
+    setDropTargetIndex(null);
+  }
+
+  function handleTileDragEnd() {
+    setDragIndex(null);
+    setDropTargetIndex(null);
+  }
+
+  function handleFileDragOver(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!formBusy) setFileDragOver(true);
+  }
+
+  function handleFileDragLeave(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    setFileDragOver(false);
+  }
+
+  function handleFileDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    setFileDragOver(false);
+    if (formBusy || dragIndex != null) return;
+    const files = event.dataTransfer?.files;
+    if (files?.length) preserveModalScroll(() => addImageFiles(files));
   }
 
   async function handleSubmit(event) {
@@ -247,19 +378,34 @@ export function ProductForm({ productId, initial, categories, formId = "product-
     }
 
     setSaving(true);
+    setPendingImageSaveHint(false);
 
     try {
       const slug = slugifySkuPart(form.slug || form.name);
       if (!slug) {
-        setError("URL slug is required.");
+        showError("URL slug is required.");
         setSaving(false);
         return;
       }
 
       if (imageItems.length === 0) {
-        setError("At least one product image is required.");
+        showError("At least one product image is required.");
         setSaving(false);
         return;
+      }
+
+      const newImageFiles = imageItems.filter((item) => item.type === "new");
+      for (const item of newImageFiles) {
+        if (!(item.file instanceof File) || item.file.size <= 0) {
+          showError("A new image failed to prepare for upload. Remove it and upload again.");
+          setSaving(false);
+          return;
+        }
+        if (item.file.size > 8 * 1024 * 1024) {
+          showError("Each image must be 8 MB or smaller.");
+          setSaving(false);
+          return;
+        }
       }
 
       for (const [index, variant] of form.variants.entries()) {
@@ -269,7 +415,7 @@ export function ProductForm({ productId, initial, categories, formId = "product-
             : "Product";
         const pricingError = getVariantPricingError(variant, variantLabel);
         if (pricingError) {
-          setError(pricingError);
+          showError(pricingError);
           setSaving(false);
           return;
         }
@@ -282,20 +428,32 @@ export function ProductForm({ productId, initial, categories, formId = "product-
       formData.append("productType", form.productType);
       formData.append("status", form.status);
       formData.append("tagline", form.tagline.trim());
-      formData.append("fullDescription", form.fullDescription.trim());
+      const storyPayload = buildStoryPayloadFromForm(form);
+      formData.append("fullDescription", storyPayload.fullDescription);
       formData.append("tag", form.tag.trim());
       formData.append("badge", form.badge.trim());
-      formData.append("benefits", form.benefits);
+      formData.append("benefits", JSON.stringify(storyPayload.benefits));
       formData.append("featured", String(form.featured));
       formData.append("isNew", String(form.isNew));
+      formData.append("bogoEnabled", String(Boolean(form.bogoEnabled)));
 
-      const existingImages = imageItems.filter((item) => item.type === "existing").map((item) => item.url);
+      const existingImages = imageItems
+        .filter((item) => item.type === "existing")
+        .map((item) => item.url);
+      const imageOrder = imageItems.map((item) => (item.type === "existing" ? item.url : "__new__"));
+      const newFiles = imageItems.filter((item) => item.type === "new").map((item) => item.file);
+
       formData.append("existingImages", JSON.stringify(existingImages));
-      imageItems
-        .filter((item) => item.type === "new")
-        .forEach((item) => {
-          formData.append("images", item.file);
-        });
+      formData.append("imageOrder", JSON.stringify(imageOrder));
+      for (const file of newFiles) {
+        formData.append("images", file, file.name || "product-image.jpg");
+      }
+
+      if (newFiles.length > 0 && imageOrder.filter((slot) => slot === "__new__").length !== newFiles.length) {
+        showError("Image list is out of sync. Remove and re-add the new images, then save again.");
+        setSaving(false);
+        return;
+      }
 
       const cleanedVariants = form.variants.map((variant, index) => ({
         ...(variant.id ? { id: variant.id } : {}),
@@ -313,6 +471,11 @@ export function ProductForm({ productId, initial, categories, formId = "product-
         formData.append("variants", JSON.stringify(cleanedVariants));
       } else {
         const simpleVariant = cleanedVariants[0];
+        if (!simpleVariant) {
+          showError("Add product pricing details before saving.");
+          setSaving(false);
+          return;
+        }
         formData.append("variantId", simpleVariant.id ?? "");
         formData.append("weight", simpleVariant.weight);
         formData.append("sku", simpleVariant.sku);
@@ -331,28 +494,59 @@ export function ProductForm({ productId, initial, categories, formId = "product-
         }
       );
 
+      if (!data?.product) {
+        throw new Error("Save succeeded but no product was returned. Refresh and verify the catalog.");
+      }
+
+      // Clear local new-file state after successful upload so cancel/reopen does not re-upload blobs.
+      const savedImages = Array.isArray(data.product.images)
+        ? data.product.images
+        : data.product.img
+          ? [data.product.img]
+          : [];
+      revokePreviewUrls();
+      const syncedItems = savedImages.map((url) => ({ type: "existing", url }));
+      setImageItems(syncedItems);
+      setForm((prev) => formFromImageItems(prev, syncedItems));
+      setPendingImageSaveHint(false);
+      setWarn("");
+
+      toast.success(isEditing ? "Product updated" : "Product created");
       onSuccess?.(data.product);
     } catch (err) {
-      setError(err.message ?? "Save failed");
+      const message = err.message ?? "Save failed";
+      showError(message);
+      toast.error(isEditing ? "Could not save product" : "Could not create product", message);
     } finally {
       setSaving(false);
     }
   }
 
   const isVariantProduct = form.productType === "variant";
-  const formBusy = saving || Boolean(cropImage);
+  const formBusy = saving;
+  const onBusyChangeRef = useRef(onBusyChange);
+  onBusyChangeRef.current = onBusyChange;
 
   useEffect(() => {
-    onBusyChange?.(formBusy);
-  }, [formBusy, onBusyChange]);
+    onBusyChangeRef.current?.({
+      busy: formBusy,
+      saving,
+      cropping: false,
+    });
+  }, [formBusy, saving]);
 
   const imagePreviewItems = useMemo(
     () =>
       imageItems.map((item, index) => ({
-        key: item.type === "existing" ? item.url : item.previewUrl,
+        key: item.type === "existing" ? item.url : item.previewUrl || `new-${index}`,
         index,
         src: item.type === "existing" ? resolveAdminMediaUrl(item.url) : item.previewUrl,
-        label: item.type === "new" ? item.file.name : index === 0 ? "Cover" : `Image ${index + 1}`,
+        label:
+          item.type === "new"
+            ? item.file?.name || `Image ${index + 1}`
+            : index === 0
+              ? "Cover"
+              : `Image ${index + 1}`,
         isCover: index === 0,
       })),
     [imageItems]
@@ -361,13 +555,22 @@ export function ProductForm({ productId, initial, categories, formId = "product-
   return (
     <form id={formId} onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
       {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+        <p
+          ref={errorRef}
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
       {warn ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
           {warn}
+        </p>
+      ) : null}
+      {pendingImageSaveHint ? (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900" role="status">
+          Image added to this form. Click <strong>Save product</strong> below to store it in the catalog.
         </p>
       ) : null}
 
@@ -451,8 +654,9 @@ export function ProductForm({ productId, initial, categories, formId = "product-
             value={form.tagline}
             onChange={(event) => setForm((current) => ({ ...current, tagline: event.target.value }))}
             className="admin-input mt-1.5 w-full"
-            placeholder="Rich & Premium"
+            placeholder="Naturally sweet Middle Eastern dates"
           />
+          <p className="admin-muted mt-1.5 text-xs">One short line under the product name on the storefront.</p>
         </label>
 
         <label className="block">
@@ -477,26 +681,168 @@ export function ProductForm({ productId, initial, categories, formId = "product-
             Optional label on the shop card. Best seller is applied automatically from sales.
           </p>
         </label>
+      </div>
 
-        <label className="block sm:col-span-2">
-          <span className="admin-label">Benefits</span>
-          <input
-            value={form.benefits}
-            onChange={(event) => setForm((current) => ({ ...current, benefits: event.target.value }))}
-            className="admin-input mt-1.5 w-full"
-            placeholder="Natural Energy, High Fiber"
+      <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-2)] p-4 space-y-4">
+        <div>
+          <p className="admin-label">Product details</p>
+          <p className="admin-muted mt-1 text-xs leading-relaxed">
+            Same structure as the storefront product page: overview, highlights, at-a-glance, nutrition, and product
+            information.
+          </p>
+        </div>
+
+        <label className="block">
+          <span className="admin-label">Overview</span>
+          <textarea
+            rows={4}
+            value={form.overview}
+            onChange={(event) => setForm((current) => ({ ...current, overview: event.target.value }))}
+            className="admin-input mt-1.5 min-h-[110px] w-full"
+            placeholder={"Paragraph 1 about taste and sourcing.\n\nParagraph 2 about how to enjoy it."}
+          />
+          <p className="admin-muted mt-1.5 text-xs">Separate paragraphs with a blank line.</p>
+        </label>
+
+        <label className="block">
+          <span className="admin-label">Highlights</span>
+          <textarea
+            rows={5}
+            value={form.highlightsText}
+            onChange={(event) => setForm((current) => ({ ...current, highlightsText: event.target.value }))}
+            className="admin-input mt-1.5 min-h-[110px] w-full"
+            placeholder={"100% natural dates\nNo added sugar\nCholesterol free"}
+          />
+          <p className="admin-muted mt-1.5 text-xs">One highlight per line. Shown as chips on the product page.</p>
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="admin-label">Ingredients</span>
+            <input
+              value={form.ingredients}
+              onChange={(event) => setForm((current) => ({ ...current, ingredients: event.target.value }))}
+              className="admin-input mt-1.5 w-full"
+              placeholder="Dates"
+            />
+          </label>
+          <label className="block">
+            <span className="admin-label">Country of origin</span>
+            <input
+              value={form.origin}
+              onChange={(event) => setForm((current) => ({ ...current, origin: event.target.value }))}
+              className="admin-input mt-1.5 w-full"
+              placeholder="Iraq"
+            />
+          </label>
+          <label className="block">
+            <span className="admin-label">Storage</span>
+            <input
+              value={form.storage}
+              onChange={(event) => setForm((current) => ({ ...current, storage: event.target.value }))}
+              className="admin-input mt-1.5 w-full"
+              placeholder="Keep in a dry and cool area..."
+            />
+          </label>
+          <label className="block">
+            <span className="admin-label">Best before</span>
+            <input
+              value={form.bestBefore}
+              onChange={(event) => setForm((current) => ({ ...current, bestBefore: event.target.value }))}
+              className="admin-input mt-1.5 w-full"
+              placeholder="9 months from packaging"
+            />
+          </label>
+        </div>
+
+        <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-3 sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="admin-label">Nutrition information</p>
+              <p className="admin-muted mt-1 text-xs leading-relaxed">
+                Optional. Turn on only if you want nutrition facts on the product page.
+              </p>
+            </div>
+            <label className="product-form-switch">
+              <span className="product-form-switch__label">
+                {form.nutritionEnabled ? "Enabled" : "Disabled"}
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                aria-checked={Boolean(form.nutritionEnabled)}
+                aria-label="Enable nutrition information"
+                checked={Boolean(form.nutritionEnabled)}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    nutritionEnabled: event.target.checked,
+                    nutritionText: current.nutritionText ?? "",
+                    nutritionNote: current.nutritionNote ?? "",
+                  }))
+                }
+              />
+              <span className="product-form-switch__track" aria-hidden="true">
+                <span className="product-form-switch__thumb" />
+              </span>
+            </label>
+          </div>
+
+          {form.nutritionEnabled ? (
+            <div className="mt-4 space-y-4">
+              <label className="block">
+                <span className="admin-label">Nutrition values (per 100g)</span>
+                <textarea
+                  rows={6}
+                  value={form.nutritionText ?? ""}
+                  onChange={(event) => setForm((current) => ({ ...current, nutritionText: event.target.value }))}
+                  className="admin-input mt-1.5 min-h-[130px] w-full"
+                  placeholder={"Energy: 380 kcal\nProtein: 3.2g\nCarbohydrates: 80g\nTotal Sugars: 60g"}
+                />
+                <p className="admin-muted mt-1.5 text-xs">One nutrient per line as Label: value</p>
+              </label>
+
+              <label className="block">
+                <span className="admin-label">Nutrition note</span>
+                <input
+                  value={form.nutritionNote ?? ""}
+                  onChange={(event) => setForm((current) => ({ ...current, nutritionNote: event.target.value }))}
+                  className="admin-input mt-1.5 w-full"
+                  placeholder="Values are approximate as stated on the product packaging."
+                />
+              </label>
+            </div>
+          ) : (
+            <p className="admin-muted mt-3 rounded-lg border border-dashed border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-2.5 text-xs">
+              Nutrition section is off — it will not appear on the shop product page.
+            </p>
+          )}
+        </div>
+
+        <label className="block">
+          <span className="admin-label">Important information</span>
+          <textarea
+            rows={3}
+            value={form.important}
+            onChange={(event) => setForm((current) => ({ ...current, important: event.target.value }))}
+            className="admin-input mt-1.5 min-h-[80px] w-full"
+            placeholder="May contain traces of nuts. Sorted and packed under hygienic conditions."
           />
         </label>
 
-        <label className="block sm:col-span-2">
-          <span className="admin-label">Full description</span>
+        <label className="block">
+          <span className="admin-label">Product information</span>
           <textarea
-            rows={4}
-            value={form.fullDescription}
-            onChange={(event) => setForm((current) => ({ ...current, fullDescription: event.target.value }))}
-            className="admin-input mt-1.5 min-h-[120px] w-full"
-            placeholder="Tell customers about sourcing, taste, and usage."
+            rows={5}
+            value={form.factsText}
+            onChange={(event) => setForm((current) => ({ ...current, factsText: event.target.value }))}
+            className="admin-input mt-1.5 min-h-[110px] w-full"
+            placeholder={"Brand: Saliah Dates\nProduct: Zahidi Dates\nFSSAI License No.: 10020042006883"}
           />
+          <p className="admin-muted mt-1.5 text-xs">
+            One fact per line as Label: value. Net Weight is taken automatically from the pack size / variant
+            weights in the pricing section below.
+          </p>
         </label>
       </div>
 
@@ -520,9 +866,21 @@ export function ProductForm({ productId, initial, categories, formId = "product-
             />
             New arrival
           </label>
+          <label className="inline-flex items-center gap-2 text-sm text-[var(--admin-fg)]">
+            <input
+              type="checkbox"
+              checked={Boolean(form.bogoEnabled)}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, bogoEnabled: event.target.checked }))
+              }
+              className="h-4 w-4 rounded border-[var(--admin-border-strong)]"
+            />
+            Buy 1 Get 1 Free
+          </label>
         </div>
         <p className="admin-muted mt-2 text-xs leading-relaxed">
-          Best seller is set automatically from order sales and cannot be toggled manually.
+          Best seller is set automatically from order sales and cannot be toggled manually. BOGO applies
+          per pack/variant — every 2nd unit is free.
         </p>
       </div>
 
@@ -530,78 +888,243 @@ export function ProductForm({ productId, initial, categories, formId = "product-
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="admin-label">Product images</p>
-            <p className="admin-muted text-xs">Upload packshots on a light background. First image is the shop cover.</p>
+            <p className="admin-muted text-xs">
+              Cover shows on shop cards. Select multiple images at once, drag to reorder, or hover Make cover.
+            </p>
             <p className="admin-muted mt-1 text-xs">
-              Recommended: 1200×1200 px (1:1), PNG or JPG, max 5 MB each.
+              Use finished 1000×1000 px (1:1) PNG, JPG, or WebP — max 8 MB each, up to 8 images.
             </p>
           </div>
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={formBusy}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Upload image
-          </button>
+        </div>
+
+        {/* Hidden inputs for programmatic buttons — keep them locally positioned so focus
+            after the OS file dialog does not scroll the modal to a blank area. */}
+        <div className="relative h-0 w-0 overflow-hidden" aria-hidden>
           <input
             ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
-            className="sr-only"
+            multiple
+            tabIndex={-1}
             disabled={formBusy}
             onChange={handleImagePick}
           />
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            tabIndex={-1}
+            disabled={formBusy}
+            onChange={handleCoverPick}
+          />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            tabIndex={-1}
+            disabled={formBusy}
+            onChange={handleGalleryPick}
+          />
+        </div>
+
+        <div
+          className={`mt-4 rounded-xl border border-dashed px-4 py-5 transition ${
+            fileDragOver
+              ? "border-[var(--admin-link)] bg-[var(--admin-link)]/5"
+              : "border-[var(--admin-border)] bg-[var(--admin-surface)]"
+          }`}
+          onDragEnter={handleFileDragOver}
+          onDragOver={handleFileDragOver}
+          onDragLeave={handleFileDragLeave}
+          onDrop={handleFileDrop}
+        >
+          <div className="flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-between sm:text-left">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--admin-surface-2)] text-[var(--admin-link)]">
+                <IconImageUpload />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-[var(--admin-fg)]">
+                  {fileDragOver ? "Drop images to upload" : "Drag & drop multiple product images here"}
+                </p>
+                <p className="admin-muted text-xs">Hold Ctrl/Cmd to select several files, or drop a batch</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <label
+                className={`btn-primary relative inline-flex cursor-pointer items-center overflow-hidden ${formBusy ? "pointer-events-none opacity-60" : ""}`}
+              >
+                Upload images
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  disabled={formBusy}
+                  onChange={handleImagePick}
+                />
+              </label>
+              <label
+                className={`btn-secondary relative inline-flex cursor-pointer items-center overflow-hidden ${formBusy ? "pointer-events-none opacity-60" : ""}`}
+              >
+                Set cover (+ extras)
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  disabled={formBusy}
+                  onChange={handleCoverPick}
+                />
+              </label>
+              <label
+                className={`btn-ghost relative inline-flex cursor-pointer items-center overflow-hidden ${formBusy ? "pointer-events-none opacity-60" : ""}`}
+              >
+                Add gallery images
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  disabled={formBusy}
+                  onChange={handleGalleryPick}
+                />
+              </label>
+            </div>
+          </div>
         </div>
 
         {imagePreviewItems.length > 0 ? (
-          <div className="mt-4 space-y-2">
-            {imagePreviewItems.map((preview) => (
-              <div
-                key={preview.key}
-                className="flex items-center gap-3 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-2"
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,14rem)_1fr]">
+            <div>
+              <p className="admin-caption mb-2">Cover image</p>
+              {imagePreviewItems[0] ? (
+                <div
+                  className={`group relative overflow-hidden rounded-xl border bg-[var(--admin-surface)] ${
+                    dropTargetIndex === 0 && dragIndex !== 0
+                      ? "border-[var(--admin-link)] ring-2 ring-[var(--admin-link)]/30"
+                      : "border-[var(--admin-border)]"
+                  } ${dragIndex === 0 ? "opacity-60" : ""}`}
+                  draggable={!formBusy}
+                  onDragStart={() => handleTileDragStart(0)}
+                  onDragOver={(event) => handleTileDragOver(event, 0)}
+                  onDrop={(event) => handleTileDrop(event, 0)}
+                  onDragEnd={handleTileDragEnd}
+                >
+                  <img
+                    src={imagePreviewItems[0].src}
+                    alt=""
+                    className="aspect-square w-full object-cover"
+                    draggable={false}
+                  />
+                  <div className="absolute left-2 top-2 rounded-full bg-emerald-800 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                    Cover
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/55 to-transparent p-2 pt-8">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-white/90">
+                      <IconGrip /> Drag to reorder
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-white/95 px-2 py-1 text-[11px] font-medium text-red-700"
+                      disabled={formBusy}
+                      onClick={() => removeImageItem(0)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="btn-ghost mt-2 w-full text-xs"
+                disabled={formBusy}
+                onClick={() => coverInputRef.current?.click()}
               >
-                <img src={preview.src} alt="" className="h-16 w-16 shrink-0 rounded-lg object-contain" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[var(--admin-fg)]">
-                    {preview.isCover ? "Cover image" : preview.label}
-                  </p>
-                  {preview.isCover ? (
-                    <p className="admin-muted text-xs">Shown on listing cards</p>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--admin-border)] text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)]"
-                    aria-label="Move image up"
-                    disabled={preview.index === 0 || formBusy}
-                    onClick={() => moveImageItem(preview.index, -1)}
-                  >
-                    <IconChevronUp />
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--admin-border)] text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)]"
-                    aria-label="Move image down"
-                    disabled={preview.index === imagePreviewItems.length - 1 || formBusy}
-                    onClick={() => moveImageItem(preview.index, 1)}
-                  >
-                    <IconChevronDown />
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost px-2 py-1 text-xs text-[var(--admin-danger)]"
-                    disabled={formBusy}
-                    onClick={() => removeImageItem(preview.index)}
-                  >
-                    Remove
-                  </button>
-                </div>
+                Replace cover / upload more
+              </button>
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="admin-caption">Gallery images</p>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-[var(--admin-link)] hover:underline"
+                  disabled={formBusy}
+                  onClick={() => galleryInputRef.current?.click()}
+                >
+                  + Add
+                </button>
               </div>
-            ))}
+              {imagePreviewItems.length > 1 ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {imagePreviewItems.slice(1).map((preview) => (
+                    <div
+                      key={preview.key}
+                      className={`group relative overflow-hidden rounded-xl border bg-[var(--admin-surface)] ${
+                        dropTargetIndex === preview.index && dragIndex !== preview.index
+                          ? "border-[var(--admin-link)] ring-2 ring-[var(--admin-link)]/30"
+                          : "border-[var(--admin-border)]"
+                      } ${dragIndex === preview.index ? "opacity-60" : ""}`}
+                      draggable={!formBusy}
+                      onDragStart={() => handleTileDragStart(preview.index)}
+                      onDragOver={(event) => handleTileDragOver(event, preview.index)}
+                      onDrop={(event) => handleTileDrop(event, preview.index)}
+                      onDragEnd={handleTileDragEnd}
+                    >
+                      <img
+                        src={preview.src}
+                        alt=""
+                        className="aspect-square w-full object-cover"
+                        draggable={false}
+                      />
+                      <div className="absolute left-1.5 top-1.5 rounded bg-black/45 px-1.5 py-0.5 text-[10px] text-white sm:opacity-0 sm:transition sm:group-hover:opacity-100">
+                        <IconGrip />
+                      </div>
+                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/60 to-transparent p-1.5 pt-6 sm:translate-y-1 sm:opacity-0 sm:transition sm:group-hover:translate-y-0 sm:group-hover:opacity-100">
+                        <button
+                          type="button"
+                          className="rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-emerald-900"
+                          disabled={formBusy}
+                          onClick={() => setCoverImage(preview.index)}
+                        >
+                          Make cover
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md bg-white/95 px-2 py-1 text-[10px] font-medium text-red-700"
+                          disabled={formBusy}
+                          onClick={() => removeImageItem(preview.index)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={formBusy}
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="flex min-h-[7.5rem] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--admin-border)] bg-[var(--admin-surface)] px-3 py-4 text-center transition hover:border-[var(--admin-link)] hover:bg-[var(--admin-hover)]"
+                >
+                  <span className="text-sm font-medium text-[var(--admin-fg)]">No gallery images yet</span>
+                  <span className="admin-muted text-xs">Optional extra photos for the product page</span>
+                </button>
+              )}
+              {imagePreviewItems.length > 1 ? (
+                <p className="admin-muted mt-2 text-xs">
+                  Tip: drag any gallery image onto Cover to promote it, or use Make cover on hover.
+                </p>
+              ) : null}
+            </div>
           </div>
         ) : (
-          <p className="admin-muted mt-4 text-sm">No images yet. Upload at least one product image.</p>
+          <p className="admin-muted mt-4 text-sm">No images yet. Upload a cover image to continue.</p>
         )}
       </div>
 
@@ -743,17 +1266,6 @@ export function ProductForm({ productId, initial, categories, formId = "product-
           })}
         </div>
       </div>
-
-      <ImageCropModal
-        open={Boolean(cropImage)}
-        imageSrc={cropImage?.src ?? ""}
-        fileName={cropImage?.fileName ?? "product-image.jpg"}
-        title="Crop product image"
-        subtitle="Adjust the 1:1 square crop for your product packshot."
-        aspect={1}
-        onClose={closeCrop}
-        onConfirm={handleCropConfirm}
-      />
     </form>
   );
 }

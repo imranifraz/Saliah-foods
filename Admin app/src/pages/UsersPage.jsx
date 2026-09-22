@@ -4,7 +4,9 @@ import { apiFetch } from "../lib/api.js";
 import { formatPhoneDisplay } from "../lib/phone.js";
 import { resolveAdminMediaUrl } from "../lib/mediaUrl.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
+import { AdminFilterDock, AdminFilterSearch } from "../components/ui/AdminFilterDock.jsx";
 import { DataTable, DataRow, DataCell } from "../components/ui/DataTable.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
 import { CreateAdminModal } from "../components/CreateAdminModal.jsx";
@@ -56,14 +58,6 @@ function ListAvatar({ name, avatarUrl }) {
   );
 }
 
-function IconClear() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  );
-}
-
 function IconPlus() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
@@ -76,14 +70,6 @@ function IconAdminUsers() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-    </svg>
-  );
-}
-
-function IconSearch() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
     </svg>
   );
 }
@@ -145,6 +131,7 @@ function TableIconButton({ to, onClick, label, children, danger = false, disable
 }
 
 function UsersListPage() {
+  const toast = useAdminToast();
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -183,12 +170,6 @@ function UsersListPage() {
     load(page);
   }, [query, page, pageSize]);
 
-  function handleSearch(event) {
-    event.preventDefault();
-    setQuery(search.trim());
-    setPage(1);
-  }
-
   function clearSearch() {
     setSearch("");
     setQuery("");
@@ -200,6 +181,10 @@ function UsersListPage() {
     setPage(1);
   }
 
+  const searchChips = query.trim()
+    ? [{ key: "q", label: `Search: ${query.trim()}`, onRemove: clearSearch }]
+    : [];
+
   async function handleDelete(user) {
     setError("");
     setDeletingId(user.id);
@@ -207,8 +192,10 @@ function UsersListPage() {
       await apiFetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
       setDeleteTarget(null);
       load();
+      toast.success("Customer deleted");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not delete customer", err.message);
     } finally {
       setDeletingId(null);
     }
@@ -252,61 +239,26 @@ function UsersListPage() {
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       ) : null}
 
-      <AdminCard
-        title="Customers"
-        subtitle="Search, review, and manage customer accounts."
-        action={
-          <form
-            onSubmit={handleSearch}
-            className="flex w-full min-w-0 flex-nowrap items-center gap-3 sm:w-auto sm:justify-end"
-          >
-            <div className="flex min-w-0 flex-1 items-stretch overflow-hidden rounded-lg border border-[var(--admin-border-strong)] bg-[var(--admin-input-bg)] sm:max-w-xs lg:max-w-sm">
-              <span className="flex shrink-0 items-center pl-3 text-[var(--admin-fg-muted)]">
-                <IconSearch />
-              </span>
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name, email, phone…"
-                className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2.5 text-[0.9375rem] font-medium text-[var(--admin-fg)] outline-none placeholder:font-normal placeholder:text-[var(--admin-fg-faint)]"
-              />
-              {search ? (
-                <button
-                  type="button"
-                  className="flex shrink-0 items-center px-2 text-[var(--admin-fg-muted)] transition hover:text-[var(--admin-fg)]"
-                  aria-label="Clear search"
-                  onClick={clearSearch}
-                >
-                  <IconClear />
-                </button>
-              ) : null}
-              <button
-                type="submit"
-                className="shrink-0 border-l border-[var(--admin-border-strong)] px-4 text-sm font-semibold text-[var(--admin-link)] transition hover:bg-[var(--admin-hover)]"
-              >
-                Search
-              </button>
-            </div>
-          </form>
-        }
-      >
-        {query ? (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="admin-muted text-sm">Filtered by</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-medium text-[var(--admin-fg)]">
-              {query}
-              <button
-                type="button"
-                className="rounded-full p-0.5 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]"
-                aria-label="Remove filter"
-                onClick={clearSearch}
-              >
-                <IconClear />
-              </button>
-            </span>
-          </div>
-        ) : null}
+      <AdminCard title="Customers" subtitle="Search, review, and manage customer accounts.">
+        <AdminFilterDock
+          title="Find customers"
+          search={
+            <AdminFilterSearch
+              id="customers-filter-search"
+              value={search}
+              onChange={setSearch}
+              onSubmit={() => {
+                setQuery(search.trim());
+                setPage(1);
+              }}
+              onClear={clearSearch}
+              placeholder="Search name, email, phone…"
+              label="Search customers"
+            />
+          }
+          chips={searchChips}
+          onClearAll={searchChips.length ? clearSearch : undefined}
+        />
 
         {loading ? (
           <LoadingState label="Loading customers..." />
@@ -464,6 +416,7 @@ function UsersListPage() {
 }
 
 function AdminsListPage() {
+  const toast = useAdminToast();
   const { user: sessionUser } = useAuth();
   const [admins, setAdmins] = useState([]);
   const [total, setTotal] = useState(0);
@@ -504,12 +457,6 @@ function AdminsListPage() {
     load(page);
   }, [query, page, pageSize]);
 
-  function handleSearch(e) {
-    e.preventDefault();
-    setQuery(search.trim());
-    setPage(1);
-  }
-
   function clearSearch() {
     setSearch("");
     setQuery("");
@@ -521,6 +468,10 @@ function AdminsListPage() {
     setPage(1);
   }
 
+  const searchChips = query.trim()
+    ? [{ key: "q", label: `Search: ${query.trim()}`, onRemove: clearSearch }]
+    : [];
+
   async function handleDelete(admin) {
     if (admin.id === sessionUser?.id) return;
 
@@ -530,8 +481,10 @@ function AdminsListPage() {
       await apiFetch(`/api/admin/admins/${admin.id}`, { method: "DELETE" });
       setDeleteTarget(null);
       load();
+      toast.success("Admin deleted");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not delete admin", err.message);
     } finally {
       setDeletingId(null);
     }
@@ -580,61 +533,26 @@ function AdminsListPage() {
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       ) : null}
 
-      <AdminCard
-        title="Administrators"
-        subtitle="Search, review, and manage admin accounts."
-        action={
-          <form
-            onSubmit={handleSearch}
-            className="flex w-full min-w-0 flex-nowrap items-center gap-3 sm:w-auto sm:justify-end"
-          >
-            <div className="flex min-w-0 flex-1 items-stretch overflow-hidden rounded-lg border border-[var(--admin-border-strong)] bg-[var(--admin-input-bg)] sm:max-w-xs lg:max-w-sm">
-              <span className="flex shrink-0 items-center pl-3 text-[var(--admin-fg-muted)]">
-                <IconSearch />
-              </span>
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name, email, phone…"
-                className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2.5 text-[0.9375rem] font-medium text-[var(--admin-fg)] outline-none placeholder:font-normal placeholder:text-[var(--admin-fg-faint)]"
-              />
-              {search ? (
-                <button
-                  type="button"
-                  className="flex shrink-0 items-center px-2 text-[var(--admin-fg-muted)] transition hover:text-[var(--admin-fg)]"
-                  aria-label="Clear search"
-                  onClick={clearSearch}
-                >
-                  <IconClear />
-                </button>
-              ) : null}
-              <button
-                type="submit"
-                className="shrink-0 border-l border-[var(--admin-border-strong)] px-4 text-sm font-semibold text-[var(--admin-link)] transition hover:bg-[var(--admin-hover)]"
-              >
-                Search
-              </button>
-            </div>
-          </form>
-        }
-      >
-        {query ? (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="admin-muted text-sm">Filtered by</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-medium text-[var(--admin-fg)]">
-              {query}
-              <button
-                type="button"
-                className="rounded-full p-0.5 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]"
-                aria-label="Remove filter"
-                onClick={clearSearch}
-              >
-                <IconClear />
-              </button>
-            </span>
-          </div>
-        ) : null}
+      <AdminCard title="Administrators" subtitle="Search, review, and manage admin accounts.">
+        <AdminFilterDock
+          title="Find administrators"
+          search={
+            <AdminFilterSearch
+              id="admins-filter-search"
+              value={search}
+              onChange={setSearch}
+              onSubmit={() => {
+                setQuery(search.trim());
+                setPage(1);
+              }}
+              onClear={clearSearch}
+              placeholder="Search name, email, phone…"
+              label="Search administrators"
+            />
+          }
+          chips={searchChips}
+          onClearAll={searchChips.length ? clearSearch : undefined}
+        />
 
         {loading ? (
           <LoadingState label="Loading admins..." />

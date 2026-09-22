@@ -70,8 +70,9 @@ export function BlogHero({ postCount = 0 }) {
 
           <div className="blog-hero__visual" aria-hidden>
             <OptimizedImage
-              src="/assets/premium-dates-category.png"
+              src="/assets/premium-dates-category.webp"
               alt=""
+              pictureClassName="absolute inset-0 block h-full w-full"
               className="blog-hero__image"
               width={800}
               height={560}

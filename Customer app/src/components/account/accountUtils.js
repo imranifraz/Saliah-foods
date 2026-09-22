@@ -1,5 +1,3 @@
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import { contactInfo } from "../../data/pages";
 import { GST_LABEL } from "../../data/pricing";
 
@@ -45,37 +43,47 @@ export function getOrderStatusBadge(status) {
 }
 
 export function getPaymentStatusLabel(order) {
-  if (order.customer?.payment?.status === "pending_configuration") return "Payment pending";
-  if (order.customer?.payment?.status === "paid") {
-    if (order.paymentMethod === "cod") return "Paid on delivery";
-    if (order.paymentMethod === "upi") return "Paid via UPI";
-    if (order.paymentMethod === "card") return "Paid by card";
-    if (order.paymentMethod === "razorpay") return "Paid online";
-  }
-  if (order.customer?.payment?.status === "pending" && order.paymentMethod === "upi") return "UPI payment pending";
-  if (order.customer?.payment?.status === "pending" && order.paymentMethod === "card") return "Card payment pending";
-  if (order.customer?.payment?.status === "pending" && order.paymentMethod === "cod") return "Pay on delivery";
-  if (order.customer?.payment?.status === "refunded") {
-    const amount =
-      order.customer.payment.refundAmount ??
-      order.customer.payment.verifiedAmount ??
-      order.total;
+  const payment = order.customer?.payment;
+  const paymentStatus = payment?.status;
+  const method = order.paymentMethod;
+
+  if (paymentStatus === "refunded") {
+    const amount = payment.refundAmount ?? payment.verifiedAmount ?? order.total;
     return `Refunded · ₹${Number(amount).toLocaleString("en-IN")}`;
   }
-  if (order.customer?.payment?.status === "cancelled" && order.status === "cancelled") {
-    return "Cancelled — refund pending";
+
+  if (paymentStatus === "paid") {
+    if (method === "cod") return "Paid on delivery";
+    if (method === "upi") return "Paid via UPI";
+    if (method === "card") return "Paid by card";
+    if (method === "razorpay") {
+      return payment?.mode === "test" ? "Paid online (test)" : "Paid online";
+    }
+    return "Paid";
   }
-  if (order.customer?.payment?.mode === "test" && order.status !== "cancelled") {
-    return "Paid online (test)";
+
+  if (paymentStatus === "pending_configuration") return "Payment pending";
+
+  if (paymentStatus === "cancelled") {
+    return "Payment cancelled";
   }
+
+  if (paymentStatus === "pending" || !paymentStatus) {
+    if (method === "upi") return "UPI payment pending";
+    if (method === "card") return "Card payment pending";
+    if (method === "razorpay") return "Online payment pending";
+    if (method === "cod") {
+      return order.status === "delivered" ? "Paid on delivery" : "Pay on delivery";
+    }
+    return "Payment pending";
+  }
+
   if (order.status === "cancelled") {
-    return order.paymentMethod === "razorpay" ? "Refund initiated" : "Refunded";
+    if (method === "cod") return "Cancelled — not charged";
+    return "Cancelled";
   }
-  if (order.paymentMethod === "razorpay") {
-    return "Paid online";
-  }
-  if (order.status === "delivered") return "Paid on delivery";
-  return "Pay on delivery";
+
+  return "Payment pending";
 }
 
 const COMPANY_NAME = "Saliah Foods";
@@ -117,6 +125,12 @@ async function loadImageAsDataUrl(url) {
 }
 
 export async function downloadOrderInvoice(order, options = {}) {
+  const [{ jsPDF }, autoTableMod] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const autoTable = autoTableMod.default;
+
   const invoiceGstin =
     String(options.gstin ?? "").trim() || COMPANY_GST_NUMBER || "";
   const doc = new jsPDF({
@@ -134,7 +148,7 @@ export async function downloadOrderInvoice(order, options = {}) {
 
   try {
     const logo = await loadImageAsDataUrl(COMPANY_LOGO_URL);
-    doc.addImage(logo, "PNG", margin + 18, cursorY + 18, 150, 33);
+    doc.addImage(logo, "PNG", margin + 18, cursorY + 14, 180, 48);
   } catch {
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
@@ -197,11 +211,15 @@ export async function downloadOrderInvoice(order, options = {}) {
     startY: cursorY,
     head: [["Item", "Pack", "Qty", "Unit Price", "Amount"]],
     body: order.items.map((item) => [
-      item.name,
+      item.bogoApplied ? `${item.name} (BOGO)` : item.name,
       item.packSize ?? "-",
       String(item.quantity ?? 0),
       formatInvoiceMoney(item.priceValue ?? 0),
-      formatInvoiceMoney((item.priceValue ?? 0) * (item.quantity ?? 0)),
+      formatInvoiceMoney(
+        item.lineTotal != null
+          ? item.lineTotal
+          : Math.max(0, (item.priceValue ?? 0) * (item.quantity ?? 0) - (item.lineDiscount ?? 0))
+      ),
     ]),
     theme: "grid",
     headStyles: {
@@ -237,6 +255,9 @@ export async function downloadOrderInvoice(order, options = {}) {
   doc.roundedRect(summaryX, cursorY, 200, 110, 14, 14, "FD");
 
   const summaryRows = [
+    ...(Number(order.discountTotal ?? 0) > 0
+      ? [["Offer savings", `-${formatInvoiceMoney(order.discountTotal)}`]]
+      : []),
     ["Subtotal", formatInvoiceMoney(order.subtotal ?? 0)],
     ["Shipping", (order.shipping ?? 0) === 0 ? "Free" : formatInvoiceMoney(order.shipping ?? 0)],
   ];

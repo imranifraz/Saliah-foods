@@ -79,8 +79,8 @@ export function ProductCard({
   const reduce = useReducedMotion();
   const { addItem } = useCart();
   const isPdpRelated = variant === "pdp-related";
-  const isListing = variant === "listing";
-  const isHomepage = variant === "homepage";
+  // Home sections use the same card as product listing.
+  const isListing = variant === "listing" || variant === "homepage";
   const activeVariant =
     product.defaultVariant ??
     product.variants?.find((variantRow) => variantRow.id === product.defaultVariantId) ??
@@ -92,7 +92,11 @@ export function ProductCard({
   const description = product.description ?? product.tagline ?? "";
   const badge = product.badge || product.tag;
   const isOutOfStock = activeVariant ? activeVariant.inStock === false : product.inStock === false;
-  const displayBadge = isOutOfStock ? "Out of stock" : badge;
+  const displayBadge = isOutOfStock
+    ? "Out of stock"
+    : product.bogoEnabled
+      ? product.offerLabel || "Buy 1 Get 1 Free"
+      : badge;
 
   const wishlistProduct = {
     productId: product.id,
@@ -108,6 +112,7 @@ export function ProductCard({
     discountPercent: activeVariant?.discountPercent ?? product.discountPercent,
     packSize: activeVariant?.packSize ?? product.packSize ?? "",
     tagline: product.tagline ?? "",
+    bogoEnabled: Boolean(product.bogoEnabled),
   };
 
   const addProductToCart = () => {
@@ -270,81 +275,6 @@ export function ProductCard({
             >
               {isOutOfStock ? "Out of stock" : "Add to cart"}
             </motion.button>
-          </div>
-        </div>
-      </motion.article>
-    );
-  }
-
-  if (isHomepage) {
-    const productHref = detailHref ?? (product.slug ? `/product/${product.slug}` : null);
-
-    return (
-      <motion.article
-        className={`group home-product-card flex h-full min-w-0 flex-col ${className}`}
-        initial={reduce ? false : { opacity: 0, y: 16 }}
-        whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-36px" }}
-        transition={{ duration: 0.5, delay: index * 0.04, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <div className="home-product-card__shell flex h-full flex-col overflow-hidden rounded-[1.25rem] border border-cream-200/90 bg-white/98">
-          <div className="home-product-card__media relative">
-            <WishlistButton product={wishlistProduct} className="absolute right-2 top-2 z-10" size="sm" />
-            <ProductCardImage product={product} badge={displayBadge} size="home" />
-
-            <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-[rgba(255,253,248,0.94)] via-[rgba(255,253,248,0.45)] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100"
-              aria-hidden
-            />
-
-            <div className="home-product-card__actions">
-              <button
-                type="button"
-                className={`home-product-card__btn home-product-card__btn--primary ${isOutOfStock ? "cursor-not-allowed opacity-50" : ""}`}
-                onClick={addProductToCart}
-                disabled={isOutOfStock}
-              >
-                {isOutOfStock ? "Out of stock" : "Add to cart"}
-              </button>
-            </div>
-          </div>
-
-          <div className="product-card-body flex flex-1 flex-col sm:pb-3">
-            {productHref ? (
-              <Link to={productHref} className="block min-w-0">
-                <h3 className="product-card-title">{product.name}</h3>
-              </Link>
-            ) : (
-              <h3 className="product-card-title">{product.name}</h3>
-            )}
-
-            {showTagline && product.tagline ? (
-              <p className="product-card-tagline line-clamp-2 text-[11px]">{product.tagline}</p>
-            ) : null}
-
-            <ProductCardRatingMeta
-              rating={rating}
-              reviewCount={reviewCount}
-              ratingClassName="font-body text-[11px] font-medium text-emerald-900/60"
-              countClassName="font-body text-[11px] text-emerald-900/28"
-            />
-
-            {showPackSize && product.packSize ? (
-              <p className="mt-0.5 font-body text-[10px] uppercase tracking-[0.16em] text-emerald-900/30">
-                {product.packSize}
-              </p>
-            ) : null}
-
-            <div className="product-card-price-row">
-              <ProductPrice
-                priceValue={product.priceValue}
-                mrpValue={product.mrpValue}
-                price={product.price}
-                mrp={product.mrp}
-                discountPercent={product.discountPercent}
-                size="md"
-              />
-            </div>
           </div>
         </div>
       </motion.article>

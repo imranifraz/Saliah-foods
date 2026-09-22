@@ -13,6 +13,7 @@ import {
   stockStatusFromQuantity,
   syncProductSummary,
 } from "../../lib/products.js";
+import { applyProductInStockToggle } from "../../lib/inventoryStock.js";
 import { requireAdmin } from "../../middleware/admin.js";
 
 function assertValidVariantPricing(priceValue, mrpValue, label) {
@@ -40,8 +41,24 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024, files: 8 },
+  limits: { fileSize: 8 * 1024 * 1024, files: 8 },
 });
+
+function runProductUpload(req, res, next) {
+  upload.array("images", 8)(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ ok: false, error: "Image must be 8 MB or smaller." });
+      }
+      if (err.code === "LIMIT_FILE_COUNT") {
+        return res.status(400).json({ ok: false, error: "You can upload at most 8 images." });
+      }
+      return res.status(400).json({ ok: false, error: err.message || "Image upload failed." });
+    }
+    return res.status(400).json({ ok: false, error: err.message || "Image upload failed." });
+  });
+}
 
 router.use(requireAdmin);
 
@@ -89,8 +106,59 @@ function parseBenefits(value) {
   return ["Natural Energy"];
 }
 
-function uploadedPaths(files = []) {
-  return files.map((file) => `/uploads/products/${file.filename}`);
+function uploadedPaths(files) {
+  const list = Array.isArray(files) ? files : [];
+  return list.map((file) => `/uploads/products/${file.filename}`);
+}
+
+function resolveProductImages(req, existingProduct = null) {
+  const incomingImages = uploadedPaths(req.files);
+  const existingImagesRaw = parseMaybeJson(req.body.existingImages, []);
+  const existingImages = Array.isArray(existingImagesRaw)
+    ? existingImagesRaw.map((url) => String(url || "").trim()).filter(Boolean)
+    : [];
+  const imageOrder = parseMaybeJson(req.body.imageOrder, null);
+  const newSlotCount = Array.isArray(imageOrder)
+    ? imageOrder.filter((slot) => slot === "__new__").length
+    : 0;
+
+  if (newSlotCount > 0 && incomingImages.length === 0) {
+    throw new Error(
+      "Image file did not reach the server. Use JPG/PNG under 8 MB, then Save product again."
+    );
+  }
+  if (newSlotCount > incomingImages.length) {
+    throw new Error(
+      `Expected ${newSlotCount} new image(s) but received ${incomingImages.length}. Please upload again.`
+    );
+  }
+
+  let images = [];
+  if (Array.isArray(imageOrder) && imageOrder.length > 0) {
+    let incomingIndex = 0;
+    images = imageOrder
+      .map((slot) => {
+        if (slot === "__new__") {
+          const next = incomingImages[incomingIndex];
+          incomingIndex += 1;
+          return next || "";
+        }
+        return String(slot || "").trim();
+      })
+      .filter(Boolean);
+    if (incomingIndex < incomingImages.length) {
+      images.push(...incomingImages.slice(incomingIndex));
+    }
+  } else {
+    images = [...incomingImages, ...existingImages];
+  }
+
+  // Do not re-attach a removed previous cover when the client sent an explicit order.
+  if (!images.length && existingProduct?.img) {
+    images = [existingProduct.img];
+  }
+
+  return dedupe(images);
 }
 
 function dedupe(values) {
@@ -138,7 +206,7 @@ function normalizeVariantRows(rawVariants, fallback, existingVariants = []) {
       mrpValue,
       stockQuantity,
       stockStatus: stockStatusFromQuantity(stockQuantity),
-      img: String(row.img ?? fallback.img ?? "").trim() || null,
+      img: String(fallback.img || row.img || "").trim() || null,
       packaging: String(row.packaging ?? fallback.packaging ?? "").trim() || null,
       isDefault: Boolean(row.isDefault),
       sortOrder: Number(row.sortOrder ?? index),
@@ -217,7 +285,7 @@ function createSimpleVariant(body, fallback, existingVariants = []) {
       mrpValue,
       stockQuantity,
       stockStatus: stockStatusFromQuantity(stockQuantity),
-      img: String(body.variantImage ?? fallback.img ?? "").trim() || null,
+      img: String(fallback.img || body.variantImage || "").trim() || null,
       packaging: String(body.packaging ?? fallback.packaging ?? "").trim() || null,
       isDefault: true,
       sortOrder: 0,
@@ -245,14 +313,7 @@ async function parseProductPayload(req, existingProduct = null) {
     String(req.body.catalogId ?? existingProduct?.catalogId ?? `${category.id}-${slug}`).trim() ||
     `${category.id}-${slug}`;
 
-  const incomingImages = uploadedPaths(req.files);
-  const existingImages = parseMaybeJson(req.body.existingImages, existingProduct?.images ?? []);
-  const images = dedupe([
-    ...existingImages,
-    ...incomingImages,
-    req.body.img ?? "",
-    existingProduct?.img ?? "",
-  ]);
+  const images = resolveProductImages(req, existingProduct);
   const mainImage = images[0];
 
   if (!mainImage) {
@@ -326,6 +387,7 @@ async function parseProductPayload(req, existingProduct = null) {
       inStock: summary.inStock,
       featured: parseBoolean(req.body.featured, existingProduct?.featured ?? false),
       isNew: parseBoolean(req.body.isNew, existingProduct?.isNew ?? false),
+      bogoEnabled: parseBoolean(req.body.bogoEnabled, existingProduct?.bogoEnabled ?? false),
     },
     variants,
   };
@@ -497,13 +559,7 @@ router.patch("/bulk", async (req, res, next) => {
         }
 
         if (hasStock) {
-          await tx.productVariant.updateMany({
-            where: { productId: id },
-            data: {
-              stockQuantity: patch.inStock ? 10 : 0,
-              stockStatus: patch.inStock ? "in_stock" : "out_of_stock",
-            },
-          });
+          await applyProductInStockToggle(tx, id, patch.inStock, { admin: req.admin });
         }
 
         updated.push(await syncProductSummary(tx, id));
@@ -513,102 +569,6 @@ router.patch("/bulk", async (req, res, next) => {
 
     res.json({ ok: true, updated: products.length, products: formatProducts(products) });
   } catch (err) {
-    next(err);
-  }
-});
-
-router.post("/:id/duplicate", async (req, res, next) => {
-  try {
-    const source = await prisma.product.findUnique({
-      where: { id: req.params.id },
-      include: {
-        variants: {
-          orderBy: [{ isDefault: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
-        },
-      },
-    });
-
-    if (!source) {
-      return res.status(404).json({ ok: false, error: "Product not found" });
-    }
-
-    let slug = `${source.slug}-copy`;
-    let counter = 2;
-    while (await prisma.product.findUnique({ where: { slug } })) {
-      slug = `${source.slug}-copy-${counter}`;
-      counter += 1;
-    }
-
-    let catalogId = `${source.categoryId}-${slug}`;
-    counter = 2;
-    while (await prisma.product.findUnique({ where: { catalogId } })) {
-      catalogId = `${source.categoryId}-${slug}-${counter}`;
-      counter += 1;
-    }
-
-    const product = await prisma.$transaction(async (tx) => {
-      const created = await tx.product.create({
-        data: {
-          catalogId,
-          slug,
-          name: `${source.name} (Copy)`,
-          productType: source.productType,
-          status: "draft",
-          tagline: source.tagline,
-          fullDescription: source.fullDescription,
-          tag: source.tag,
-          img: source.img,
-          images: source.images,
-          packSize: source.packSize,
-          categoryId: source.categoryId,
-          categoryLabel: source.categoryLabel,
-          priceValue: source.priceValue,
-          mrpValue: source.mrpValue,
-          rating: source.rating,
-          reviewCount: 0,
-          packaging: source.packaging,
-          badge: source.badge,
-          benefits: source.benefits,
-          inStock: false,
-          featured: false,
-          isNew: false,
-          isBestSeller: false,
-        },
-      });
-
-      for (const [index, variant] of source.variants.entries()) {
-        let sku = `${variant.sku}-COPY`;
-        let skuCounter = 2;
-        while (await tx.productVariant.findUnique({ where: { sku } })) {
-          sku = `${variant.sku}-COPY-${skuCounter}`;
-          skuCounter += 1;
-        }
-
-        await tx.productVariant.create({
-          data: {
-            productId: created.id,
-            sku,
-            weight: variant.weight,
-            priceValue: variant.priceValue,
-            mrpValue: variant.mrpValue,
-            stockQuantity: 0,
-            stockStatus: "out_of_stock",
-            img: variant.img,
-            packaging: variant.packaging,
-            isDefault: variant.isDefault,
-            sortOrder: index,
-          },
-        });
-      }
-
-      return syncProductSummary(tx, created.id);
-    });
-
-    res.status(201).json({ ok: true, product: formatProduct(product) });
-  } catch (err) {
-    if (err.code === "P2002") {
-      return res.status(409).json({ ok: false, error: "Duplicate product slug, catalog ID, or variant SKU" });
-    }
     next(err);
   }
 });
@@ -634,7 +594,7 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-router.post("/", upload.array("images", 8), async (req, res, next) => {
+router.post("/", runProductUpload, async (req, res, next) => {
   try {
     const parsed = await parseProductPayload(req);
 
@@ -653,7 +613,7 @@ router.post("/", upload.array("images", 8), async (req, res, next) => {
   }
 });
 
-router.patch("/:id", upload.array("images", 8), async (req, res, next) => {
+router.patch("/:id", runProductUpload, async (req, res, next) => {
   try {
     const existing = await prisma.product.findUnique({
       where: { id: req.params.id },
@@ -668,14 +628,7 @@ router.patch("/:id", upload.array("images", 8), async (req, res, next) => {
     if (!req.is("multipart/form-data") && bodyKeys.length === 1 && bodyKeys[0] === "inStock") {
       const nextInStock = parseBoolean(req.body.inStock, existing.inStock);
       const product = await prisma.$transaction(async (tx) => {
-        await tx.productVariant.updateMany({
-          where: { productId: existing.id },
-          data: {
-            stockQuantity: nextInStock ? 10 : 0,
-            stockStatus: nextInStock ? "in_stock" : "out_of_stock",
-          },
-        });
-        return syncProductSummary(tx, existing.id);
+        return applyProductInStockToggle(tx, existing.id, nextInStock, { admin: req.admin });
       });
       return res.json({ ok: true, product: formatProduct(product) });
     }

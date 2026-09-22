@@ -48,6 +48,7 @@ export function PremiumDates() {
             columns={4}
             maxRows={3}
             showPackSize
+            showTagline
           />
         )}
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../lib/api.js";
 import { cmsImageSrc, uploadCmsImage } from "../lib/cmsUpload.js";
 import { ImageCropModal } from "./ImageCropModal.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 export const emptyFeaturedPromo = {
   title: "",
@@ -55,6 +56,7 @@ export function slugifyCategoryLabel(value) {
 }
 
 export function CategoryForm({ categoryId, initial, onCancel, onSuccess }) {
+  const toast = useAdminToast();
   const isEditing = Boolean(categoryId);
 
   const [form, setForm] = useState(() => mapCategoryToForm(initial));
@@ -320,14 +322,18 @@ export function CategoryForm({ categoryId, initial, onCancel, onSuccess }) {
     };
 
     if (form.featuredPromoEnabled && !form.featuredPromo.title.trim()) {
-      setError("Featured promo title is required when promo is enabled.");
+      const message = "Featured promo title is required when promo is enabled.";
+      setError(message);
+      toast.error("Could not save category", message);
       setSaving(false);
       return;
     }
 
     const slug = slugifyCategoryLabel(form.id || form.label);
     if (!slug) {
-      setError("Category URL slug is required.");
+      const message = "Category URL slug is required.";
+      setError(message);
+      toast.error("Could not save category", message);
       setSaving(false);
       return;
     }
@@ -338,16 +344,20 @@ export function CategoryForm({ categoryId, initial, onCancel, onSuccess }) {
           method: "PATCH",
           body: JSON.stringify({ ...payload, id: slug }),
         });
+        toast.success("Category updated");
         onSuccess?.(data.category);
       } else {
         const data = await apiFetch("/api/admin/categories", {
           method: "POST",
           body: JSON.stringify({ ...payload, id: slug }),
         });
+        toast.success("Category created");
         onSuccess?.(data.category);
       }
     } catch (err) {
-      setError(err.message ?? "Save failed");
+      const message = err.message ?? "Save failed";
+      setError(message);
+      toast.error(isEditing ? "Could not update category" : "Could not create category", message);
     } finally {
       setSaving(false);
     }

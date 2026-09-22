@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useOrders } from "../../context/OrdersContext";
 import { useCart } from "../../context/CartContext";
 import { canCancelOrder, formatINR, formatOrderDate } from "../../data/orders";
@@ -259,6 +260,16 @@ function getReviewActionLabel(review) {
   return REVIEW_STATUS_META[review.status]?.actionLabel ?? "View review";
 }
 
+function getItemReview(item, reviewItemsByOrderItemId) {
+  return reviewItemsByOrderItemId[item.id]?.item.review ?? item.review ?? null;
+}
+
+function needsReview(item, reviewItemsByOrderItemId) {
+  if (!item?.productId) return false;
+  const review = getItemReview(item, reviewItemsByOrderItemId);
+  return !review || review.status === "rejected";
+}
+
 function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpenReview }) {
   const { gstin } = useGstSettings();
   const [showDetails, setShowDetails] = useState(false);
@@ -277,6 +288,15 @@ function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpe
         : order.paymentMethod === "card"
           ? "Debit / Credit Card"
           : "Cash on Delivery";
+
+  const reviewableItems =
+    order.status === "delivered"
+      ? order.items.filter((item) => item.productId)
+      : [];
+  const pendingReviewItems = reviewableItems.filter((item) =>
+    needsReview(item, reviewItemsByOrderItemId)
+  );
+  const firstPendingReview = pendingReviewItems[0] ?? null;
 
   return (
     <article className="account-order-card">
@@ -313,44 +333,88 @@ function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpe
 
       {refund ? <RefundDetailsPanel order={order} /> : null}
 
+      {order.status === "delivered" && pendingReviewItems.length > 0 ? (
+        <div className="mx-4 mb-1 mt-4 rounded-2xl border border-gold-500/25 bg-gold-500/8 px-4 py-3 sm:mx-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-body text-sm font-semibold text-emerald-900">
+                Rate your products
+              </p>
+              <p className="mt-0.5 font-body text-xs text-emerald-900/55">
+                {pendingReviewItems.length} item{pendingReviewItems.length === 1 ? "" : "s"} waiting
+                for your review after delivery.
+              </p>
+            </div>
+            {firstPendingReview ? (
+              <AccountBtn
+                variant="primary"
+                className="account-btn--sm"
+                onClick={() =>
+                  onOpenReview({
+                    orderId: order.id,
+                    item: firstPendingReview,
+                    review: getItemReview(firstPendingReview, reviewItemsByOrderItemId),
+                  })
+                }
+              >
+                Write a review
+              </AccountBtn>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className="account-order-card__body">
         <ul className="space-y-2">
-          {order.items.map((item) => (
-            <li
-              key={item.id}
-              className="rounded-2xl border border-cream-200/60 bg-white/65 px-3 py-3 font-body text-sm text-emerald-900/65"
-            >
-              <div className="flex justify-between gap-3">
-                <div>
-                  <p>
-                    {item.name}
-                    {item.packSize ? ` · ${item.packSize}` : ""} × {item.quantity}
-                  </p>
-                  {order.status === "delivered" && item.productId ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <ReviewStatusPill
-                        review={reviewItemsByOrderItemId[item.id]?.item.review ?? item.review}
-                      />
-                      <AccountBtn
-                        variant="soft"
-                        className="account-btn--sm"
-                        onClick={() =>
-                          onOpenReview({
-                            orderId: order.id,
-                            item,
-                            review: reviewItemsByOrderItemId[item.id]?.item.review ?? item.review ?? null,
-                          })
-                        }
-                      >
-                        {getReviewActionLabel(reviewItemsByOrderItemId[item.id]?.item.review ?? item.review)}
-                      </AccountBtn>
-                    </div>
-                  ) : null}
+          {order.items.map((item) => {
+            const review = getItemReview(item, reviewItemsByOrderItemId);
+            const canRate = order.status === "delivered" && item.productId;
+
+            return (
+              <li
+                key={item.id}
+                className="rounded-2xl border border-cream-200/60 bg-white/65 px-3 py-3 font-body text-sm text-emerald-900/65"
+              >
+                <div className="flex justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p>
+                      {item.name}
+                      {item.packSize ? ` · ${item.packSize}` : ""} × {item.quantity}
+                      {item.bogoApplied ? " · BOGO" : ""}
+                    </p>
+                    {canRate ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <ReviewStatusPill review={review} />
+                        <AccountBtn
+                          variant={needsReview(item, reviewItemsByOrderItemId) ? "primary" : "soft"}
+                          className="account-btn--sm"
+                          onClick={() =>
+                            onOpenReview({
+                              orderId: order.id,
+                              item,
+                              review,
+                            })
+                          }
+                        >
+                          {getReviewActionLabel(review)}
+                        </AccountBtn>
+                      </div>
+                    ) : null}
+                  </div>
+                  <span className="shrink-0 font-medium">
+                    {formatINR(
+                      item.lineTotal != null
+                        ? item.lineTotal
+                        : Math.max(
+                            0,
+                            (item.priceValue ?? 0) * (item.quantity ?? 0) - (item.lineDiscount ?? 0)
+                          )
+                    )}
+                  </span>
                 </div>
-                <span className="shrink-0 font-medium">{formatINR((item.priceValue ?? 0) * item.quantity)}</span>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
 
         <div className="mt-5 flex flex-wrap gap-2 border-t border-cream-200/60 pt-5">
@@ -456,6 +520,12 @@ function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpe
                   Price breakup
                 </p>
                 <div className="mt-3 space-y-2 font-body text-sm">
+                  {(order.discountTotal ?? 0) > 0 ? (
+                    <div className="flex items-center justify-between text-emerald-700">
+                      <span>Offer savings</span>
+                      <span>−{formatINR(order.discountTotal)}</span>
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between text-emerald-900/55">
                     <span>Subtotal</span>
                     <span>{formatINR(order.subtotal ?? 0)}</span>
@@ -533,10 +603,57 @@ function OrderCard({ order, onCancel, onReorder, reviewItemsByOrderItemId, onOpe
 }
 
 export function AccountOrdersSection() {
-  const { currentOrders, pastOrders, cancelOrder, reviewItemsByOrderItemId, submitReview } = useOrders();
+  const {
+    orders,
+    currentOrders,
+    pastOrders,
+    cancelledOrders,
+    cancelOrder,
+    reviewItemsByOrderItemId,
+    submitReview,
+  } = useOrders();
   const { addItem } = useCart();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [feedback, setFeedback] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
+
+  const pendingReviewCount = useMemo(() => {
+    return pastOrders.reduce((count, order) => {
+      return (
+        count +
+        order.items.filter((item) => needsReview(item, reviewItemsByOrderItemId)).length
+      );
+    }, 0);
+  }, [pastOrders, reviewItemsByOrderItemId]);
+
+  const requestedBucket = searchParams.get("bucket");
+  const [bucket, setBucket] = useState(
+    requestedBucket === "past" || requestedBucket === "cancelled" || requestedBucket === "active"
+      ? requestedBucket
+      : "active"
+  );
+  const [bucketTouched, setBucketTouched] = useState(Boolean(requestedBucket));
+
+  useEffect(() => {
+    if (requestedBucket === "past" || requestedBucket === "cancelled" || requestedBucket === "active") {
+      setBucket(requestedBucket);
+      setBucketTouched(true);
+      return;
+    }
+    if (!bucketTouched && pendingReviewCount > 0) {
+      setBucket("past");
+    }
+  }, [requestedBucket, pendingReviewCount, bucketTouched]);
+
+  const selectBucket = (id) => {
+    setBucketTouched(true);
+    setBucket(id);
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", "orders");
+    if (id === "active") next.delete("bucket");
+    else next.set("bucket", id);
+    setSearchParams(next, { replace: true });
+  };
 
   const reorder = (order) => {
     order.items.forEach((item) => addItem(item));
@@ -546,6 +663,7 @@ export function AccountOrdersSection() {
     const result = await cancelOrder(orderId, reason);
     if (result?.ok) {
       setFeedback({ type: "success", message: "Order cancelled successfully." });
+      selectBucket("cancelled");
     } else {
       setFeedback({
         type: "error",
@@ -569,7 +687,30 @@ export function AccountOrdersSection() {
     return result;
   };
 
-  if (!currentOrders.length && !pastOrders.length) {
+  const buckets = [
+    { id: "active", label: "Active orders", orders: currentOrders },
+    { id: "past", label: "Past orders", orders: pastOrders },
+    { id: "cancelled", label: "Cancelled orders", orders: cancelledOrders },
+  ];
+
+  const activeBucket = buckets.find((item) => item.id === bucket) ?? buckets[0];
+  const visibleOrders = activeBucket.orders;
+
+  const firstPendingTarget = useMemo(() => {
+    for (const order of pastOrders) {
+      const item = order.items.find((entry) => needsReview(entry, reviewItemsByOrderItemId));
+      if (item) {
+        return {
+          orderId: order.id,
+          item,
+          review: getItemReview(item, reviewItemsByOrderItemId),
+        };
+      }
+    }
+    return null;
+  }, [pastOrders, reviewItemsByOrderItemId]);
+
+  if (!orders.length) {
     return (
       <div className="account-section">
         <AccountCard>
@@ -584,49 +725,107 @@ export function AccountOrdersSection() {
     );
   }
 
+  const emptyCopy = {
+    active: {
+      title: "No active orders",
+      description: "Orders currently being processed will show up here.",
+    },
+    past: {
+      title: "No past orders",
+      description: "Delivered orders appear here — you can rate products after delivery.",
+    },
+    cancelled: {
+      title: "No cancelled orders",
+      description: "Cancelled orders will appear in this tab.",
+    },
+  };
+
   return (
-    <div className="account-orders-section space-y-8">
+    <div className="account-orders-section space-y-6">
       {feedback ? <AccountAlert type={feedback.type}>{feedback.message}</AccountAlert> : null}
 
-      {currentOrders.length > 0 ? (
-        <div>
-          <h3 className="mb-4 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-900/40">
-            Active orders
-          </h3>
-          <div className="space-y-5">
-            {currentOrders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onCancel={handleCancel}
-                onReorder={reorder}
-                reviewItemsByOrderItemId={reviewItemsByOrderItemId}
-                onOpenReview={setReviewTarget}
-              />
-            ))}
+      {pendingReviewCount > 0 ? (
+        <div className="rounded-2xl border border-gold-500/30 bg-gradient-to-br from-gold-500/12 to-cream-50 px-4 py-4 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-display text-lg text-emerald-900">Reviews waiting</p>
+              <p className="mt-1 font-body text-sm text-emerald-900/60">
+                You have {pendingReviewCount} delivered product
+                {pendingReviewCount === 1 ? "" : "s"} to rate. Open{" "}
+                <button
+                  type="button"
+                  className="font-semibold text-emerald-800 underline underline-offset-2"
+                  onClick={() => selectBucket("past")}
+                >
+                  Past orders
+                </button>{" "}
+                and tap Write a review.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <AccountBtn variant="soft" className="account-btn--sm" onClick={() => selectBucket("past")}>
+                View past orders
+              </AccountBtn>
+              {firstPendingTarget ? (
+                <AccountBtn
+                  variant="primary"
+                  className="account-btn--sm"
+                  onClick={() => {
+                    selectBucket("past");
+                    setReviewTarget(firstPendingTarget);
+                  }}
+                >
+                  Write a review
+                </AccountBtn>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
 
-      {pastOrders.length > 0 ? (
-        <div>
-          <h3 className="mb-4 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-900/40">
-            Past orders
-          </h3>
-          <div className="space-y-5">
-            {pastOrders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onCancel={handleCancel}
-                onReorder={reorder}
-                reviewItemsByOrderItemId={reviewItemsByOrderItemId}
-                onOpenReview={setReviewTarget}
-              />
-            ))}
-          </div>
+      <div className="account-filter-pills" role="tablist" aria-label="Filter orders">
+        {buckets.map((item) => {
+          const isActive = bucket === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              className={`account-filter-pill ${isActive ? "account-filter-pill--active" : ""}`}
+              onClick={() => selectBucket(item.id)}
+            >
+              {item.label}
+              {item.orders.length > 0 ? ` (${item.orders.length})` : ""}
+              {item.id === "past" && pendingReviewCount > 0 ? ` · ${pendingReviewCount} to rate` : ""}
+            </button>
+          );
+        })}
+      </div>
+
+      {visibleOrders.length > 0 ? (
+        <div className="space-y-5">
+          {visibleOrders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              onCancel={handleCancel}
+              onReorder={reorder}
+              reviewItemsByOrderItemId={reviewItemsByOrderItemId}
+              onOpenReview={setReviewTarget}
+            />
+          ))}
         </div>
-      ) : null}
+      ) : (
+        <AccountCard>
+          <AccountEmptyState
+            title={emptyCopy[bucket]?.title ?? "No orders"}
+            description={emptyCopy[bucket]?.description ?? "Nothing to show in this tab."}
+            actionLabel="Continue shopping"
+            actionHref="/products"
+          />
+        </AccountCard>
+      )}
 
       <ReviewModal
         target={reviewTarget}

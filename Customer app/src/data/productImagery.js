@@ -64,7 +64,10 @@ export function inferImageProfile(product) {
 
 /** Attach correct packshot + balance profile for homepage grids. */
 export function withHomeImagery(product) {
-  const img = PACKSHOT_BY_NAME[product.name] ?? product.img;
+  const current = String(product.img || "");
+  const usesUploadedPackshot = /\/uploads\//i.test(current);
+  // Never replace an admin-uploaded packshot with a static studio asset.
+  const img = usesUploadedPackshot ? current : PACKSHOT_BY_NAME[product.name] ?? current;
   const imageProfile = inferImageProfile({ ...product, img });
 
   return {

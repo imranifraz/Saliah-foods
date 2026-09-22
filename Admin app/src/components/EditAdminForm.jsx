@@ -8,6 +8,7 @@ import {
 } from "../lib/phone.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { AdminAvatarUpload } from "./AdminAvatarUpload.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 function emptyForm(admin) {
   return {
@@ -19,6 +20,7 @@ function emptyForm(admin) {
 }
 
 export function EditAdminForm({ admin, onCancel, onSuccess }) {
+  const toast = useAdminToast();
   const { user: sessionUser, refresh } = useAuth();
   const [form, setForm] = useState(emptyForm(admin));
   const [error, setError] = useState("");
@@ -78,9 +80,11 @@ export function EditAdminForm({ admin, onCancel, onSuccess }) {
         }),
       });
       if (isSelf) await refresh();
+      toast.success("Admin updated");
       onSuccess?.(data.admin);
     } catch (err) {
       setError(err.message);
+      toast.error("Could not update admin", err.message);
     } finally {
       setSaving(false);
     }

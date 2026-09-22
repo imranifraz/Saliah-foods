@@ -12,7 +12,7 @@ import {
 export function getCustomerStoreUrl() {
   const configured = import.meta.env.VITE_CUSTOMER_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
-  if (import.meta.env.DEV) return "http://localhost:5173";
+  if (import.meta.env.DEV) return "http://localhost:5180";
   return "";
 }
 
@@ -29,9 +29,14 @@ export const adminAppSections = [
   {
     label: "CMS",
     items: [
-      { type: "internal", to: "/cms/home", label: "Homepage", description: "Hero, story & banners", icon: IconCms },
-      { type: "internal", to: "/cms/pages", label: "Web content", description: "About, FAQ & pages", icon: IconCms },
-      { type: "internal", to: "/cms/blog", label: "Blog", description: "Articles & updates", icon: IconBlog },
+      { type: "internal", to: "/cms/pages", label: "Web content", description: "Home, Sourcing, Legacy, FAQ, Contact", icon: IconCms },
+      { type: "internal", to: "/cms/home", label: "Home Page", description: "Hero, logo, story & testimonials", icon: IconCms },
+      { type: "internal", to: "/cms/sourcing", label: "Sourcing & Quality", description: "Quality page content", icon: IconCms },
+      { type: "internal", to: "/cms/legacy", label: "Our Legacy", description: "Founder & brand story", icon: IconCms },
+      { type: "internal", to: "/cms/faq", label: "FAQ", description: "Questions & answers", icon: IconCms },
+      { type: "internal", to: "/cms/blog", label: "Blog", description: "Journal articles", icon: IconBlog },
+      { type: "internal", to: "/cms/contact", label: "Contact Us", description: "Contact details & map", icon: IconCms },
+      { type: "internal", to: "/cms/newsletter", label: "Newsletter", description: "Subscriber list & CSV export", icon: IconCms },
     ],
   },
   {

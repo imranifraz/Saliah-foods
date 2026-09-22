@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { getBlogPostPath } from "../../data/blog";
+import {
+  BLOG_COVER_IMAGE_HEIGHT,
+  BLOG_COVER_IMAGE_WIDTH,
+} from "../../data/blogImageSpec.js";
 import { OptimizedImage } from "../ui/OptimizedImage";
 
 export function BlogFeaturedCard({ post }) {
@@ -18,11 +22,13 @@ export function BlogFeaturedCard({ post }) {
         <div className="blog-featured__media">
           <OptimizedImage
             src={post.img}
-            alt=""
+            alt={post.title}
+            pictureClassName="absolute inset-0 block h-full w-full"
             className="blog-featured__image"
-            width={1200}
-            height={720}
-            sizes="(max-width: 1024px) 100vw, 65vw"
+            width={BLOG_COVER_IMAGE_WIDTH}
+            height={BLOG_COVER_IMAGE_HEIGHT}
+            sizes="(max-width: 640px) 100vw, 320px"
+            priority
           />
           <div className="blog-featured__overlay" aria-hidden />
           <span className="blog-featured__badge">Featured story</span>

@@ -7,6 +7,7 @@ import { ProductDetailPurchasePanel } from "../components/products/ProductDetail
 import { ProductDetailReviewsSection } from "../components/products/ProductDetailReviewsSection";
 import { ProductDetailRelatedSection } from "../components/products/ProductDetailRelatedSection";
 import { ProductDetailStickyBar } from "../components/products/ProductDetailStickyBar";
+import { ProductDetailStorySection } from "../components/products/ProductDetailStorySection";
 import { WishlistButton } from "../components/account/WishlistButton";
 import { useCart } from "../context/CartContext";
 import {
@@ -106,23 +107,40 @@ export function ProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1480px] px-4 py-28 text-center sm:px-5 md:px-10">
-        <p className="font-body text-sm text-emerald-900/55">Loading product…</p>
+      <div className="relative pb-24 pt-[calc(var(--site-header)+0.75rem)] md:pb-28 md:pt-[calc(var(--site-header)+1rem)]">
+        <div className="pdp-atmosphere pointer-events-none absolute inset-0" aria-hidden />
+        <div className="relative mx-auto max-w-[1480px] px-4 sm:px-5 md:px-10">
+          <div className="pdp-skeleton" aria-busy="true" aria-label="Loading product">
+            <div className="pdp-skeleton__gallery" />
+            <div className="pdp-skeleton__info">
+              <div className="pdp-skeleton__line pdp-skeleton__line--sm" />
+              <div className="pdp-skeleton__line pdp-skeleton__line--title" />
+              <div className="pdp-skeleton__line pdp-skeleton__line--md" />
+              <div className="pdp-skeleton__panel" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error || !product) {
     return (
-      <div className="mx-auto max-w-[1480px] px-4 py-28 sm:px-5 md:px-10">
-        <h1 className="font-display text-2xl font-medium text-emerald-900">Product not found</h1>
-        <p className="mt-3 font-body text-sm text-emerald-900/55">
-          This product could not be loaded from the server.
-        </p>
-        {error ? <p className="mt-2 font-body text-xs text-emerald-900/40">{error}</p> : null}
-        <Link to="/products" className="mt-4 inline-block font-body text-sm text-emerald-800 underline">
-          Browse all products
-        </Link>
+      <div className="relative pb-24 pt-[calc(var(--site-header)+1.5rem)] md:pb-28">
+        <div className="pdp-atmosphere pointer-events-none absolute inset-0" aria-hidden />
+        <div className="relative mx-auto max-w-[1480px] px-4 sm:px-5 md:px-10">
+          <div className="pdp-empty">
+            <p className="pdp-empty__eyebrow">Saliah Foods</p>
+            <h1 className="pdp-empty__title">Product not found</h1>
+            <p className="pdp-empty__copy">
+              This product could not be loaded. It may have been moved or is temporarily unavailable.
+            </p>
+            {error ? <p className="pdp-empty__error">{error}</p> : null}
+            <Link to="/products" className="pdp-empty__cta">
+              Browse the collection
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -144,7 +162,9 @@ export function ProductDetailPage() {
   const displayMrpValue = selectedVariant?.mrpValue ?? product.mrpValue;
   const displayPrice = selectedVariant?.price ?? product.price;
   const fixedPackSize = !needsPackSelection ? getFixedPackSizeLabel(product) : null;
-  const displayPackSize = needsPackSelection ? selectedVariant?.label : fixedPackSize;
+  const displayPackSize = needsPackSelection
+    ? selectedVariant?.packSize || selectedVariant?.label || selectedVariant?.weight || null
+    : fixedPackSize;
   const isOutOfStock = selectedVariant ? selectedVariant.inStock === false : product.inStock === false;
 
   const linePricing = {
@@ -165,6 +185,7 @@ export function ProductDetailPage() {
     ...linePricing,
     packSize: displayPackSize ?? "",
     tagline: product.tagline ?? "",
+    bogoEnabled: Boolean(product.bogoEnabled),
   };
 
   function buildCartLine() {
@@ -177,6 +198,7 @@ export function ProductDetailPage() {
       img: selectedVariant?.img || product.img,
       ...linePricing,
       packSize: displayPackSize ?? "",
+      bogoEnabled: Boolean(product.bogoEnabled),
     };
   }
 
@@ -207,46 +229,57 @@ export function ProductDetailPage() {
 
       <div className="relative pb-24 pt-[calc(var(--site-header)+0.75rem)] md:pb-28 md:pt-[calc(var(--site-header)+1rem)]">
         <div className="pdp-atmosphere pointer-events-none absolute inset-0" aria-hidden />
-        <div className="plp-texture pointer-events-none absolute inset-0" aria-hidden />
+        <div className="plp-texture pointer-events-none absolute inset-0 opacity-70" aria-hidden />
+        <div className="pdp-atmosphere-veil pointer-events-none absolute inset-x-0 top-0 h-[28rem]" aria-hidden />
 
         <div className="relative mx-auto max-w-[1480px] px-4 sm:px-5 md:px-10">
-          <nav className="mb-4 font-body text-[11px] uppercase tracking-[0.16em] text-emerald-900/35" aria-label="Breadcrumb">
-            <Link to="/" className="transition-colors hover:text-emerald-800">
+          <nav className="pdp-breadcrumb mb-6 md:mb-8" aria-label="Breadcrumb">
+            <Link to="/" className="pdp-breadcrumb__link">
               Home
             </Link>
-            <span className="mx-2">/</span>
-            <Link to="/products" className="transition-colors hover:text-emerald-800">
+            <span className="pdp-breadcrumb__sep" aria-hidden>
+              /
+            </span>
+            <Link to="/products" className="pdp-breadcrumb__link">
               Products
             </Link>
-            <span className="mx-2">/</span>
-            <Link to={categoryHref} className="transition-colors hover:text-emerald-800">
+            <span className="pdp-breadcrumb__sep" aria-hidden>
+              /
+            </span>
+            <Link to={categoryHref} className="pdp-breadcrumb__link">
               {product.categoryLabel}
             </Link>
-            <span className="mx-2">/</span>
-            <span className="text-emerald-900/60">{product.name}</span>
+            <span className="pdp-breadcrumb__sep" aria-hidden>
+              /
+            </span>
+            <span className="pdp-breadcrumb__current">{product.name}</span>
           </nav>
 
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 xl:gap-16">
-            <ProductDetailGallery images={gallery} productName={product.name} badge={product.badge} />
+          <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-14 xl:gap-20">
+            <ProductDetailGallery
+              images={gallery}
+              productName={product.name}
+              badge={
+                product.bogoEnabled
+                  ? product.offerLabel || "Buy 1 Get 1 Free"
+                  : product.badge
+              }
+            />
 
             <motion.div
-              initial={reduce ? false : { opacity: 0, y: 16 }}
+              initial={reduce ? false : { opacity: 0, y: 18 }}
               animate={reduce ? undefined : { opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.06 }}
-              className="flex flex-col lg:pt-1"
+              transition={{ duration: 0.5, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col lg:sticky lg:top-[calc(var(--site-header)+1rem)] lg:pt-1"
             >
-              <p className="font-body text-[10px] font-medium uppercase tracking-[0.22em] text-emerald-800/45">
-                {product.categoryLabel}
-              </p>
-              <div className="mt-2 flex items-start justify-between gap-3">
-                <h1 className="font-display text-[clamp(1.875rem,3.5vw,2.75rem)] font-medium leading-tight tracking-tight text-emerald-900">
-                  {product.name}
-                </h1>
-                <WishlistButton product={wishlistProduct} size="lg" />
+              <div className="pdp-info-header">
+                <div className="pdp-info-header__top">
+                  <p className="pdp-info-header__eyebrow">{product.categoryLabel}</p>
+                  <WishlistButton product={wishlistProduct} size="lg" />
+                </div>
+                <h1 className="pdp-info-header__title">{product.name}</h1>
+                {product.tagline ? <p className="pdp-info-header__tagline">{product.tagline}</p> : null}
               </div>
-              {product.tagline ? (
-                <p className="mt-2 font-body text-[15px] leading-relaxed text-emerald-900/52">{product.tagline}</p>
-              ) : null}
 
               <ProductDetailPurchasePanel
                 rating={rating}
@@ -264,33 +297,27 @@ export function ProductDetailPage() {
                 displayMrpValue={displayMrpValue}
                 displayPrice={displayPrice}
                 displayMrp={linePricing.mrp}
+                discountPercent={linePricing.discountPercent}
                 priceKey={selectedVariant?.id ?? selectedPackId ?? product.slug}
                 isOutOfStock={isOutOfStock}
+                bogoEnabled={Boolean(product.bogoEnabled)}
+                offerLabel={product.offerLabel || "Buy 1 Get 1 Free"}
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
                 ctaRef={ctaRef}
               />
-
-              {product.benefits?.length ? (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {product.benefits.map((benefit) => (
-                    <span
-                      key={benefit}
-                      className="rounded-full border border-cream-200/80 bg-white/70 px-3 py-1 font-body text-[10px] uppercase tracking-[0.12em] text-emerald-900/55"
-                    >
-                      {benefit}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-
-              {description ? (
-                <p className="mt-6 font-body text-[13px] leading-relaxed text-emerald-900/48">{description}</p>
-              ) : null}
             </motion.div>
           </div>
 
-          <section className="pdp-bottom-stack mt-14 md:mt-16" aria-label="Reviews and recommendations">
+          <ProductDetailStorySection
+            description={description}
+            benefits={product.benefits}
+            categoryLabel={product.categoryLabel}
+            productName={product.name}
+            netWeight={displayPackSize}
+          />
+
+          <section className="pdp-bottom-stack mt-14 md:mt-20" aria-label="Reviews and recommendations">
             <div className="pdp-bottom-stack__reviews" id="pdp-reviews">
               <ProductDetailReviewsSection
                 productSlug={product.slug}

@@ -6,6 +6,7 @@ import { RoleBadge } from "../components/ui/RoleBadge.jsx";
 import { StatusBadge } from "../components/ui/StatusBadge.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
 import { IconOrders, IconPackage, IconProducts } from "../components/icons/AdminIcons.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 function formatMemberSince(iso) {
   return new Date(iso).toLocaleDateString("en-IN", {
@@ -62,6 +63,7 @@ function InfoRow({ label, value }) {
 }
 
 export function UserDetailPage() {
+  const toast = useAdminToast();
   const { id } = useParams();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -97,8 +99,10 @@ export function UserDetailPage() {
       });
       setUser(d.user);
       setSaved(true);
+      toast.success("Customer updated");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not update customer", err.message);
     } finally {
       setSaving(false);
     }
@@ -110,9 +114,11 @@ export function UserDetailPage() {
     setError("");
     try {
       await apiFetch(`/api/admin/users/${id}`, { method: "DELETE" });
+      toast.success("Customer deleted");
       navigate("/users");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not delete customer", err.message);
       setDeleting(false);
     }
   }
@@ -130,16 +136,6 @@ export function UserDetailPage() {
 
   return (
     <div>
-      <Link
-        to="/users"
-        className="admin-muted mb-5 inline-flex items-center gap-1.5 text-sm font-medium transition hover:text-[var(--admin-link)]"
-      >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-        </svg>
-        Back to customers
-      </Link>
-
       <section className="admin-card mb-6 overflow-hidden">
         <div className="relative border-b border-[var(--admin-border)] px-6 py-6">
           <div

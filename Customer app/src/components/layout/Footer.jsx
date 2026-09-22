@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { useHomeContent } from "../../context/HomeContentContext.jsx";
 import { useContactContent } from "../../context/ContactContentContext.jsx";
+import { useHomeContent } from "../../context/HomeContentContext.jsx";
 import { resolveMediaUrl } from "../../lib/api.js";
-import { OptimizedImage } from "../ui/OptimizedImage";
+
+const FALLBACK_LOGO = "/assets/saliah-foods-logo.png";
 
 const shopLinks = [
   { label: "Premium Dates", href: "/products/premium-dates" },
@@ -85,10 +86,13 @@ function FooterLink({ to, children, external = false }) {
 
 export function Footer() {
   const year = new Date().getFullYear();
-  const { content: homeContent } = useHomeContent();
   const { contact } = useContactContent();
+  const { content, loading: homeLoading } = useHomeContent();
   const { email, phone, phoneTel, hours, address } = contact;
   const addressLine = address.split("\n")[0];
+  const logoPath =
+    content?.siteLogoLight || content?.siteLogo || (!homeLoading ? FALLBACK_LOGO : "");
+  const logoSrc = logoPath ? resolveMediaUrl(logoPath) : "";
 
   return (
     <footer className="relative overflow-x-clip border-t border-emerald-900/8 bg-emerald-950 text-cream-50">
@@ -105,15 +109,23 @@ export function Footer() {
         <div className="grid gap-12 sm:gap-14 lg:grid-cols-12 lg:gap-10 xl:gap-12">
           {/* Brand */}
           <div className="lg:col-span-4">
-            <Link to="/" className="inline-block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-400/50">
-              <OptimizedImage
-                src={resolveMediaUrl(homeContent.siteLogoLight) || "/assets/application-logo-white.webp"}
-                alt="Saliah Foods"
-                className="h-11 w-auto sm:h-12 md:h-14"
-                width={595}
-                height={131}
-                priority={false}
-              />
+            <Link
+              to="/"
+              className="inline-block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-400/50"
+            >
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  alt="Saliah Foods"
+                  width={150}
+                  height={49}
+                  className="block h-auto w-[100px] max-w-full bg-transparent object-contain object-left brightness-0 invert sm:w-[120px] md:w-[140px]"
+                  decoding="async"
+                  loading="lazy"
+                />
+              ) : (
+                <span className="block h-[32px] w-[100px] sm:w-[120px] md:h-[45px] md:w-[140px]" aria-hidden />
+              )}
             </Link>
             <p className="mt-5 max-w-sm font-body text-sm leading-relaxed text-cream-50/60">
               Premium dates, natural wellness foods, and artisan preserves — carefully sourced and

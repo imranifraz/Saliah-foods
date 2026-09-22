@@ -4,6 +4,7 @@ import { AdminModalLayout } from "./AdminModalLayout.jsx";
 import { ConfirmDialog } from "./ConfirmDialog.jsx";
 import { ViewInventoryPanel } from "./ViewInventoryPanel.jsx";
 import { ProductThumb } from "./ui/ProductThumb.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 function QuickStockChip({ onClick, children, disabled = false }) {
   return (
@@ -168,6 +169,7 @@ export function InventoryManageModal({
   onViewHistory,
   onViewProduct,
 }) {
+  const toast = useAdminToast();
   const [currentMode, setCurrentMode] = useState(mode);
   const [openedInEditMode, setOpenedInEditMode] = useState(false);
   const [draft, setDraft] = useState("0");
@@ -217,10 +219,12 @@ export function InventoryManageModal({
         body: JSON.stringify({ stockQuantity: nextOnHand }),
       });
       setConfirmOpen(false);
+      toast.success("Stock updated");
       onUpdated?.();
       onClose();
     } catch (err) {
       setError(err.message);
+      toast.error("Could not update stock", err.message);
     } finally {
       setSaving(false);
     }
@@ -229,7 +233,9 @@ export function InventoryManageModal({
   function handleSubmit(event) {
     event.preventDefault();
     if (!dirty || nextOnHand < min) {
-      setError(`On-hand stock must be at least ${min}.`);
+      const message = `On-hand stock must be at least ${min}.`;
+      setError(message);
+      toast.error("Could not update stock", message);
       return;
     }
     setConfirmOpen(true);

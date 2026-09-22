@@ -136,7 +136,7 @@ export function buildOrderNotificationFeed(orders, prefs) {
         message: `Your order is delivered. Please rate ${reviewNames || productNames} and help other customers choose Saliah.`,
         at: deliveredAt,
         actionLabel: "Rate products",
-        actionHref: "/account?tab=orders",
+        actionHref: "/account?tab=orders&bucket=past",
       });
     }
   }

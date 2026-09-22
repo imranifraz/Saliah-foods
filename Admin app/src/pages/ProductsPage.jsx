@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
 import { CreateProductModal } from "../components/CreateProductModal.jsx";
 import { ProductManageModal } from "../components/ProductManageModal.jsx";
@@ -14,6 +15,7 @@ function IconPlus() {
 }
 
 export function ProductsPage() {
+  const navigate = useNavigate();
   const listRef = useRef(null);
   const [categories, setCategories] = useState([]);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -62,7 +64,7 @@ export function ProductsPage() {
         categories={categories}
         onViewProduct={(product) => setManageProduct({ id: product.id, mode: "view" })}
         onViewPrices={(product) => setManageProduct({ id: product.id, mode: "prices" })}
-        onEditProduct={(product) => setManageProduct({ id: product.id, mode: "edit" })}
+        onEditProduct={(product) => navigate(`/products/${product.id}/edit`)}
         onCreateClick={() => setCreateModalOpen(true)}
       />
 
@@ -73,12 +75,22 @@ export function ProductsPage() {
         onCreated={reload}
       />
 
+      {/* Details / prices only — Edit always goes to /products/:id/edit (same ProductForm). */}
       <ProductManageModal
         open={Boolean(manageProduct)}
         productId={manageProduct?.id ?? null}
         mode={manageProduct?.mode ?? "view"}
         categories={categories}
         onClose={() => setManageProduct(null)}
+        onModeChange={(nextMode) => {
+          if (nextMode === "edit" && manageProduct?.id) {
+            const productId = manageProduct.id;
+            setManageProduct(null);
+            navigate(`/products/${productId}/edit`);
+            return;
+          }
+          setManageProduct((current) => (current ? { ...current, mode: nextMode } : current));
+        }}
         onUpdated={reload}
       />
     </div>

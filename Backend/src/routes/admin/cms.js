@@ -9,6 +9,7 @@ import {
   formatHomeCmsPage,
   normalizeHomeCmsBody,
 } from "../../lib/home-cms.js";
+import { sanitizeRichHtml, richHtmlHasText } from "../../lib/richText.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -16,25 +17,49 @@ router.use(requireAdmin);
 const cmsUploadDir = path.resolve(process.cwd(), "uploads", "cms");
 fs.mkdirSync(cmsUploadDir, { recursive: true });
 
+const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"]);
+const VIDEO_EXTS = new Set([".mp4", ".webm", ".mov", ".m4v"]);
+const ALLOWED_EXTS = new Set([...IMAGE_EXTS, ...VIDEO_EXTS]);
+
 const cmsUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, cmsUploadDir),
     filename: (_req, file, cb) => {
       const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
-      const safeExt = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"].includes(ext)
-        ? ext
-        : ".jpg";
+      const safeExt = ALLOWED_EXTS.has(ext) ? ext : ".jpg";
       cb(null, `cms-${Date.now()}-${Math.round(Math.random() * 1e6)}${safeExt}`);
     },
   }),
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype?.startsWith("image/")) {
-      return cb(new Error("Only image uploads are allowed"));
+    const mime = file.mimetype || "";
+    const ok =
+      mime.startsWith("image/") ||
+      mime === "video/mp4" ||
+      mime === "video/webm" ||
+      mime === "video/quicktime" ||
+      mime === "video/x-m4v";
+    if (!ok) {
+      return cb(new Error("Only image or video uploads are allowed (JPG, PNG, WebP, MP4, WebM)"));
     }
     cb(null, true);
   },
 });
+
+function pickUploadedFile(req) {
+  if (req.file) return req.file;
+  const files = req.files;
+  if (!files) return null;
+  if (Array.isArray(files)) return files[0] || null;
+  return files.file?.[0] || files.image?.[0] || null;
+}
+
+function mediaKindFromUpload(file) {
+  const mime = file?.mimetype || "";
+  const ext = path.extname(file?.filename || file?.originalname || "").toLowerCase();
+  if (mime.startsWith("video/") || VIDEO_EXTS.has(ext)) return "video";
+  return "image";
+}
 
 function slugify(text) {
   return text
@@ -55,6 +80,21 @@ function formatPage(p) {
   };
 }
 
+function normalizeBlogContent(content) {
+  if (!Array.isArray(content)) return [{ type: "p", text: "" }];
+  const blocks = content
+    .map((item) => {
+      const type = item?.type === "h2" ? "h2" : "p";
+      const text =
+        type === "h2"
+          ? String(item?.text ?? "").trim()
+          : sanitizeRichHtml(item?.text ?? "");
+      return { type, text };
+    })
+    .filter((item) => (item.type === "h2" ? item.text : richHtmlHasText(item.text)));
+  return blocks.length ? blocks : [{ type: "p", text: "" }];
+}
+
 function formatBlog(post) {
   return {
     id: post.id,
@@ -67,7 +107,7 @@ function formatBlog(post) {
     author: post.author,
     featured: post.featured,
     img: post.img,
-    content: post.content,
+    content: normalizeBlogContent(post.content),
     updatedAt: post.updatedAt?.toISOString?.() ?? post.createdAt.toISOString(),
   };
 }
@@ -121,19 +161,30 @@ router.put("/home", async (req, res, next) => {
   }
 });
 
-router.post("/upload", cmsUpload.single("image"), (req, res, next) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ ok: false, error: "Image file is required" });
+router.post(
+  "/upload",
+  cmsUpload.fields([
+    { name: "file", maxCount: 1 },
+    { name: "image", maxCount: 1 },
+  ]),
+  (req, res, next) => {
+    try {
+      const file = pickUploadedFile(req);
+      if (!file) {
+        return res.status(400).json({ ok: false, error: "Image or video file is required" });
+      }
+      const kind = mediaKindFromUpload(file);
+      res.status(201).json({
+        ok: true,
+        url: `/uploads/cms/${file.filename}`,
+        kind,
+        mediaType: kind,
+      });
+    } catch (err) {
+      next(err);
     }
-    res.status(201).json({
-      ok: true,
-      url: `/uploads/cms/${req.file.filename}`,
-    });
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 // ——— Web pages (CMS) ———
 router.get("/pages", async (_req, res, next) => {
@@ -235,7 +286,7 @@ router.post("/blog", async (req, res, next) => {
         author: author ?? "Saliah Editorial",
         featured: Boolean(featured),
         img: img ?? "/assets/kimia-dates.png",
-        content: content ?? [{ type: "p", text: "" }],
+        content: normalizeBlogContent(content),
       },
     });
     res.status(201).json({ ok: true, post: formatBlog(post) });
@@ -267,6 +318,7 @@ router.patch("/blog/:id", async (req, res, next) => {
     for (const key of fields) {
       if (req.body[key] !== undefined) data[key] = req.body[key];
     }
+    if (data.content !== undefined) data.content = normalizeBlogContent(data.content);
     if (req.body.featured !== undefined) data.featured = Boolean(req.body.featured);
 
     const post = await prisma.blogPost.update({ where: { id: existing.id }, data });

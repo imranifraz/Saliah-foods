@@ -18,7 +18,7 @@ const website = {
   url: siteUrl,
   potentialAction: {
     "@type": "SearchAction",
-    target: `${siteUrl}/?q={search_term_string}`,
+    target: `${siteUrl}/products?q={search_term_string}`,
     "query-input": "required name=search_term_string",
   },
 };

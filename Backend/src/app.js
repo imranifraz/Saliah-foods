@@ -14,9 +14,10 @@ import paymentPublicRoutes from "./routes/payments.js";
 import notificationRoutes from "./routes/notifications.js";
 import reviewRoutes from "./routes/reviews.js";
 import contactRoutes from "./routes/contact.js";
+import newsletterRoutes from "./routes/newsletter.js";
 import adminRoutes from "./routes/admin/index.js";
 import { errorHandler, notFound } from "./middleware/error.js";
-import { customerPublicAssetsDir } from "./lib/paths.js";
+import { customerPublicAssetsDirs } from "./lib/paths.js";
 
 const app = express();
 
@@ -38,7 +39,19 @@ app.use(
 );
 app.use(express.json());
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
-app.use("/assets", express.static(customerPublicAssetsDir()));
+// Serve every known customer assets folder (e.g. public/assets + public/assets-1)
+for (const assetsDir of customerPublicAssetsDirs()) {
+  app.use("/assets", express.static(assetsDir));
+}
+
+app.get("/", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "saliah-dates-api",
+    health: "/api/health",
+    hint: "API routes live under /api. Open the Admin or Customer app in the browser, not this URL alone.",
+  });
+});
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "saliah-dates-api" });
@@ -56,6 +69,7 @@ app.use("/api/payments", paymentPublicRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.use(notFound);

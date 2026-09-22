@@ -1,14 +1,33 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Cropper from "react-easy-crop";
 import { getCroppedImageFile } from "../lib/cropImage.js";
+
+async function getFallbackSquareCrop(imageSrc) {
+  const image = await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.addEventListener("load", () => resolve(img));
+    img.addEventListener("error", () => reject(new Error("Could not load image for cropping.")));
+    if (typeof imageSrc === "string" && !imageSrc.startsWith("blob:") && !imageSrc.startsWith("data:")) {
+      img.crossOrigin = "anonymous";
+    }
+    img.src = imageSrc;
+  });
+
+  const size = Math.min(image.naturalWidth || image.width, image.naturalHeight || image.height);
+  const x = Math.max(0, Math.floor(((image.naturalWidth || image.width) - size) / 2));
+  const y = Math.max(0, Math.floor(((image.naturalHeight || image.height) - size) / 2));
+  return { x, y, width: size, height: size };
+}
 
 export function ImageCropModal({
   open,
   imageSrc,
   fileName = "category-image.jpg",
   title = "Crop image",
-  subtitle = "Adjust the square crop for your category image.",
+  subtitle = "Adjust the square crop, then add it to the form.",
   aspect = 1,
+  outputSize,
   onClose,
   onConfirm,
 }) {
@@ -17,38 +36,70 @@ export function ImageCropModal({
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
+  const cropPixelsRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+    cropPixelsRef.current = null;
+    setError("");
+    setProcessing(false);
+  }, [open, imageSrc]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKeyDown(event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!processing) onClose?.();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [open, onClose, processing]);
 
   const onCropComplete = useCallback((_croppedArea, croppedPixels) => {
+    cropPixelsRef.current = croppedPixels;
     setCroppedAreaPixels(croppedPixels);
   }, []);
 
   async function handleConfirm() {
-    if (!croppedAreaPixels || !imageSrc) return;
+    if (!imageSrc || processing) return;
 
     setProcessing(true);
     setError("");
     try {
-      const file = await getCroppedImageFile(imageSrc, croppedAreaPixels, fileName);
+      const pixels = cropPixelsRef.current || croppedAreaPixels || (await getFallbackSquareCrop(imageSrc));
+      if (!pixels?.width || !pixels?.height) {
+        throw new Error("Crop is not ready yet. Move the image slightly, then try again.");
+      }
+      const file = await getCroppedImageFile(imageSrc, pixels, fileName, { outputSize });
       await onConfirm(file);
     } catch (err) {
       setError(err.message ?? "Could not crop image.");
-    } finally {
       setProcessing(false);
     }
   }
 
-  if (!open || !imageSrc) return null;
+  function handleCancel() {
+    if (processing) return;
+    onClose?.();
+  }
 
-  return (
+  if (!open || !imageSrc || typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="admin-modal fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-[200] flex items-end justify-center p-0 sm:items-center sm:p-4"
       role="presentation"
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/55"
-        aria-label="Close crop dialog"
-        onClick={onClose}
+      <div
+        className="absolute inset-0 bg-black/60"
+        aria-hidden
+        onClick={handleCancel}
       />
 
       <div
@@ -56,19 +107,21 @@ export function ImageCropModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="image-crop-title"
+        onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-4 sm:px-5">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-4 sm:px-5">
           <div className="min-w-0">
             <h2 id="image-crop-title" className="font-display text-lg font-semibold text-[var(--admin-fg)]">
               {title}
             </h2>
-            {subtitle ? <p className="admin-caption mt-1">{subtitle}</p> : null}
+            {subtitle ? <p className="mt-1 text-sm text-[var(--admin-fg-muted)]">{subtitle}</p> : null}
           </div>
           <button
             type="button"
             className="rounded-lg p-2 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]"
-            aria-label="Close"
-            onClick={onClose}
+            aria-label="Close crop dialog"
+            disabled={processing}
+            onClick={handleCancel}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -110,15 +163,16 @@ export function ImageCropModal({
           </label>
         </div>
 
-        <div className="flex flex-col-reverse gap-2 border-t border-[var(--admin-border)] px-4 py-4 sm:flex-row sm:justify-end sm:px-5">
-          <button type="button" className="btn-ghost w-full sm:w-auto" disabled={processing} onClick={onClose}>
-            Cancel
+        <div className="flex shrink-0 flex-col gap-2 border-t border-[var(--admin-border)] bg-[var(--admin-surface)] px-4 py-4 sm:flex-row sm:justify-end sm:px-5">
+          <button type="button" className="btn-ghost w-full sm:w-auto" disabled={processing} onClick={handleCancel}>
+            Back to form
           </button>
           <button type="button" className="btn-primary w-full sm:w-auto" disabled={processing} onClick={handleConfirm}>
-            {processing ? "Applying…" : "Apply crop"}
+            {processing ? "Adding…" : "Add image to form"}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

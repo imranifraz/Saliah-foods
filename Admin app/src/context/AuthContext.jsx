@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
       method: "POST",
       body: JSON.stringify({ email, password, rememberMe }),
     });
-    setRememberMePreference(rememberMe, email, password);
+    setRememberMePreference(rememberMe, email);
     setAuthSession({ token: data.token, refreshToken: data.refreshToken, rememberMe: data.rememberMe });
     setUser(data.user);
     setSessionExpired(false);

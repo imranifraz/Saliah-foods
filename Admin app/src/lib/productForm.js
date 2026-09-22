@@ -1,4 +1,14 @@
-export const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+import {
+  createEmptyProductStory,
+  highlightsToTextarea,
+  pairsToTextarea,
+  serializeProductStory,
+  storyFromProduct,
+  textareaToHighlights,
+  textareaToPairs,
+} from "./productStory.js";
+
+export const PRODUCT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 
 export function createVariant(overrides = {}) {
   return {
@@ -14,6 +24,23 @@ export function createVariant(overrides = {}) {
   };
 }
 
+function createEmptyStoryFields() {
+  const story = createEmptyProductStory();
+  return {
+    overview: "",
+    highlightsText: "100% natural\nNo added sugar\nCarefully packed",
+    ingredients: "",
+    nutritionEnabled: false,
+    nutritionText: "",
+    nutritionNote: story.nutritionNote,
+    origin: "",
+    storage: story.storage,
+    bestBefore: "",
+    important: "",
+    factsText: "",
+  };
+}
+
 export function createEmptyForm(categoryId = "dates") {
   return {
     name: "",
@@ -22,12 +49,12 @@ export function createEmptyForm(categoryId = "dates") {
     productType: "simple",
     status: "active",
     tagline: "",
-    fullDescription: "",
     tag: "",
     badge: "",
-    benefits: "Natural Energy",
     featured: false,
     isNew: false,
+    bogoEnabled: false,
+    ...createEmptyStoryFields(),
     existingImages: [],
     imageFiles: [],
     variants: [createVariant({ weight: "250g", packaging: "Pouch", isDefault: true })],
@@ -35,6 +62,38 @@ export function createEmptyForm(categoryId = "dates") {
 }
 
 export function mapProductToForm(product) {
+  const fromGallery = Array.isArray(product.images)
+    ? product.images.map((url) => String(url || "").trim()).filter(Boolean)
+    : [];
+  const cover = String(product.img || "").trim();
+  const existingImages = fromGallery.length
+    ? fromGallery
+    : cover
+      ? [cover]
+      : [];
+  const ordered =
+    cover && existingImages.includes(cover)
+      ? [cover, ...existingImages.filter((url) => url !== cover)]
+      : cover && !existingImages.includes(cover)
+        ? [cover, ...existingImages]
+        : existingImages;
+
+  const packSize =
+    product.packSize ||
+    product.variants?.[0]?.weight ||
+    product.variants?.[0]?.packSize ||
+    "";
+  const story = storyFromProduct({
+    fullDescription: product.fullDescription ?? "",
+    benefits: product.benefits,
+    name: product.name ?? "",
+    packSize,
+  });
+  // Net Weight is owned by variant/pack pricing fields — keep it out of the freeform facts box.
+  const factsForForm = (story.facts || []).filter(
+    (row) => !/^net\s*weight$/i.test(String(row.label || "").trim())
+  );
+
   return {
     name: product.name ?? "",
     slug: product.slug ?? "",
@@ -42,13 +101,23 @@ export function mapProductToForm(product) {
     productType: product.productType ?? "simple",
     status: product.status ?? "active",
     tagline: product.tagline ?? "",
-    fullDescription: product.fullDescription ?? "",
     tag: product.tag ?? "",
     badge: product.badge ?? "",
-    benefits: Array.isArray(product.benefits) ? product.benefits.join(", ") : "",
     featured: Boolean(product.featured),
     isNew: Boolean(product.isNew),
-    existingImages: Array.isArray(product.images) ? product.images : product.img ? [product.img] : [],
+    bogoEnabled: Boolean(product.bogoEnabled),
+    overview: story.overview,
+    highlightsText: highlightsToTextarea(story.highlights),
+    ingredients: story.ingredients,
+    nutritionEnabled: Array.isArray(story.nutrition) && story.nutrition.some((row) => row?.label && row?.value),
+    nutritionText: pairsToTextarea(story.nutrition),
+    nutritionNote: story.nutritionNote,
+    origin: story.origin,
+    storage: story.storage,
+    bestBefore: story.bestBefore,
+    important: story.important,
+    factsText: pairsToTextarea(factsForForm),
+    existingImages: ordered,
     imageFiles: [],
     variants:
       product.variants?.length > 0
@@ -68,13 +137,57 @@ export function mapProductToForm(product) {
   };
 }
 
+/** Build catalog fullDescription + benefits array from structured form fields. */
+export function buildStoryPayloadFromForm(form) {
+  const highlights = textareaToHighlights(form.highlightsText);
+  const nutritionEnabled = Boolean(form.nutritionEnabled);
+  const nutrition = nutritionEnabled ? textareaToPairs(form.nutritionText) : [];
+  const nutritionNote = nutritionEnabled ? form.nutritionNote : "";
+  const facts = textareaToPairs(form.factsText).filter(
+    (row) => !/^net\s*weight$/i.test(String(row.label || "").trim())
+  );
+
+  // Net Weight always comes from the pricing / variant pack labels.
+  const packWeights = (form.variants || [])
+    .map((variant) => String(variant.weight || "").trim())
+    .filter(Boolean);
+  const uniqueWeights = [...new Set(packWeights)];
+  const netWeight =
+    form.productType === "variant" && uniqueWeights.length > 1
+      ? uniqueWeights.join(" / ")
+      : uniqueWeights[0] || "";
+  if (netWeight) {
+    const productIdx = facts.findIndex((row) => /^product$/i.test(String(row.label || "").trim()));
+    const netRow = { label: "Net Weight", value: netWeight };
+    if (productIdx >= 0) facts.splice(productIdx + 1, 0, netRow);
+    else facts.splice(Math.min(1, facts.length), 0, netRow);
+  }
+
+  const fullDescription = serializeProductStory({
+    overview: form.overview,
+    highlights,
+    ingredients: form.ingredients,
+    nutrition,
+    nutritionNote,
+    origin: form.origin,
+    storage: form.storage,
+    bestBefore: form.bestBefore,
+    important: form.important,
+    facts,
+  });
+
+  return {
+    fullDescription,
+    benefits: highlights.length ? highlights : ["Natural Energy"],
+  };
+}
+
 export function slugifySkuPart(value) {
   return String(value ?? "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 }
-
 export function buildAutoSku({ categoryId, productName, weight }) {
   const parts = [
     slugifySkuPart(categoryId),
@@ -184,7 +297,7 @@ export function formatProductDate(iso) {
 export function validateProductImageFile(file) {
   if (!file) return { ok: false, error: "No file selected." };
   if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
-    return { ok: false, error: "Image must be 5 MB or smaller." };
+    return { ok: false, error: "Image must be 8 MB or smaller." };
   }
   if (!file.type.startsWith("image/")) {
     return { ok: true, warn: "This file may not be an image. Upload JPG, PNG, or WebP for best results." };

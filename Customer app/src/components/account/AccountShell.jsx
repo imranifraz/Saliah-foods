@@ -12,6 +12,7 @@ import { AccountWishlistSection } from "./AccountWishlistSection";
 import { AccountNotificationsSection } from "./AccountNotificationsSection";
 import { EmailVerificationBanner } from "../auth/EmailVerificationBanner";
 import { AccountSectionHeader } from "./AccountUI";
+import { useNotifications } from "../../context/NotificationsContext";
 
 const TABS = [
   { id: "personal", label: "Personal details" },
@@ -35,7 +36,7 @@ const TAB_DESCRIPTIONS = {
   personal: "Manage your contact information for orders, delivery updates, and account security.",
   password: "Keep your Saliah account secure with a strong, unique password.",
   passwordSocial: "Create a password to sign in with email in addition to your social account.",
-  orders: "Track deliveries, download invoices, and reorder your favourites.",
+  orders: "Track deliveries, download invoices, reorder favourites, and rate delivered products.",
   ordersEmpty: "View and track your Saliah orders.",
   addresses: "Manage delivery locations for faster checkout across India.",
   wishlist: "Curate the dates, honey, and preserves you love for later.",
@@ -48,6 +49,7 @@ export function AccountShell() {
   const { user, logout, emailVerified, resendVerificationEmail, hasPassword } = useAuth();
   const { count: wishlistCount } = useWishlist();
   const { orders, currentOrders } = useOrders();
+  const { unreadCount: notificationCount } = useNotifications();
 
   const tab = TABS.some((t) => t.id === searchParams.get("tab"))
     ? searchParams.get("tab")
@@ -111,7 +113,13 @@ export function AccountShell() {
           <div className="account-layout">
             <aside className="account-layout__nav">
               <div className="account-layout__nav-inner">
-                <AccountSidebar tabs={TABS} activeTab={tab} onSelect={setTab} wishlistCount={wishlistCount} />
+                <AccountSidebar
+                  tabs={TABS}
+                  activeTab={tab}
+                  onSelect={setTab}
+                  wishlistCount={wishlistCount}
+                  notificationCount={notificationCount}
+                />
               </div>
             </aside>
 

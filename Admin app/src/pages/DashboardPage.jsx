@@ -164,12 +164,36 @@ export function DashboardPage() {
   const [analyticsRange, setAnalyticsRange] = useState("month");
   const [analyticsGroupBy, setAnalyticsGroupBy] = useState("day");
   const [error, setError] = useState("");
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
-    apiFetch("/api/admin/dashboard")
-      .then(setData)
-      .catch((e) => setError(e.message));
-  }, []);
+    let cancelled = false;
+    let attempt = 0;
+
+    async function loadDashboard() {
+      setError("");
+      try {
+        const res = await apiFetch("/api/admin/dashboard");
+        if (!cancelled) setData(res);
+      } catch (e) {
+        attempt += 1;
+        // Retry a few times — first paint often races backend/proxy startup.
+        if (!cancelled && attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+          if (!cancelled) return loadDashboard();
+        }
+        if (!cancelled) {
+          setData(null);
+          setError(e.message || "Request failed");
+        }
+      }
+    }
+
+    loadDashboard();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,13 +211,26 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [analyticsRange, analyticsGroupBy]);
+  }, [analyticsRange, analyticsGroupBy, reloadToken]);
 
   if (error) {
     return (
-      <p className="rounded-xl border border-[color-mix(in_srgb,var(--admin-danger)_40%,transparent)] bg-[var(--admin-danger-bg)] px-4 py-3 text-sm font-medium text-[var(--admin-danger)]">
-        {error}
-      </p>
+      <div className="space-y-3">
+        <p className="rounded-xl border border-[color-mix(in_srgb,var(--admin-danger)_40%,transparent)] bg-[var(--admin-danger-bg)] px-4 py-3 text-sm font-medium text-[var(--admin-danger)]">
+          {error}
+        </p>
+        <button
+          type="button"
+          className="btn-primary text-xs"
+          onClick={() => {
+            setError("");
+            setData(null);
+            setReloadToken((value) => value + 1);
+          }}
+        >
+          Retry dashboard
+        </button>
+      </div>
     );
   }
 

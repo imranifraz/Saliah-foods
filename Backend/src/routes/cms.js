@@ -3,6 +3,8 @@ import { prisma } from "../lib/prisma.js";
 import { formatHomeCmsPage } from "../lib/home-cms.js";
 import { formatContactCmsPage } from "../lib/contactCms.js";
 import { formatFaqCmsPage } from "../lib/faqCms.js";
+import { formatSourcingCmsPage } from "../lib/sourcingCms.js";
+import { formatLegacyCmsPage } from "../lib/legacyCms.js";
 
 const router = Router();
 
@@ -44,7 +46,11 @@ router.get("/pages/:slug", async (req, res, next) => {
         ? formatContactCmsPage(page)
         : page.slug === "faq" || page.pageType === "faq"
           ? formatFaqCmsPage(page)
-          : page;
+          : page.slug === "sourcing-quality"
+            ? formatSourcingCmsPage(page)
+            : page.slug === "our-legacy" || page.slug === "about-us" || page.pageType === "legacy"
+              ? formatLegacyCmsPage(page)
+              : page;
     res.json({ ok: true, page: formatted });
   } catch (err) {
     next(err);

@@ -1,54 +1,37 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api.js";
 import { AdminModalLayout } from "./AdminModalLayout.jsx";
-import { ProductForm, mapProductToForm } from "./ProductForm.jsx";
 import { ViewProductPanel, ProductVariantsPanel } from "./ViewProductPanel.jsx";
 import { LoadingState } from "./ui/LoadingState.jsx";
 
+/**
+ * Product details / prices modal.
+ * Edit always goes through /products/:id/edit (ProductEditPage + ProductForm) — not a second form here.
+ */
 export function ProductManageModal({
   open,
   productId,
   mode = "view",
-  categories,
+  categories = [],
   onClose,
   onUpdated,
+  onModeChange,
 }) {
   const [product, setProduct] = useState(null);
-  const [currentMode, setCurrentMode] = useState(mode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [formBusy, setFormBusy] = useState(false);
-  const openedInEditModeRef = useRef(false);
   const loadTokenRef = useRef(0);
-  const prevOpenRef = useRef(false);
-  const prevProductIdRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) {
-      prevOpenRef.current = false;
-      return;
-    }
-
-    const justOpened = !prevOpenRef.current;
-    const productChanged = productId != null && productId !== prevProductIdRef.current;
-
-    if (justOpened || productChanged) {
-      setCurrentMode(mode);
-      openedInEditModeRef.current = mode === "edit";
-    }
-
-    prevOpenRef.current = true;
-    prevProductIdRef.current = productId;
-  }, [open, productId, mode]);
-
-  useEffect(() => {
-    if (currentMode !== "edit") setFormBusy(false);
-  }, [currentMode, productId]);
 
   useEffect(() => {
     if (!open || !productId) {
       setProduct(null);
       setError("");
+      return;
+    }
+
+    // Edit is a dedicated page — hand off immediately (same ProductForm as listing Edit).
+    if (mode === "edit") {
+      onModeChange?.("edit");
       return;
     }
 
@@ -70,39 +53,23 @@ export function ProductManageModal({
         if (loadToken !== loadTokenRef.current) return;
         setLoading(false);
       });
-  }, [open, productId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid loops from inline onModeChange
+  }, [open, productId, mode]);
 
   if (!open) return null;
+  if (mode === "edit") return null;
 
-  const isEdit = currentMode === "edit";
-  const isPrices = currentMode === "prices";
-  const title = isEdit ? "Edit product" : isPrices ? "Variant prices" : "Product details";
-  const subtitle = isEdit
-    ? "Update catalog information, images, and variants."
-    : isPrices
-      ? product?.name ?? "Review selling price and MRP for each variant."
-      : "Review catalog information, variants, and stock.";
+  const isPrices = mode === "prices";
+  const title = isPrices ? "Variant prices" : "Product details";
+  const subtitle = isPrices
+    ? product?.name ?? "Review selling price and MRP for each variant."
+    : "Review catalog information, variants, and stock.";
 
-  function handleEnterEditMode() {
-    setCurrentMode("edit");
+  function handleEnterEditMode(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    onModeChange?.("edit");
   }
-
-  function handleCancelEdit() {
-    if (openedInEditModeRef.current) {
-      onClose();
-      return;
-    }
-    setCurrentMode("view");
-  }
-
-  function handleEditSuccess(updatedProduct) {
-    setProduct(updatedProduct);
-    setCurrentMode("view");
-    setFormBusy(false);
-    onUpdated?.();
-  }
-
-  const editFormId = product ? `edit-product-form-${product.id}` : "edit-product-form";
 
   return (
     <AdminModalLayout
@@ -120,21 +87,7 @@ export function ProductManageModal({
               Close
             </button>
           </div>
-        ) : product && isEdit ? (
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={handleCancelEdit}
-              className="btn-ghost w-full sm:w-auto"
-              disabled={formBusy}
-            >
-              Cancel
-            </button>
-            <button type="submit" form={editFormId} className="btn-primary w-full sm:w-auto" disabled={formBusy}>
-              {formBusy ? "Saving…" : "Save product"}
-            </button>
-          </div>
-        ) : product && !isEdit ? (
+        ) : product ? (
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" onClick={onClose} className="btn-ghost w-full sm:w-auto">
               Close
@@ -150,16 +103,6 @@ export function ProductManageModal({
         <LoadingState label="Loading product…" />
       ) : error && !product ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      ) : product && isEdit ? (
-        <ProductForm
-          key={`${product.id}-edit`}
-          formId={editFormId}
-          productId={product.id}
-          initial={mapProductToForm(product)}
-          categories={categories}
-          onBusyChange={setFormBusy}
-          onSuccess={handleEditSuccess}
-        />
       ) : product && isPrices ? (
         <ProductVariantsPanel product={product} showStock={false} />
       ) : product ? (

@@ -10,6 +10,7 @@ import {
 } from "../lib/phone.js";
 import { resolveAdminMediaUrl } from "../lib/mediaUrl.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { ChangePasswordModal } from "../components/ChangePasswordModal.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
@@ -174,6 +175,7 @@ function ProfileField({ label, value, icon }) {
 }
 
 export function AdminProfilePage() {
+  const toast = useAdminToast();
   const { user: sessionUser, refresh } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
@@ -233,8 +235,10 @@ export function AdminProfilePage() {
     try {
       const upload = await uploadAdminAvatar(file);
       await updateAvatar(upload.url);
+      toast.success("Profile photo updated");
     } catch (err) {
       setError(err.message ?? "Could not upload profile photo");
+      toast.error("Could not upload photo", err.message);
     } finally {
       setAvatarUploading(false);
     }
@@ -245,8 +249,10 @@ export function AdminProfilePage() {
     setAvatarUploading(true);
     try {
       await updateAvatar("");
+      toast.success("Profile photo removed");
     } catch (err) {
       setError(err.message ?? "Could not remove profile photo");
+      toast.error("Could not remove photo", err.message);
     } finally {
       setAvatarUploading(false);
     }
@@ -301,8 +307,10 @@ export function AdminProfilePage() {
       setIsEditing(false);
       setSearchParams({}, { replace: true });
       await refresh();
+      toast.success("Profile updated");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not update profile", err.message);
     } finally {
       setSaving(false);
     }

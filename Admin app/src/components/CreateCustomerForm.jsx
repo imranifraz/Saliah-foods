@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiFetch } from "../lib/api.js";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 function emptyForm() {
   return {
@@ -11,6 +12,7 @@ function emptyForm() {
 }
 
 export function CreateCustomerForm({ onCancel, onSuccess }) {
+  const toast = useAdminToast();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -25,9 +27,11 @@ export function CreateCustomerForm({ onCancel, onSuccess }) {
         method: "POST",
         body: JSON.stringify(form),
       });
+      toast.success("Customer created");
       onSuccess?.();
     } catch (err) {
       setError(err.message);
+      toast.error("Could not create customer", err.message);
     } finally {
       setSaving(false);
     }

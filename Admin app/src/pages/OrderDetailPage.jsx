@@ -1,42 +1,43 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { StatusBadge } from "../components/ui/StatusBadge.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import { ConfirmDialog } from "../components/ConfirmDialog.jsx";
+import { OrderStatusTimeline } from "../components/OrderStatusTimeline.jsx";
+import { ORDER_STATUS_LABELS } from "../lib/orderStatus.js";
 import {
   formatPaymentDateTime,
   formatRefundAmount,
   getRefundDetails,
 } from "../utils/paymentRefund.js";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
-const STATUSES = [
-  "placed",
-  "confirmed",
-  "packed",
-  "shipped",
-  "out_for_delivery",
-  "delivered",
-  "cancelled",
-];
+const STATUSES = Object.keys(ORDER_STATUS_LABELS);
 
 export function OrderDetailPage() {
+  const toast = useAdminToast();
   const { id } = useParams();
+  const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [status, setStatus] = useState("");
-  const [trackingNote, setTrackingNote] = useState("");
+  const [statusNote, setStatusNote] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     apiFetch(`/api/admin/orders/${id}`)
       .then((d) => {
         setOrder(d.order);
         setStatus(d.order.status);
-        setTrackingNote(d.order.trackingNote ?? "");
+        setStatusNote("");
         setCancelReason(d.order.cancelReason ?? "");
       })
       .catch((e) => setError(e.message));
@@ -53,8 +54,10 @@ export function OrderDetailPage() {
     try {
       const d = await apiFetch(`/api/admin/orders/${id}/payment/mark-paid`, { method: "PATCH" });
       setOrder(d.order);
+      toast.success("Payment marked received");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not mark payment", err.message);
     } finally {
       setMarkingPaid(false);
     }
@@ -64,16 +67,42 @@ export function OrderDetailPage() {
     e.preventDefault();
     setError("");
     setSaved(false);
+    setSaving(true);
     try {
       const d = await apiFetch(`/api/admin/orders/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status, trackingNote, cancelReason }),
+        body: JSON.stringify({
+          status,
+          cancelReason,
+          ...(status !== order.status ? { trackingNote: statusNote.trim() } : {}),
+        }),
       });
       setOrder(d.order);
       setStatus(d.order.status);
+      setStatusNote("");
+      setCancelReason(d.order.cancelReason ?? "");
       setSaved(true);
+      toast.success("Order status updated");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not update order", err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setError("");
+    setDeleting(true);
+    try {
+      await apiFetch(`/api/admin/orders/${id}`, { method: "DELETE" });
+      toast.success("Order deleted");
+      navigate("/orders");
+    } catch (err) {
+      setError(err.message ?? "Could not delete order");
+      toast.error("Could not delete order", err.message);
+      setDeleting(false);
+      setConfirmDelete(false);
     }
   }
 
@@ -97,15 +126,27 @@ export function OrderDetailPage() {
 
   return (
     <div>
-      <Link to="/orders" className="btn-ghost mb-2 inline-flex gap-1 px-0">
-        ← Back to orders
-      </Link>
-
       <PageHeader
         title={order.id}
         subtitle={`Placed ${new Date(order.createdAt).toLocaleString("en-IN")}`}
-        action={<StatusBadge status={order.status} />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={order.status} />
+            <button
+              type="button"
+              className="btn-ghost text-sm text-red-700 hover:bg-red-50"
+              disabled={deleting}
+              onClick={() => setConfirmDelete(true)}
+            >
+              Delete order
+            </button>
+          </div>
+        }
       />
+
+      {error ? (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <AdminCard title="Customer details">
@@ -213,18 +254,28 @@ export function OrderDetailPage() {
           </div>
         </AdminCard>
 
-        <AdminCard title="Update order">
+        <AdminCard
+          title="Fulfillment timeline"
+          subtitle="Same progress steps customers see, plus full status history"
+        >
+          <OrderStatusTimeline order={order} />
+        </AdminCard>
+
+        <AdminCard title="Update status">
           <form onSubmit={handleSave} className="space-y-5">
             <label className="block">
-              <span className="admin-label">Status</span>
+              <span className="admin-label">New status</span>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setSaved(false);
+                }}
                 className="admin-input"
               >
                 {STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {s.replace(/_/g, " ")}
+                    {ORDER_STATUS_LABELS[s]}
                   </option>
                 ))}
               </select>
@@ -242,13 +293,21 @@ export function OrderDetailPage() {
               </label>
             ) : null}
             <label className="block">
-              <span className="admin-label">Tracking note</span>
+              <span className="admin-label">Note for this update</span>
               <textarea
-                value={trackingNote}
-                onChange={(e) => setTrackingNote(e.target.value)}
+                value={statusNote}
+                onChange={(e) => setStatusNote(e.target.value)}
                 rows={3}
                 className="admin-input resize-none"
+                placeholder={
+                  status !== order.status
+                    ? `Optional — appears on the timeline when moving to “${ORDER_STATUS_LABELS[status]}”`
+                    : "Optional — leave blank, or change status to add a timeline note"
+                }
               />
+              <span className="mt-1.5 block text-xs text-[var(--admin-fg-faint)]">
+                Notes are saved on the status history timeline when the status changes.
+              </span>
             </label>
             {status === "cancelled" && order.status !== "cancelled" ? (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -256,16 +315,28 @@ export function OrderDetailPage() {
                 when the customer cancels before packed.
               </p>
             ) : null}
+            {status !== order.status ? (
+              <p className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-hover)] px-3 py-2 text-sm text-[var(--admin-fg-muted)]">
+                Moving from{" "}
+                <span className="font-medium text-[var(--admin-fg)]">
+                  {ORDER_STATUS_LABELS[order.status] ?? order.status}
+                </span>{" "}
+                →{" "}
+                <span className="font-medium text-[var(--admin-fg)]">
+                  {ORDER_STATUS_LABELS[status] ?? status}
+                </span>
+              </p>
+            ) : null}
             {error && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
             )}
             {saved && (
               <p className="rounded-lg bg-emerald-800/10 px-3 py-2 text-sm text-emerald-800">
-                Changes saved successfully.
+                Status timeline updated.
               </p>
             )}
-            <button type="submit" className="btn-primary">
-              Save changes
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? "Saving…" : "Update status"}
             </button>
           </form>
         </AdminCard>
@@ -277,16 +348,31 @@ export function OrderDetailPage() {
             <li key={item.id} className="flex items-center justify-between py-4 text-sm">
               <div>
                 <p className="font-medium text-emerald-900">{item.name}</p>
-                <p className="text-emerald-900/50">Qty {item.quantity}</p>
+                <p className="text-emerald-900/50">
+                  Qty {item.quantity}
+                  {item.bogoApplied ? " · Buy 1 Get 1 Free" : ""}
+                  {item.packSize ? ` · ${item.packSize}` : ""}
+                </p>
               </div>
               <span className="font-medium">
-                ₹{(item.priceValue * item.quantity).toLocaleString("en-IN")}
+                ₹
+                {(
+                  item.lineTotal != null
+                    ? item.lineTotal
+                    : Math.max(0, item.priceValue * item.quantity - (item.lineDiscount ?? 0))
+                ).toLocaleString("en-IN")}
               </span>
             </li>
           ))}
         </ul>
         <div className="gold-line my-4" />
-        <div className="flex justify-between text-sm">
+        {(order.discountTotal ?? 0) > 0 ? (
+          <div className="flex justify-between text-sm text-emerald-800">
+            <span>Offer savings</span>
+            <span>−₹{order.discountTotal.toLocaleString("en-IN")}</span>
+          </div>
+        ) : null}
+        <div className="mt-1 flex justify-between text-sm">
           <span className="text-emerald-900/55">Subtotal</span>
           <span>₹{order.subtotal.toLocaleString("en-IN")}</span>
         </div>
@@ -299,6 +385,19 @@ export function OrderDetailPage() {
           <span>₹{order.total.toLocaleString("en-IN")}</span>
         </div>
       </AdminCard>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete order?"
+        description={`Permanently delete ${order.id}? Reserved stock for open orders will be released. This cannot be undone.`}
+        confirmLabel="Delete order"
+        danger
+        loading={deleting}
+        onClose={() => {
+          if (!deleting) setConfirmDelete(false);
+        }}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

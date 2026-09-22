@@ -76,9 +76,20 @@ export async function syncProductSummary(prisma, productId) {
   if (!product) return null;
 
   const summary = buildProductSummary(product, product.variants);
+  // Keep gallery order from the product row; only refresh derived pricing/stock fields.
+  // Prefer images[] written by the last PATCH — never let an empty variant img wipe the gallery.
   return prisma.product.update({
     where: { id: product.id },
-    data: summary,
+    data: {
+      catalogId: summary.catalogId,
+      img: (summary.images?.[0] || summary.img || product.img) ?? product.img,
+      images: summary.images?.length ? summary.images : product.images,
+      packSize: summary.packSize || null,
+      packaging: summary.packaging,
+      priceValue: summary.priceValue,
+      mrpValue: summary.mrpValue,
+      inStock: summary.inStock,
+    },
     include: {
       variants: {
         orderBy: [{ isDefault: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],

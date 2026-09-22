@@ -6,6 +6,7 @@ import {
   maskRazorpayKeyId,
   resolveRazorpayKeySecret,
 } from "../../lib/razorpay.js";
+import { normalizeShippingSettings } from "../../lib/shippingSettings.js";
 import { requireAdmin } from "../../middleware/admin.js";
 
 const router = Router();
@@ -22,13 +23,13 @@ router.get("/", async (_req, res, next) => {
 
     const settingsMap = Object.fromEntries(settings.map((s) => [s.key, s.value]));
     const [razorpay, gst] = await Promise.all([getRazorpaySettings(), getGstSettings()]);
+    const shipping = normalizeShippingSettings(settingsMap.shipping);
 
     res.json({
       ok: true,
       methods,
       store: {
-        freeShippingThreshold: settingsMap.shipping?.freeShippingThreshold ?? 999,
-        shippingFee: settingsMap.shipping?.shippingFee ?? 99,
+        ...shipping,
         codEnabled: settingsMap.checkout?.codEnabled ?? true,
       },
       gst,
@@ -170,24 +171,37 @@ router.put("/gst", async (req, res, next) => {
 
 router.put("/store", async (req, res, next) => {
   try {
-    const { freeShippingThreshold, shippingFee, codEnabled } = req.body;
+    const {
+      freeShippingThreshold,
+      shippingFee,
+      codEnabled,
+      promoBarEnabled,
+      promoBarMessage,
+      promoBarHref,
+    } = req.body;
 
-    if (freeShippingThreshold !== undefined || shippingFee !== undefined) {
+    const shippingTouched =
+      freeShippingThreshold !== undefined ||
+      shippingFee !== undefined ||
+      promoBarEnabled !== undefined ||
+      promoBarMessage !== undefined ||
+      promoBarHref !== undefined;
+
+    if (shippingTouched) {
+      const existing = await prisma.storeSetting.findUnique({ where: { key: "shipping" } });
+      const nextShipping = normalizeShippingSettings({
+        ...(existing?.value && typeof existing.value === "object" ? existing.value : {}),
+        ...(freeShippingThreshold !== undefined ? { freeShippingThreshold } : {}),
+        ...(shippingFee !== undefined ? { shippingFee } : {}),
+        ...(promoBarEnabled !== undefined ? { promoBarEnabled } : {}),
+        ...(promoBarMessage !== undefined ? { promoBarMessage } : {}),
+        ...(promoBarHref !== undefined ? { promoBarHref } : {}),
+      });
+
       await prisma.storeSetting.upsert({
         where: { key: "shipping" },
-        create: {
-          key: "shipping",
-          value: {
-            freeShippingThreshold: Number(freeShippingThreshold ?? 999),
-            shippingFee: Number(shippingFee ?? 99),
-          },
-        },
-        update: {
-          value: {
-            freeShippingThreshold: Number(freeShippingThreshold ?? 999),
-            shippingFee: Number(shippingFee ?? 99),
-          },
-        },
+        create: { key: "shipping", value: nextShipping },
+        update: { value: nextShipping },
       });
     }
 
@@ -199,7 +213,18 @@ router.put("/store", async (req, res, next) => {
       });
     }
 
-    res.json({ ok: true });
+    const [shippingRow, checkoutRow] = await Promise.all([
+      prisma.storeSetting.findUnique({ where: { key: "shipping" } }),
+      prisma.storeSetting.findUnique({ where: { key: "checkout" } }),
+    ]);
+
+    res.json({
+      ok: true,
+      store: {
+        ...normalizeShippingSettings(shippingRow?.value),
+        codEnabled: checkoutRow?.value?.codEnabled ?? true,
+      },
+    });
   } catch (err) {
     next(err);
   }

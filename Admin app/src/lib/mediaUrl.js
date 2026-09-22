@@ -25,6 +25,10 @@ function toPathname(value) {
     trimmed.startsWith("data:") ||
     trimmed.startsWith("blob:")
   ) {
+    // Keep blob:/data: URLs intact for local previews — only normalize http(s) to pathname.
+    if (trimmed.startsWith("blob:") || trimmed.startsWith("data:")) {
+      return trimmed;
+    }
     try {
       const { pathname } = new URL(trimmed);
       return pathname || "";
@@ -50,8 +54,21 @@ function toPathname(value) {
 export function resolveAdminMediaUrl(url) {
   if (url == null || url === "") return "";
 
-  const path = normalizeAssetExtension(toPathname(url));
+  const raw = String(url).trim();
+  if (raw.startsWith("blob:") || raw.startsWith("data:")) return raw;
+
+  let path = toPathname(url);
   if (!path) return "";
+
+  // Prefer WebP for catalog shots only — keep brand logo PNGs as-is.
+  const isBrandLogo =
+    /\/(?:assets\/)?(?:saliah-foods-logo|application-logo|application-logo-white|application-dark-logo)(?:[-.].*)?$/i.test(
+      path
+    ) || /logo.*\.png$/i.test(path);
+
+  if (!isBrandLogo) {
+    path = normalizeAssetExtension(path);
+  }
 
   if (path.startsWith("/uploads/")) {
     return API_BASE ? `${API_BASE}${path}` : path;
@@ -59,6 +76,11 @@ export function resolveAdminMediaUrl(url) {
 
   if (path.startsWith("/assets/")) {
     return API_BASE ? `${API_BASE}${path}` : path;
+  }
+
+  // Admin static public files (e.g. /saliah-foods-logo.png)
+  if (path.startsWith("/saliah-")) {
+    return path;
   }
 
   return API_BASE ? `${API_BASE}${path}` : path;

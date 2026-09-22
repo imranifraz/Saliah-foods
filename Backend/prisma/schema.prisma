@@ -152,6 +152,7 @@ model Product {
   featured        Boolean         @default(false)
   isNew           Boolean         @default(false)
   isBestSeller    Boolean         @default(false)
+  bogoEnabled     Boolean         @default(false)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   reviews         Review[]
@@ -215,41 +216,45 @@ enum OrderStatus {
 }
 
 model Order {
-  id            String      @id
-  userId        String?
-  status        OrderStatus @default(placed)
-  subtotal      Int
-  shipping      Int
-  total         Int
-  gstAmount     Int?
-  gstLabel      String?
-  paymentMethod String
-  cancelReason  String?
-  trackingNote  String      @default("")
-  customer      Json
-  statusHistory Json        @default("[]")
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  items         OrderItem[]
-  reviews       Review[]
+  id             String      @id
+  userId         String?
+  status         OrderStatus @default(placed)
+  subtotal       Int
+  shipping       Int
+  total          Int
+  discountTotal  Int         @default(0)
+  appliedOffers  Json?
+  gstAmount      Int?
+  gstLabel       String?
+  paymentMethod  String
+  cancelReason   String?
+  trackingNote   String      @default("")
+  customer       Json
+  statusHistory  Json        @default("[]")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  reviews        Review[]
 }
 
 model OrderItem {
-  id          String @id @default(cuid())
-  orderId     String
-  productId   String?
-  variantId   String?
-  sku         String?
-  productSlug String
-  name        String
-  img         String
-  packSize    String?
-  priceValue  Int
-  mrpValue    Int?
-  quantity    Int
-  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  review      Review?
+  id           String  @id @default(cuid())
+  orderId      String
+  productId    String?
+  variantId    String?
+  sku          String?
+  productSlug  String
+  name         String
+  img          String
+  packSize     String?
+  priceValue   Int
+  mrpValue     Int?
+  quantity     Int
+  lineDiscount Int     @default(0)
+  bogoApplied  Boolean @default(false)
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  review       Review?
 }
 
 model Review {
@@ -349,6 +354,19 @@ model ContactMessage {
 
   @@index([createdAt])
   @@index([readAt, createdAt])
+}
+
+model NewsletterSubscriber {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  source         String    @default("website")
+  status         String    @default("active")
+  unsubscribedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([createdAt])
+  @@index([status, createdAt])
 }
 
 model PaymentMethod {

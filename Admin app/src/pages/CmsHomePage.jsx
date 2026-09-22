@@ -1,23 +1,103 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../lib/api.js";
+import { getCustomerStoreUrl } from "../config/adminApps.js";
 import { cmsImageSrc, uploadCmsImage, uploadCmsImages } from "../lib/cmsUpload.js";
+import { useSiteBrand } from "../context/SiteBrandContext.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import { RichTextEditor } from "../components/RichTextEditor.jsx";
 
 function newId(prefix) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
 }
 
-function ImagePreview({ src, alt, className = "" }) {
+function isVideoUrl(url = "") {
+  return /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(String(url));
+}
+
+function MediaPreview({ src, type, alt, className = "" }) {
   if (!src) return null;
+  const resolved = cmsImageSrc(src);
+  const isVideo = type === "video" || isVideoUrl(src);
+  if (isVideo) {
+    return (
+      <video
+        src={resolved}
+        className={`rounded-xl border border-emerald-900/10 object-cover ${className}`}
+        muted
+        playsInline
+        preload="metadata"
+        aria-label={alt || "Video preview"}
+      />
+    );
+  }
   return (
     <img
-      src={cmsImageSrc(src)}
+      src={resolved}
       alt={alt}
       className={`rounded-xl border border-emerald-900/10 object-cover ${className}`}
     />
+  );
+}
+
+function ImagePreview({ src, alt, className = "" }) {
+  return <MediaPreview src={src} alt={alt} className={className} />;
+}
+
+function MediaUploadField({ label, value, type = "image", onChange, hint }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const data = await uploadCmsImage(file);
+      const nextType = data.mediaType || data.kind || (file.type?.startsWith("video/") ? "video" : "image");
+      onChange({ url: data.url, type: nextType });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <span className="admin-label">{label}</span>
+      {hint ? <p className="text-xs text-emerald-900/45">{hint}</p> : null}
+      <MediaPreview src={value} type={type} alt="" className="h-28 w-full max-w-xs" />
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="btn-ghost cursor-pointer text-xs">
+          {uploading ? "Uploading…" : "Upload image or video"}
+          <input
+            type="file"
+            accept="image/*,video/mp4,video/webm,video/quicktime"
+            className="sr-only"
+            onChange={handleFile}
+            disabled={uploading}
+          />
+        </label>
+        <input
+          value={value}
+          onChange={(e) =>
+            onChange({
+              url: e.target.value,
+              type: isVideoUrl(e.target.value) ? "video" : type || "image",
+            })
+          }
+          className="admin-input min-w-[220px] flex-1 text-xs"
+          placeholder="/uploads/cms/… (image or .mp4/.webm)"
+        />
+      </div>
+      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+    </div>
   );
 }
 
@@ -88,20 +168,36 @@ function ImageUploadField({ label, value, onChange, hint, multiple = false, onMu
   );
 }
 
+function moveBanner(slides, index, direction) {
+  const next = [...slides];
+  const target = index + direction;
+  if (target < 0 || target >= next.length) return slides;
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
+function emptyBanner() {
+  return { id: newId("banner"), type: "image", src: "", image: "", alt: "Saliah Foods banner", poster: "" };
+}
+
 function HeroBannersEditor({ banners, onChange }) {
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkError, setBulkError] = useState("");
   const slides = Array.isArray(banners) ? banners : [];
+  const mediaCount = slides.filter((b) => b.src || b.image).length;
 
   async function handleBulkUpload(files) {
     setBulkUploading(true);
     setBulkError("");
     try {
-      const urls = await uploadCmsImages(files);
-      const newSlides = urls.map((url, index) => ({
+      const uploaded = await uploadCmsImages(files);
+      const newSlides = uploaded.map((item, index) => ({
         id: newId("banner"),
-        image: url,
+        type: item.type,
+        src: item.url,
+        image: item.url,
         alt: `Saliah Foods banner ${slides.length + index + 1}`,
+        poster: "",
       }));
       onChange([...slides, ...newSlides]);
     } catch (err) {
@@ -111,25 +207,28 @@ function HeroBannersEditor({ banners, onChange }) {
     }
   }
 
+  function patchBanner(id, patch) {
+    onChange(slides.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  }
+
   return (
-    <div className="mt-8 space-y-4 border-t border-emerald-900/10 pt-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-medium text-emerald-900">Home banner images</p>
+          <p className="font-medium text-emerald-900">Hero banner media</p>
           <p className="mt-1 text-xs text-emerald-900/45">
-            Add one or many images. The customer home page shows them as a sliding banner with animation.
+            Upload images and/or videos. They rotate as a carousel on the customer home hero.
           </p>
           <p className="mt-1 text-xs font-medium text-emerald-800/60">
-            {slides.filter((b) => b.image).length} image{slides.filter((b) => b.image).length === 1 ? "" : "s"}{" "}
-            added
+            {mediaCount} item{mediaCount === 1 ? "" : "s"} added · images ~1920×1080 · videos MP4/WebM up to 50MB
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <label className="btn-primary cursor-pointer text-xs">
-            {bulkUploading ? "Uploading…" : "+ Upload multiple images"}
+            {bulkUploading ? "Uploading…" : "+ Upload media"}
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,video/mp4,video/webm,video/quicktime"
               multiple
               className="sr-only"
               disabled={bulkUploading}
@@ -144,23 +243,22 @@ function HeroBannersEditor({ banners, onChange }) {
           <button
             type="button"
             className="btn-ghost text-xs"
-            onClick={() =>
-              onChange([...slides, { id: newId("banner"), image: "", alt: "Saliah Foods banner" }])
-            }
+            onClick={() => onChange([...slides, emptyBanner()])}
           >
-            + Add one banner
+            + Add one slide
           </button>
         </div>
       </div>
 
-      {slides.some((b) => b.image) ? (
+      {mediaCount ? (
         <div className="flex flex-wrap gap-2">
           {slides
-            .filter((b) => b.image)
-            .map((banner, index) => (
-              <ImagePreview
+            .filter((b) => b.src || b.image)
+            .map((banner) => (
+              <MediaPreview
                 key={banner.id}
-                src={banner.image}
+                src={banner.src || banner.image}
+                type={banner.type}
                 alt=""
                 className="h-16 w-24 shrink-0"
               />
@@ -170,54 +268,84 @@ function HeroBannersEditor({ banners, onChange }) {
 
       {bulkError ? <p className="text-xs text-red-600">{bulkError}</p> : null}
 
-      {slides.map((banner, index) => (
-        <div
-          key={banner.id}
-          className="rounded-2xl border border-emerald-900/10 bg-cream-50/50 p-4 space-y-3"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-900/50">
-              Banner {index + 1}
-            </p>
-            <button
-              type="button"
-              className="text-xs text-red-600"
-              onClick={() => onChange(slides.filter((b) => b.id !== banner.id))}
-              disabled={slides.length <= 1}
-            >
-              Remove
-            </button>
-          </div>
-          <ImageUploadField
-            label="Banner image"
-            value={banner.image}
-            onChange={(url) =>
-              onChange(slides.map((b) => (b.id === banner.id ? { ...b, image: url } : b)))
-            }
-          />
-          <label className="block">
-            <span className="admin-label">Image description (accessibility)</span>
-            <input
-              value={banner.alt}
-              onChange={(e) =>
-                onChange(slides.map((b) => (b.id === banner.id ? { ...b, alt: e.target.value } : b)))
+      {slides.map((banner, index) => {
+        const src = banner.src || banner.image || "";
+        const type = banner.type || (isVideoUrl(src) ? "video" : "image");
+        return (
+          <div
+            key={banner.id}
+            className="space-y-3 rounded-2xl border border-emerald-900/10 bg-cream-50/50 p-4"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-900/50">
+                Banner {index + 1} · {type}
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="text-xs text-emerald-800/70 disabled:opacity-40"
+                  onClick={() => onChange(moveBanner(slides, index, -1))}
+                  disabled={index === 0}
+                >
+                  Move up
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-emerald-800/70 disabled:opacity-40"
+                  onClick={() => onChange(moveBanner(slides, index, 1))}
+                  disabled={index === slides.length - 1}
+                >
+                  Move down
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-red-600 disabled:opacity-40"
+                  onClick={() => onChange(slides.filter((b) => b.id !== banner.id))}
+                  disabled={slides.length <= 1}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+            <MediaUploadField
+              label="Banner image or video"
+              value={src}
+              type={type}
+              hint="Images: JPG/WebP ~1920×1080. Videos: MP4 or WebM, muted autoplay-friendly, under 50MB."
+              onChange={({ url, type: nextType }) =>
+                patchBanner(banner.id, {
+                  src: url,
+                  image: url,
+                  type: nextType,
+                })
               }
-              className="admin-input"
             />
-          </label>
-        </div>
-      ))}
+            <label className="block">
+              <span className="admin-label">Description (accessibility)</span>
+              <input
+                value={banner.alt || ""}
+                onChange={(e) => patchBanner(banner.id, { alt: e.target.value })}
+                className="admin-input"
+              />
+            </label>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 export function CmsHomePage() {
+  const toast = useAdminToast();
+  const { applySiteLogo, refresh: refreshSiteBrand } = useSiteBrand();
   const [published, setPublished] = useState(true);
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const customerUrl = getCustomerStoreUrl();
+  const liveHomeUrl = customerUrl || "";
 
   useEffect(() => {
     apiFetch("/api/admin/cms/home")
@@ -252,9 +380,13 @@ export function CmsHomePage() {
         method: "PUT",
         body: JSON.stringify({ published, content }),
       });
+      applySiteLogo(content?.siteLogo);
+      await refreshSiteBrand();
       setSaved(true);
+      toast.success("Home page saved");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not save home page", err.message);
     } finally {
       setSaving(false);
     }
@@ -266,14 +398,29 @@ export function CmsHomePage() {
 
   return (
     <div>
-      <Link to="/cms/pages" className="btn-ghost mb-2 inline-flex px-0">
-        ← Web content
-      </Link>
-
       <PageHeader
-        title="Homepage"
-        subtitle="Manage site logo, hero banners, our story, and testimonials shown on the customer home page."
+        title="Home Page"
+        subtitle="Manage static home content only: hero banners & copy, site logo, our story, and testimonials. Product and category sections stay in Product & Category Management."
+        action={
+          liveHomeUrl ? (
+            <a href={liveHomeUrl} target="_blank" rel="noreferrer" className="btn-ghost text-xs">
+              Open live home
+            </a>
+          ) : null
+        }
       />
+
+      <div className="mb-6 rounded-2xl border border-emerald-900/10 bg-emerald-900/[0.03] px-4 py-3 text-sm text-emerald-900/70">
+        Shop by category, premium dates, wellness products, and favourites pull from the catalog — edit those under{" "}
+        <Link to="/categories" className="font-medium text-emerald-900 underline-offset-2 hover:underline">
+          Categories
+        </Link>{" "}
+        and{" "}
+        <Link to="/products" className="font-medium text-emerald-900 underline-offset-2 hover:underline">
+          Products
+        </Link>
+        .
+      </div>
 
       <form onSubmit={handleSave} className="space-y-6">
         <AdminCard title="Publish">
@@ -293,12 +440,22 @@ export function CmsHomePage() {
             label="Logo image"
             value={content.siteLogo}
             onChange={(url) => patchContent("siteLogo", url)}
-            hint="Shown in the website header and footer."
+            hint="Updates the customer site header/footer and the admin panel logo together. Prefer a transparent PNG (~1024×333)."
           />
         </AdminCard>
 
         <AdminCard title="Hero section">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <p className="mb-6 text-sm text-emerald-900/55">
+            Control the first screen of the storefront: carousel images, headline, description, and buttons.
+          </p>
+
+          <HeroBannersEditor
+            banners={hero.banners}
+            onChange={(banners) => patchContent("hero.banners", banners)}
+          />
+
+          <div className="mt-8 grid gap-4 border-t border-emerald-900/10 pt-6 sm:grid-cols-2">
+            <p className="font-medium text-emerald-900 sm:col-span-2">Hero content</p>
             <label className="block sm:col-span-2">
               <span className="admin-label">Headline</span>
               <input
@@ -307,15 +464,18 @@ export function CmsHomePage() {
                 className="admin-input"
               />
             </label>
-            <label className="block sm:col-span-2">
-              <span className="admin-label">Description</span>
-              <textarea
+            <div className="block sm:col-span-2">
+              <span id="home-hero-subtitle-label" className="admin-label">
+                Description
+              </span>
+              <RichTextEditor
+                id="home-hero-subtitle"
+                labelId="home-hero-subtitle-label"
                 value={hero.subtitle}
-                onChange={(e) => patchContent("hero.subtitle", e.target.value)}
-                rows={3}
-                className="admin-input"
+                onChange={(subtitle) => patchContent("hero.subtitle", subtitle)}
+                minHeight={90}
               />
-            </label>
+            </div>
             <label className="block">
               <span className="admin-label">Primary button label</span>
               <input
@@ -369,11 +529,6 @@ export function CmsHomePage() {
               />
             </label>
           </div>
-
-          <HeroBannersEditor
-            banners={hero.banners}
-            onChange={(banners) => patchContent("hero.banners", banners)}
-          />
         </AdminCard>
 
         <AdminCard title="Our story section">
@@ -394,15 +549,18 @@ export function CmsHomePage() {
                 className="admin-input"
               />
             </label>
-            <label className="block sm:col-span-2">
-              <span className="admin-label">Paragraph</span>
-              <textarea
+            <div className="block sm:col-span-2">
+              <span id="home-story-body-label" className="admin-label">
+                Paragraph
+              </span>
+              <RichTextEditor
+                id="home-story-body"
+                labelId="home-story-body-label"
                 value={story.body}
-                onChange={(e) => patchContent("story.body", e.target.value)}
-                rows={4}
-                className="admin-input"
+                onChange={(body) => patchContent("story.body", body)}
+                minHeight={120}
               />
-            </label>
+            </div>
             <div className="sm:col-span-2">
               <ImageUploadField
                 label="Story image"
@@ -455,15 +613,18 @@ export function CmsHomePage() {
                 className="admin-input"
               />
             </label>
-            <label className="block sm:col-span-2">
-              <span className="admin-label">Section description</span>
-              <textarea
+            <div className="block sm:col-span-2">
+              <span id="home-testimonials-subtitle-label" className="admin-label">
+                Section description
+              </span>
+              <RichTextEditor
+                id="home-testimonials-subtitle"
+                labelId="home-testimonials-subtitle-label"
                 value={testimonials.subtitle}
-                onChange={(e) => patchContent("testimonials.subtitle", e.target.value)}
-                rows={2}
-                className="admin-input"
+                onChange={(subtitle) => patchContent("testimonials.subtitle", subtitle)}
+                minHeight={72}
               />
-            </label>
+            </div>
           </div>
 
           <div className="mt-6 space-y-4 border-t border-emerald-900/10 pt-6">
@@ -486,7 +647,7 @@ export function CmsHomePage() {
             {testimonials.items.map((item, index) => (
               <div
                 key={item.id}
-                className="rounded-2xl border border-emerald-900/10 bg-cream-50/50 p-4 space-y-3"
+                className="space-y-3 rounded-2xl border border-emerald-900/10 bg-cream-50/50 p-4"
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-emerald-900/50">
@@ -506,22 +667,22 @@ export function CmsHomePage() {
                     Remove
                   </button>
                 </div>
-                <label className="block">
+                <div>
                   <span className="admin-label">Quote</span>
-                  <textarea
+                  <RichTextEditor
+                    id={`home-testimonial-quote-${item.id}`}
                     value={item.quote}
-                    onChange={(e) =>
+                    onChange={(quote) =>
                       patchContent(
                         "testimonials.items",
                         testimonials.items.map((t) =>
-                          t.id === item.id ? { ...t, quote: e.target.value } : t
+                          t.id === item.id ? { ...t, quote } : t
                         )
                       )
                     }
-                    rows={3}
-                    className="admin-input"
+                    minHeight={90}
                   />
-                </label>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block">
                     <span className="admin-label">Name</span>
@@ -571,7 +732,7 @@ export function CmsHomePage() {
         ) : null}
 
         <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? "Saving…" : "Save homepage"}
+          {saving ? "Saving…" : "Save home page"}
         </button>
       </form>
     </div>

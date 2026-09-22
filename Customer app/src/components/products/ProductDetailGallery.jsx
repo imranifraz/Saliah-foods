@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { OptimizedImage } from "../ui/OptimizedImage";
 
 export function ProductDetailGallery({ images, productName, badge }) {
@@ -7,66 +7,113 @@ export function ProductDetailGallery({ images, productName, badge }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const active = images[activeIndex] ?? images[0];
   const isCloseup = active?.type === "closeup";
+  const total = images.length;
 
   useEffect(() => {
     setActiveIndex(0);
   }, [images]);
 
+  function go(delta) {
+    if (total < 2) return;
+    setActiveIndex((current) => (current + delta + total) % total);
+  }
+
   return (
-    <div className="flex flex-col gap-3">
+    <div className="pdp-gallery">
       <motion.div
-        initial={reduce ? false : { opacity: 0, y: 10 }}
+        initial={reduce ? false : { opacity: 0, y: 14 }}
         animate={reduce ? undefined : { opacity: 1, y: 0 }}
-        transition={{ duration: 0.45 }}
-        className="pdp-gallery-main group overflow-hidden rounded-2xl border border-cream-200/80 shadow-[0_10px_40px_rgba(22,49,42,0.08)]"
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="pdp-gallery-stage group"
       >
-        <div className="relative flex min-h-[26rem] items-center justify-center px-3 py-4 sm:min-h-[30rem] sm:px-5 sm:py-5 lg:min-h-[32rem]">
-          {badge ? (
-            <span className="absolute left-4 top-4 z-10 rounded-full border border-cream-200/80 bg-white/95 px-3 py-1 font-body text-[9px] font-medium uppercase tracking-[0.16em] text-emerald-800/65 shadow-sm">
-              {badge}
+        <div className="pdp-gallery-stage__glow" aria-hidden />
+        <div className="pdp-gallery-stage__frame" aria-hidden />
+
+        <div className="pdp-gallery-stage__canvas">
+          {badge ? <span className="pdp-gallery-badge">{badge}</span> : null}
+
+          {total > 1 ? (
+            <span className="pdp-gallery-count" aria-live="polite">
+              {String(activeIndex + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
             </span>
           ) : null}
 
-          <OptimizedImage
-            key={active?.id}
-            src={active?.src}
-            alt={active?.alt ?? productName}
-            className={`max-h-[28rem] max-w-[98%] object-contain drop-shadow-[0_24px_48px_rgba(22,49,42,0.18)] transition-transform duration-700 ease-out group-hover:scale-[1.04] sm:max-h-[30rem] lg:max-h-[31rem] ${
-              isCloseup ? "scale-[1.12] group-hover:scale-[1.16]" : ""
-            } ${active?.type === "lifestyle" ? "max-h-full w-full rounded-lg object-cover" : ""}`}
-            width={680}
-            height={680}
-          />
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={active?.id ?? activeIndex}
+              className="pdp-gallery-stage__image-wrap"
+              initial={reduce ? false : { opacity: 0, scale: 0.985 }}
+              animate={reduce ? undefined : { opacity: 1, scale: 1 }}
+              exit={reduce ? undefined : { opacity: 0, scale: 1.01 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <OptimizedImage
+                src={active?.src}
+                alt={active?.alt ?? productName}
+                className={`pdp-gallery-stage__image ${
+                  isCloseup ? "pdp-gallery-stage__image--closeup" : ""
+                } ${active?.type === "lifestyle" ? "pdp-gallery-stage__image--lifestyle" : ""}`}
+                width={720}
+                height={720}
+              />
+            </motion.div>
+          </AnimatePresence>
+
+          {total > 1 ? (
+            <>
+              <button
+                type="button"
+                className="pdp-gallery-nav pdp-gallery-nav--prev"
+                aria-label="Previous image"
+                onClick={() => go(-1)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="pdp-gallery-nav pdp-gallery-nav--next"
+                aria-label="Next image"
+                onClick={() => go(1)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </button>
+            </>
+          ) : null}
         </div>
       </motion.div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 sm:gap-2.5" role="tablist" aria-label="Product images">
-        {images.map((image, index) => (
-          <button
-            key={image.id}
-            type="button"
-            role="tab"
-            aria-selected={activeIndex === index}
-            aria-label={image.alt}
-            className={`pdp-gallery-thumb shrink-0 overflow-hidden rounded-xl border transition-all duration-300 ${
-              activeIndex === index
-                ? "border-emerald-900/25 bg-white shadow-[0_4px_16px_rgba(22,49,42,0.08)]"
-                : "border-cream-200/70 bg-white/60 hover:border-cream-200 hover:bg-white"
-            }`}
-            onClick={() => setActiveIndex(index)}
-          >
-            <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center bg-gradient-to-b from-cream-100/60 to-cream-50/30 p-1.5 sm:h-[5rem] sm:w-[5rem]">
-              <OptimizedImage
-                src={image.src}
-                alt=""
-                className={`max-h-full max-w-full object-contain ${image.type === "lifestyle" ? "h-full w-full object-cover rounded-md" : ""}`}
-                width={80}
-                height={80}
-              />
-            </div>
-          </button>
-        ))}
-      </div>
+      {total > 1 ? (
+        <div className="pdp-gallery-thumbs" role="tablist" aria-label="Product images">
+          {images.map((image, index) => {
+            const selected = activeIndex === index;
+            return (
+              <button
+                key={image.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-label={image.alt}
+                className={`pdp-gallery-thumb ${selected ? "pdp-gallery-thumb--active" : ""}`}
+                onClick={() => setActiveIndex(index)}
+              >
+                <OptimizedImage
+                  src={image.src}
+                  alt=""
+                  className={`pdp-gallery-thumb__img ${
+                    image.type === "lifestyle" ? "pdp-gallery-thumb__img--cover" : ""
+                  }`}
+                  width={96}
+                  height={96}
+                />
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -2,23 +2,7 @@ export const AUTH_TOKEN_KEY = "saliah-admin-token";
 export const AUTH_REFRESH_KEY = "saliah-admin-refresh";
 export const AUTH_REMEMBER_KEY = "saliah-admin-remember-me";
 export const AUTH_EMAIL_KEY = "saliah-admin-remember-email";
-export const AUTH_PASSWORD_KEY = "saliah-admin-remember-password";
-
-function encodeRememberedPassword(password) {
-  try {
-    return btoa(unescape(encodeURIComponent(password)));
-  } catch {
-    return "";
-  }
-}
-
-function decodeRememberedPassword(encoded) {
-  try {
-    return decodeURIComponent(escape(atob(encoded)));
-  } catch {
-    return "";
-  }
-}
+const LEGACY_AUTH_PASSWORD_KEY = "saliah-admin-remember-password";
 
 function readStoredValue(key) {
   try {
@@ -38,25 +22,25 @@ export function getRememberedEmail() {
 
 export function getRememberedCredentials() {
   if (!getRememberMePreference()) {
-    return { email: "", password: "" };
+    return { email: "" };
   }
 
   try {
+    // Never store passwords; clear any legacy value left from older builds.
+    localStorage.removeItem(LEGACY_AUTH_PASSWORD_KEY);
     const email = localStorage.getItem(AUTH_EMAIL_KEY) ?? "";
-    const encodedPassword = localStorage.getItem(AUTH_PASSWORD_KEY);
-    const password = encodedPassword ? decodeRememberedPassword(encodedPassword) : "";
-    return { email, password };
+    return { email };
   } catch {
-    return { email: "", password: "" };
+    return { email: "" };
   }
 }
 
-export function setRememberMePreference(rememberMe, email = "", password = "") {
+export function setRememberMePreference(rememberMe, email = "") {
   try {
+    localStorage.removeItem(LEGACY_AUTH_PASSWORD_KEY);
     if (rememberMe) {
       localStorage.setItem(AUTH_REMEMBER_KEY, "1");
       if (email) localStorage.setItem(AUTH_EMAIL_KEY, email.trim().toLowerCase());
-      if (password) localStorage.setItem(AUTH_PASSWORD_KEY, encodeRememberedPassword(password));
     } else {
       clearRememberedCredentials();
     }
@@ -69,7 +53,7 @@ export function clearRememberedCredentials() {
   try {
     localStorage.setItem(AUTH_REMEMBER_KEY, "0");
     localStorage.removeItem(AUTH_EMAIL_KEY);
-    localStorage.removeItem(AUTH_PASSWORD_KEY);
+    localStorage.removeItem(LEGACY_AUTH_PASSWORD_KEY);
   } catch {
     /* ignore storage errors */
   }
@@ -193,12 +177,26 @@ export async function apiFetch(path, options = {}, retry = true) {
   try {
     res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   } catch {
+    // First open often races backend/proxy warm-up (ECONNRESET) — retry once.
+    if (retry) {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      return apiFetch(path, options, false);
+    }
     const err = new Error("Cannot reach server. Is the backend running?");
     err.status = 0;
     throw err;
   }
 
+  // Vite proxy can return empty/HTML bodies on upstream reset — treat as retryable.
   const data = await res.json().catch(() => ({}));
+
+  if (
+    retry &&
+    (res.status === 502 || res.status === 503 || res.status === 504)
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    return apiFetch(path, options, false);
+  }
 
   if (res.status === 401 && retry && !path.includes("/api/admin/auth/login") && !path.includes("/api/admin/auth/refresh")) {
     const refreshed = await refreshAdminSessionOnce();

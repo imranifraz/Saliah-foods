@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { useNotifications } from "./notificationsCtx.js";
-import { isActiveOrder } from "../data/orders";
+import { isActiveOrder, isCancelledOrder, isPastOrder } from "../data/orders";
 import { cancelOrderApi, fetchOrdersApi } from "../services/orderApi.js";
 import { fetchMyReviewItemsApi, submitReviewApi } from "../services/reviewApi.js";
 
@@ -61,7 +61,11 @@ export function OrdersProvider({ children }) {
   const addOrder = useCallback(
     (order) => {
       setOrders((prev) => [order, ...prev.filter((entry) => entry.id !== order.id)]);
-      refreshNotifications();
+      try {
+        refreshNotifications();
+      } catch {
+        /* ignore */
+      }
       return order;
     },
     [refreshNotifications]
@@ -122,10 +126,8 @@ export function OrdersProvider({ children }) {
   );
 
   const currentOrders = useMemo(() => orders.filter(isActiveOrder), [orders]);
-  const pastOrders = useMemo(
-    () => orders.filter((o) => !isActiveOrder(o)),
-    [orders]
-  );
+  const pastOrders = useMemo(() => orders.filter(isPastOrder), [orders]);
+  const cancelledOrders = useMemo(() => orders.filter(isCancelledOrder), [orders]);
   const reviewItemsByOrderItemId = useMemo(
     () => Object.fromEntries(reviewItems.map((entry) => [entry.item.id, entry])),
     [reviewItems]
@@ -138,6 +140,7 @@ export function OrdersProvider({ children }) {
       orders,
       currentOrders,
       pastOrders,
+      cancelledOrders,
       loading,
       reviewItems,
       reviewItemsByOrderItemId,
@@ -153,6 +156,7 @@ export function OrdersProvider({ children }) {
       orders,
       currentOrders,
       pastOrders,
+      cancelledOrders,
       loading,
       reviewItems,
       reviewItemsByOrderItemId,

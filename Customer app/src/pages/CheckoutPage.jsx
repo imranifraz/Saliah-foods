@@ -29,12 +29,13 @@ import {
   verifyTestPaymentApi,
 } from "../services/paymentApi.js";
 import { trackPurchase } from "../lib/analytics.js";
+import { isEmailVerificationRequired } from "../lib/emailVerificationPolicy.js";
 
 export function CheckoutPage() {
   const navigate = useNavigate();
   const reduce = useReducedMotion();
   const { user, emailVerified, resendVerificationEmail } = useAuth();
-  const { items, subtotal, clearCart, closeCart } = useCart();
+  const { items, subtotal, discountTotal, clearCart, closeCart } = useCart();
   const { calcOrderBreakdown } = useGstSettings();
   const { addOrder } = useOrders();
   const { addresses, defaultAddress, addAddress, loading: addressesLoading } = useProfile();
@@ -42,7 +43,7 @@ export function CheckoutPage() {
   const [addressMode, setAddressMode] = useState("new");
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [newForm, setNewForm] = useState({ ...getEmptyCheckoutForm(), addressLabel: "" });
-  const [saveNewToProfile, setSaveNewToProfile] = useState(true);
+  const [saveNewToProfile, setSaveNewToProfile] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
@@ -79,13 +80,20 @@ export function CheckoutPage() {
   }, [addresses, defaultAddress, user, addressesLoading]);
 
   useEffect(() => {
-    fetchPaymentMethodsApi()
-      .then((data) => {
+    let cancelled = false;
+    let attempts = 0;
+
+    async function loadPaymentMethods() {
+      setPaymentMethodsLoading(true);
+      try {
+        const data = await fetchPaymentMethodsApi();
+        if (cancelled) return;
         const methods = data.methods ?? [];
         setPaymentMethods(methods);
         setPaymentMethod((current) => {
           if (current && methods.some((method) => method.id === current)) return current;
-          return methods[0]?.id ?? "";
+          // Prefer COD for reliable local testing when Razorpay keys are placeholders.
+          return methods.find((method) => method.id === "cod")?.id ?? methods[0]?.id ?? "";
         });
         setRazorpayConfigured(data.razorpayConfigured === true);
         setTestPaymentsAllowed(data.testPaymentsAllowed === true);
@@ -97,12 +105,24 @@ export function CheckoutPage() {
             shippingFee: Number(data.shipping.shippingFee ?? getDefaultShippingSettings().shippingFee),
           });
         }
-      })
-      .catch(() => {
+      } catch {
+        if (cancelled) return;
+        attempts += 1;
+        if (attempts < 3) {
+          window.setTimeout(loadPaymentMethods, 800 * attempts);
+          return;
+        }
         setPaymentMethods([]);
         setPaymentMethod("");
-      })
-      .finally(() => setPaymentMethodsLoading(false));
+      } finally {
+        if (!cancelled) setPaymentMethodsLoading(false);
+      }
+    }
+
+    loadPaymentMethods();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (items.length === 0 && !completedOrder) {
@@ -121,11 +141,6 @@ export function CheckoutPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!emailVerified) {
-      setErrors({ submit: "Verify your email before placing an order." });
-      return;
-    }
-
     const nextErrors = {};
 
     if (addressMode === "saved") {
@@ -134,7 +149,9 @@ export function CheckoutPage() {
       }
     } else {
       Object.assign(nextErrors, validateCheckoutForm({ ...newForm, paymentMethod }));
-      if (!newForm.addressLabel?.trim()) nextErrors.addressLabel = "Address label is required";
+      if (saveNewToProfile && !newForm.addressLabel?.trim()) {
+        nextErrors.addressLabel = "Address label is required when saving to profile";
+      }
     }
 
     if (!paymentMethod) nextErrors.paymentMethod = "Select a payment method";
@@ -145,6 +162,7 @@ export function CheckoutPage() {
     }
 
     let customer;
+    let addressSaveWarning = "";
 
     if (addressMode === "saved") {
       const selected = addresses.find((address) => address.id === selectedAddressId);
@@ -157,20 +175,20 @@ export function CheckoutPage() {
       customer = {
         fullName: newForm.fullName.trim(),
         email: newForm.email.trim(),
-        phone: newForm.phone.trim(),
+        phone: newForm.phone.trim().replace(/\s/g, "").replace(/^\+91/, "").slice(-10),
         addressLine1: newForm.addressLine1.trim(),
         addressLine2: newForm.addressLine2.trim(),
         city: newForm.city.trim(),
         state: newForm.state,
         pincode: newForm.pincode.trim(),
         paymentMethod,
-        addressLabel: newForm.addressLabel.trim(),
+        addressLabel: newForm.addressLabel.trim() || "Home",
       };
 
       if (saveNewToProfile) {
         try {
           await addAddress({
-            label: newForm.addressLabel.trim(),
+            label: customer.addressLabel,
             fullName: customer.fullName,
             email: customer.email,
             phone: customer.phone,
@@ -181,12 +199,8 @@ export function CheckoutPage() {
             pincode: customer.pincode,
           });
         } catch (err) {
-          setErrors((prev) => ({
-            ...prev,
-            submit: err.message ?? "Could not save address to your profile",
-          }));
-          setSubmitting(false);
-          return;
+          // Do not block order placement if the address book save fails.
+          addressSaveWarning = err.message ?? "Could not save address to your profile";
         }
       }
     }
@@ -244,7 +258,7 @@ export function CheckoutPage() {
           const paymentVerification = await verifyRazorpayPaymentApi(paymentResponse);
           paymentVerificationToken = paymentVerification.verificationToken;
         } else {
-          throw new Error("Online payment is not available right now.");
+          throw new Error("Online payment is not available right now. Please choose Cash on Delivery.");
         }
       }
 
@@ -260,12 +274,22 @@ export function CheckoutPage() {
         paymentVerificationToken,
       });
 
+      // Show success first so an empty cart cannot redirect away from checkout.
+      setCompletedOrder(data.order);
+      try {
+        addOrder(data.order);
+      } catch {
+        /* order already placed — ignore local list refresh errors */
+      }
       closeCart();
       clearCart();
-      addOrder(data.order);
-      setCompletedOrder(data.order);
     } catch (err) {
-      setErrors((prev) => ({ ...prev, submit: err.message }));
+      setErrors((prev) => ({
+        ...prev,
+        submit: addressSaveWarning
+          ? `${err.message} (Also: ${addressSaveWarning})`
+          : err.message || "Could not place order. Check the backend is running on port 3001.",
+      }));
     } finally {
       setSubmitting(false);
     }
@@ -324,7 +348,7 @@ export function CheckoutPage() {
             </p>
           </motion.header>
 
-          {!emailVerified && user?.email ? (
+          {!isEmailVerificationRequired() ? null : !emailVerified && user?.email ? (
             <EmailVerificationBanner
               email={user.email}
               onResend={resendVerificationEmail}
@@ -368,6 +392,7 @@ export function CheckoutPage() {
                 <CheckoutOrderSummary
                   items={items}
                   subtotal={subtotal}
+                  discountTotal={discountTotal}
                   shippingSettings={shippingSettings}
                   compact
                   editable
@@ -382,14 +407,14 @@ export function CheckoutPage() {
 
               <motion.button
                 type="submit"
-                disabled={submitting || !emailVerified || !canSubmit || paymentMethodsLoading}
+                disabled={submitting || !canSubmit || paymentMethodsLoading}
                 className="pdp-btn-primary w-full rounded-full py-4 font-body text-[11px] font-semibold uppercase tracking-[0.2em] text-white disabled:opacity-60 sm:w-auto sm:px-12"
                 whileHover={reduce || submitting ? undefined : { y: -2 }}
                 whileTap={reduce || submitting ? undefined : { scale: 0.985 }}
               >
                 {getCheckoutSubmitLabel(paymentMethod, {
                   submitting,
-                  emailVerified,
+                  emailVerified: true,
                   razorpayConfigured,
                   testPaymentsAllowed,
                 })}
@@ -400,6 +425,7 @@ export function CheckoutPage() {
               <CheckoutOrderSummary
                 items={items}
                 subtotal={subtotal}
+                discountTotal={discountTotal}
                 shippingSettings={shippingSettings}
                 editable
               />

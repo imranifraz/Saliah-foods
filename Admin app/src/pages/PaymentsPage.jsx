@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../lib/api.js";
 import { PageHeader } from "../components/ui/PageHeader.jsx";
 import { AdminCard } from "../components/ui/AdminCard.jsx";
 import { LoadingState } from "../components/ui/LoadingState.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 const EMPTY_GST = {
   ratePercent: 5,
@@ -23,12 +24,46 @@ const EMPTY_RAZORPAY = {
   source: "none",
 };
 
+const DEFAULT_PROMO_MESSAGE = "Get FREE shipping on orders above ₹{threshold}";
+
+function formatThresholdAmount(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toLocaleString("en-IN") : "0";
+}
+
+/** Keep message amount token in sync with the free-shipping field. */
+function syncPromoMessageWithThreshold(message, threshold) {
+  let next = String(message || "").trim() || DEFAULT_PROMO_MESSAGE;
+  next = next.replace(/₹\s*[\d,]+/g, "₹{threshold}");
+  if (!next.includes("{threshold}") && !next.includes("{amount}")) {
+    const amountText = String(Number(threshold) || "");
+    if (amountText && next.includes(amountText)) {
+      next = next.replace(amountText, "{threshold}");
+    } else {
+      next = DEFAULT_PROMO_MESSAGE;
+    }
+  }
+  return next;
+}
+
+function resolvePromoPreview(message, threshold) {
+  const amount = formatThresholdAmount(threshold);
+  return syncPromoMessageWithThreshold(message, threshold)
+    .replaceAll("{threshold}", amount)
+    .replaceAll("{amount}", amount)
+    .replace(/₹\s*[\d,]+/g, `₹${amount}`);
+}
+
 export function PaymentsPage() {
+  const toast = useAdminToast();
   const [methods, setMethods] = useState([]);
   const [store, setStore] = useState({
     freeShippingThreshold: 999,
     shippingFee: 99,
     codEnabled: true,
+    promoBarEnabled: true,
+    promoBarMessage: DEFAULT_PROMO_MESSAGE,
+    promoBarHref: "/products",
   });
   const [razorpay, setRazorpay] = useState(EMPTY_RAZORPAY);
   const [razorpayForm, setRazorpayForm] = useState({
@@ -45,12 +80,44 @@ export function PaymentsPage() {
   const [gstSaved, setGstSaved] = useState(false);
   const [savingGst, setSavingGst] = useState(false);
 
+  const promoPreview = useMemo(
+    () => resolvePromoPreview(store.promoBarMessage, store.freeShippingThreshold),
+    [store.promoBarMessage, store.freeShippingThreshold]
+  );
+
+  function updateFreeShippingThreshold(rawValue) {
+    const nextThreshold = Number(rawValue);
+    setStore((prev) => ({
+      ...prev,
+      freeShippingThreshold: nextThreshold,
+      promoBarMessage: syncPromoMessageWithThreshold(prev.promoBarMessage, nextThreshold),
+    }));
+  }
+
+  function updatePromoMessage(rawValue) {
+    setStore((prev) => ({
+      ...prev,
+      promoBarMessage: rawValue,
+    }));
+  }
+
   function load() {
     setLoading(true);
     apiFetch("/api/admin/payments")
       .then((d) => {
         setMethods(d.methods);
-        setStore(d.store);
+        setStore({
+          freeShippingThreshold: 999,
+          shippingFee: 99,
+          codEnabled: true,
+          promoBarEnabled: true,
+          promoBarHref: "/products",
+          ...(d.store ?? {}),
+          promoBarMessage: syncPromoMessageWithThreshold(
+            d.store?.promoBarMessage ?? DEFAULT_PROMO_MESSAGE,
+            d.store?.freeShippingThreshold ?? 999
+          ),
+        });
         const nextRazorpay = d.razorpay ?? EMPTY_RAZORPAY;
         setRazorpay(nextRazorpay);
         setRazorpayForm({
@@ -75,8 +142,10 @@ export function PaymentsPage() {
         body: JSON.stringify({ enabled: !m.enabled }),
       });
       load();
+      toast.success("Payment method updated");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not update payment method", err.message);
     }
   }
 
@@ -84,14 +153,34 @@ export function PaymentsPage() {
     e.preventDefault();
     setError("");
     setSaved(false);
+    const payload = {
+      ...store,
+      promoBarMessage: syncPromoMessageWithThreshold(
+        store.promoBarMessage,
+        store.freeShippingThreshold
+      ),
+    };
     try {
       await apiFetch("/api/admin/payments/store", {
         method: "PUT",
-        body: JSON.stringify(store),
+        body: JSON.stringify(payload),
+      }).then((data) => {
+        if (data.store) {
+          setStore((prev) => ({
+            ...prev,
+            ...data.store,
+            promoBarMessage: syncPromoMessageWithThreshold(
+              data.store.promoBarMessage ?? prev.promoBarMessage,
+              data.store.freeShippingThreshold ?? prev.freeShippingThreshold
+            ),
+          }));
+        }
       });
       setSaved(true);
+      toast.success("Shipping settings saved");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not save shipping settings", err.message);
     }
   }
 
@@ -116,8 +205,10 @@ export function PaymentsPage() {
       });
       setGst(data.gst ?? gst);
       setGstSaved(true);
+      toast.success("GST settings saved");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not save GST settings", err.message);
     } finally {
       setSavingGst(false);
     }
@@ -141,9 +232,11 @@ export function PaymentsPage() {
         enabled: nextRazorpay.enabled !== false,
       }));
       setRazorpaySaved(true);
+      toast.success("Razorpay settings saved");
       load();
     } catch (err) {
       setError(err.message);
+      toast.error("Could not save Razorpay settings", err.message);
     } finally {
       setSavingRazorpay(false);
     }
@@ -296,9 +389,7 @@ export function PaymentsPage() {
               <input
                 type="number"
                 value={store.freeShippingThreshold}
-                onChange={(e) =>
-                  setStore({ ...store, freeShippingThreshold: Number(e.target.value) })
-                }
+                onChange={(e) => updateFreeShippingThreshold(e.target.value)}
                 className="admin-input"
               />
             </label>
@@ -319,6 +410,55 @@ export function PaymentsPage() {
               />
               <span className="text-sm">Cash on delivery available</span>
             </label>
+
+            <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-2)] p-4 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--admin-fg)]">Free shipping offer badge</p>
+                  <p className="mt-1 text-xs text-[var(--admin-fg-faint)]">
+                    Shows as a floating icon on the customer home hero. Hover or tap to reveal the offer.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={store.promoBarEnabled !== false}
+                    onChange={(e) => setStore({ ...store, promoBarEnabled: e.target.checked })}
+                  />
+                  <span className="text-sm">Enabled</span>
+                </label>
+              </div>
+              <label className="block">
+                <span className="admin-label">Message</span>
+                <input
+                  type="text"
+                  value={store.promoBarMessage ?? ""}
+                  onChange={(e) => updatePromoMessage(e.target.value)}
+                  className="admin-input"
+                  placeholder={DEFAULT_PROMO_MESSAGE}
+                />
+                <span className="mt-1.5 block text-xs text-[var(--admin-fg-faint)]">
+                  The free-shipping amount updates automatically from the field above.
+                </span>
+              </label>
+              <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-surface)] px-3 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--admin-fg-faint)]">
+                  Live preview
+                </p>
+                <p className="mt-1 text-sm font-medium text-[var(--admin-fg)]">{promoPreview}</p>
+              </div>
+              <label className="block">
+                <span className="admin-label">Link (optional)</span>
+                <input
+                  type="text"
+                  value={store.promoBarHref ?? ""}
+                  onChange={(e) => setStore({ ...store, promoBarHref: e.target.value })}
+                  className="admin-input"
+                  placeholder="/products"
+                />
+              </label>
+            </div>
+
             {saved && (
               <p className="text-sm text-emerald-800">Shipping settings saved.</p>
             )}

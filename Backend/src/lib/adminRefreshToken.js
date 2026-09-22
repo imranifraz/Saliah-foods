@@ -12,6 +12,7 @@ const adminSessionSelect = {
   tokenVersion: true,
   profileNote: true,
   passwordHash: true,
+  avatarUrl: true,
 };
 
 function hashRefreshToken(rawToken) {

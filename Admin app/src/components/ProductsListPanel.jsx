@@ -7,38 +7,21 @@ import { AdminCard } from "./ui/AdminCard.jsx";
 import { StatCard } from "./ui/StatCard.jsx";
 import { DataRow, DataCell } from "./ui/DataTable.jsx";
 import { LoadingState } from "./ui/LoadingState.jsx";
+import {
+  AdminFilterDock,
+  AdminFilterSearch,
+  AdminFilterSegment,
+  AdminFilterSelect,
+} from "./ui/AdminFilterDock.jsx";
 import { ConfirmDialog } from "./ConfirmDialog.jsx";
 import { ProductThumb } from "./ui/ProductThumb.jsx";
 import { IconPackage, IconProducts } from "./icons/AdminIcons.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 function IconPlus() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-    </svg>
-  );
-}
-
-function IconSearch() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-    </svg>
-  );
-}
-
-function IconFilter() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M4.5 12h15.75M7.5 18h9.75" />
-    </svg>
-  );
-}
-
-function IconClear() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
   );
 }
@@ -104,14 +87,6 @@ function IconStockToggle({ className = "h-4 w-4" }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-    </svg>
-  );
-}
-
-function IconDuplicate() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75m9 6H9.375a1.125 1.125 0 00-1.125 1.125v9.75m3-6.75h6.75a1.125 1.125 0 011.125 1.125v9.75a1.125 1.125 0 01-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V9.375c0-.621.504-1.125 1.125-1.125z" />
     </svg>
   );
 }
@@ -362,6 +337,7 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
   { categories, onViewProduct, onViewPrices, onEditProduct, onCreateClick },
   ref
 ) {
+  const toast = useAdminToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
@@ -395,12 +371,10 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkWorking, setBulkWorking] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [duplicateTarget, setDuplicateTarget] = useState(null);
   const [stockTarget, setStockTarget] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [duplicatingId, setDuplicatingId] = useState(null);
   const [togglingStockId, setTogglingStockId] = useState(null);
   const [togglingStatusId, setTogglingStatusId] = useState(null);
 
@@ -504,8 +478,75 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
   }, [query, categoryFilter, statusFilter, stockFilter, featuredFilter, typeFilter, badgeFilter, sortValue, page, pageSize]);
 
   useEffect(() => {
-    if (filtersActive) setFiltersOpen(true);
-  }, [filtersActive]);
+    if (
+      categoryFilter !== "all" ||
+      featuredFilter !== "all" ||
+      typeFilter !== "all" ||
+      badgeFilter !== "all" ||
+      sortValue !== "name:asc"
+    ) {
+      setFiltersOpen(true);
+    }
+  }, [categoryFilter, featuredFilter, typeFilter, badgeFilter, sortValue]);
+
+  const filterChips = useMemo(() => {
+    const chips = [];
+    if (query.trim()) {
+      chips.push({ key: "q", label: `Search: ${query.trim()}`, onRemove: clearSearch });
+    }
+    if (statusFilter !== "all") {
+      chips.push({
+        key: "status",
+        label: STATUS_FILTERS.find((filter) => filter.value === statusFilter)?.label ?? statusFilter,
+        onRemove: () => clearFilter(setStatusFilter),
+      });
+    }
+    if (stockFilter !== "all") {
+      chips.push({
+        key: "stock",
+        label: STOCK_FILTERS.find((filter) => filter.value === stockFilter)?.label ?? stockFilter,
+        onRemove: () => clearFilter(setStockFilter),
+      });
+    }
+    if (categoryFilter !== "all") {
+      chips.push({
+        key: "category",
+        label: categories.find((category) => category.id === categoryFilter)?.label ?? categoryFilter,
+        onRemove: () => setCategory("all"),
+      });
+    }
+    if (featuredFilter !== "all") {
+      chips.push({
+        key: "featured",
+        label: FEATURED_FILTERS.find((filter) => filter.value === featuredFilter)?.label ?? featuredFilter,
+        onRemove: () => clearFilter(setFeaturedFilter),
+      });
+    }
+    if (typeFilter !== "all") {
+      chips.push({
+        key: "type",
+        label: TYPE_FILTERS.find((filter) => filter.value === typeFilter)?.label ?? typeFilter,
+        onRemove: () => clearFilter(setTypeFilter),
+      });
+    }
+    if (badgeFilter !== "all") {
+      chips.push({
+        key: "badge",
+        label: BADGE_FILTERS.find((filter) => filter.value === badgeFilter)?.label ?? badgeFilter,
+        onRemove: () => clearFilter(setBadgeFilter),
+      });
+    }
+    return chips;
+  }, [
+    query,
+    statusFilter,
+    stockFilter,
+    categoryFilter,
+    featuredFilter,
+    typeFilter,
+    badgeFilter,
+    categories,
+  ]);
 
   const safePage = Math.min(page, totalPages);
   const showingFrom = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
@@ -520,14 +561,6 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
     if (nextCategory && nextCategory !== "all") next.set("category", nextCategory);
     else next.delete("category");
     setSearchParams(next, { replace: true });
-  }
-
-  function handleSearch(event) {
-    event.preventDefault();
-    const nextQuery = search.trim();
-    setQuery(nextQuery);
-    setPage(1);
-    syncUrlParams(nextQuery, categoryFilter);
   }
 
   function clearSearch() {
@@ -593,8 +626,10 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
     try {
       await apiFetch("/api/admin/products/sync-best-sellers", { method: "POST" });
       loadProducts();
+      toast.success("Best sellers synced");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not sync best sellers", err.message);
     } finally {
       setSyncingBestSellers(false);
     }
@@ -630,8 +665,10 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
       });
       setSelectedIds(new Set());
       loadProducts();
+      toast.success("Products updated");
     } catch (err) {
       setError(err.message);
+      toast.error("Bulk update failed", err.message);
     } finally {
       setBulkWorking(false);
     }
@@ -650,12 +687,16 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
       const failed = results.filter((result) => result.status === "rejected").length;
       if (failed > 0) {
         setError(`${failed} product${failed === 1 ? "" : "s"} could not be deleted.`);
+        toast.error("Some products not deleted", `${failed} could not be deleted.`);
+      } else {
+        toast.success("Products deleted");
       }
       setSelectedIds(new Set());
       setBulkDeleteOpen(false);
       loadProducts();
     } catch (err) {
       setError(err.message);
+      toast.error("Could not delete products", err.message);
     } finally {
       setBulkWorking(false);
     }
@@ -671,8 +712,10 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
       });
       setStockTarget(null);
       loadProducts();
+      toast.success(product.inStock ? "Marked out of stock" : "Marked in stock");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not update stock flag", err.message);
     } finally {
       setTogglingStockId(null);
     }
@@ -689,24 +732,12 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
       });
       setStatusTarget(null);
       loadProducts();
+      toast.success(nextStatus === "active" ? "Product published" : "Product set to draft");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not update status", err.message);
     } finally {
       setTogglingStatusId(null);
-    }
-  }
-
-  async function duplicateProduct(product) {
-    setError("");
-    setDuplicatingId(product.id);
-    try {
-      await apiFetch(`/api/admin/products/${product.id}/duplicate`, { method: "POST" });
-      setDuplicateTarget(null);
-      loadProducts();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setDuplicatingId(null);
     }
   }
 
@@ -717,8 +748,10 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
       await apiFetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
       setDeleteTarget(null);
       loadProducts();
+      toast.success("Product deleted");
     } catch (err) {
       setError(err.message);
+      toast.error("Could not delete product", err.message);
     } finally {
       setDeletingId(null);
     }
@@ -766,7 +799,7 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
         title="Products"
         subtitle="Search, filter, and manage catalog items."
         action={
-          <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               className="btn-ghost inline-flex items-center gap-2 text-sm"
@@ -776,212 +809,89 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
               <IconSync />
               {syncingBestSellers ? "Syncing…" : "Sync best sellers"}
             </button>
-            <div className="flex w-full min-w-0 items-center gap-2 sm:max-w-md">
-              <form onSubmit={handleSearch} className="min-w-0 flex-1">
-                <div className="flex w-full min-w-0 items-stretch overflow-hidden rounded-lg border border-[var(--admin-border-strong)] bg-[var(--admin-input-bg)]">
-                  <span className="flex shrink-0 items-center pl-3 text-[var(--admin-fg-muted)]">
-                    <IconSearch />
-                  </span>
-                  <input
-                    type="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search name, slug, SKU, or catalog ID…"
-                    className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2.5 text-[0.9375rem] font-medium text-[var(--admin-fg)] outline-none placeholder:font-normal placeholder:text-[var(--admin-fg-faint)]"
-                  />
-                  {search ? (
-                    <button
-                      type="button"
-                      className="flex shrink-0 items-center px-2 text-[var(--admin-fg-muted)] transition hover:text-[var(--admin-fg)]"
-                      aria-label="Clear search"
-                      onClick={clearSearch}
-                    >
-                      <IconClear />
-                    </button>
-                  ) : null}
-                  <button
-                    type="submit"
-                    className="shrink-0 border-l border-[var(--admin-border-strong)] px-4 text-sm font-semibold text-[var(--admin-link)] transition hover:bg-[var(--admin-hover)]"
-                  >
-                    Search
-                  </button>
-                </div>
-              </form>
-              <button
-                type="button"
-                className={`relative inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border transition ${
-                  filtersOpen || filtersActive
-                    ? "border-[var(--admin-tab-active-border)] bg-[var(--admin-tab-active-bg)] text-[var(--admin-link)]"
-                    : "border-[var(--admin-border-strong)] bg-[var(--admin-input-bg)] text-[var(--admin-fg-muted)] hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]"
-                }`}
-                aria-label="Filter and sort products"
-                aria-expanded={filtersOpen}
-                title="Filter and sort"
-                onClick={() => setFiltersOpen((open) => !open)}
-              >
-                <IconFilter />
-                {filtersActive ? (
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--admin-link)]" aria-hidden />
-                ) : null}
-              </button>
-              <button
-                type="button"
-                className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-[var(--admin-border-strong)] bg-[var(--admin-input-bg)] text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)] disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label={exporting ? "Exporting products" : "Export products to CSV"}
-                title={exporting ? "Exporting…" : "Export CSV"}
-                disabled={exporting || loading}
-                onClick={exportCsv}
-              >
-                {exporting ? <span className="text-xs font-semibold">…</span> : <IconDownload />}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="btn-ghost inline-flex h-[42px] w-[42px] items-center justify-center"
+              aria-label={exporting ? "Exporting products" : "Export products to CSV"}
+              title={exporting ? "Exporting…" : "Export CSV"}
+              disabled={exporting || loading}
+              onClick={exportCsv}
+            >
+              {exporting ? <span className="text-xs font-semibold">…</span> : <IconDownload />}
+            </button>
           </div>
         }
       >
-        {filtersOpen ? (
-          <div className="mb-4 grid gap-3 border-b border-[var(--admin-border)] pb-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <label className="admin-caption mb-1.5 block">Category</label>
-              <select
+        <AdminFilterDock
+          title="Find products"
+          search={
+            <AdminFilterSearch
+              id="products-filter-search"
+              value={search}
+              onChange={setSearch}
+              onSubmit={() => {
+                const nextQuery = search.trim();
+                setQuery(nextQuery);
+                setPage(1);
+                syncUrlParams(nextQuery, categoryFilter);
+              }}
+              onClear={clearSearch}
+              placeholder="Search name, slug, SKU, or catalog ID…"
+              label="Search products"
+            />
+          }
+          advancedOpen={filtersOpen}
+          onAdvancedOpenChange={setFiltersOpen}
+          advanced={
+            <>
+              <AdminFilterSelect
+                label="Category"
                 value={categoryFilter}
-                onChange={(e) => setCategory(e.target.value)}
-                className="admin-input"
-                aria-label="Filter by category"
-              >
-                {categoryOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="admin-caption mb-1.5 block">Status</label>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="admin-input" aria-label="Filter by status">
-                {STATUS_FILTERS.map((filter) => (
-                  <option key={filter.value} value={filter.value}>
-                    {filter.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="admin-caption mb-1.5 block">Stock</label>
-              <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)} className="admin-input" aria-label="Filter by stock">
-                {STOCK_FILTERS.map((filter) => (
-                  <option key={filter.value} value={filter.value}>
-                    {filter.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="admin-caption mb-1.5 block">Featured</label>
-              <select value={featuredFilter} onChange={(e) => setFeaturedFilter(e.target.value)} className="admin-input" aria-label="Filter by featured">
-                {FEATURED_FILTERS.map((filter) => (
-                  <option key={filter.value} value={filter.value}>
-                    {filter.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="admin-caption mb-1.5 block">Type</label>
-              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="admin-input" aria-label="Filter by type">
-                {TYPE_FILTERS.map((filter) => (
-                  <option key={filter.value} value={filter.value}>
-                    {filter.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="admin-caption mb-1.5 block">Badge</label>
-              <select value={badgeFilter} onChange={(e) => setBadgeFilter(e.target.value)} className="admin-input" aria-label="Filter by badge">
-                {BADGE_FILTERS.map((filter) => (
-                  <option key={filter.value} value={filter.value}>
-                    {filter.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="admin-caption mb-1.5 block">Sort by</label>
-              <select value={sortValue} onChange={(e) => setSortValue(e.target.value)} className="admin-input" aria-label="Sort products">
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        ) : null}
-
-        {hasActiveFilters ? (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="admin-muted text-sm">Filtered by</span>
-            {categoryFilter !== "all" ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-medium text-[var(--admin-fg)]">
-                {categories.find((category) => category.id === categoryFilter)?.label ?? categoryFilter}
-                <button type="button" className="rounded-full p-0.5 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]" aria-label="Remove category filter" onClick={() => setCategory("all")}>
-                  <IconClear />
-                </button>
-              </span>
-            ) : null}
-            {statusFilter !== "all" ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-medium text-[var(--admin-fg)]">
-                {STATUS_FILTERS.find((filter) => filter.value === statusFilter)?.label}
-                <button type="button" className="rounded-full p-0.5 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]" aria-label="Remove status filter" onClick={() => clearFilter(setStatusFilter)}>
-                  <IconClear />
-                </button>
-              </span>
-            ) : null}
-            {stockFilter !== "all" ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-medium text-[var(--admin-fg)]">
-                {STOCK_FILTERS.find((filter) => filter.value === stockFilter)?.label}
-                <button type="button" className="rounded-full p-0.5 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]" aria-label="Remove stock filter" onClick={() => clearFilter(setStockFilter)}>
-                  <IconClear />
-                </button>
-              </span>
-            ) : null}
-            {featuredFilter !== "all" ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-medium text-[var(--admin-fg)]">
-                {FEATURED_FILTERS.find((filter) => filter.value === featuredFilter)?.label}
-                <button type="button" className="rounded-full p-0.5 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]" aria-label="Remove featured filter" onClick={() => clearFilter(setFeaturedFilter)}>
-                  <IconClear />
-                </button>
-              </span>
-            ) : null}
-            {typeFilter !== "all" ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-medium text-[var(--admin-fg)]">
-                {TYPE_FILTERS.find((filter) => filter.value === typeFilter)?.label}
-                <button type="button" className="rounded-full p-0.5 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]" aria-label="Remove type filter" onClick={() => clearFilter(setTypeFilter)}>
-                  <IconClear />
-                </button>
-              </span>
-            ) : null}
-            {badgeFilter !== "all" ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-medium text-[var(--admin-fg)]">
-                {BADGE_FILTERS.find((filter) => filter.value === badgeFilter)?.label}
-                <button type="button" className="rounded-full p-0.5 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]" aria-label="Remove badge filter" onClick={() => clearFilter(setBadgeFilter)}>
-                  <IconClear />
-                </button>
-              </span>
-            ) : null}
-            {query.trim() ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-3 py-1 text-xs font-medium text-[var(--admin-fg)]">
-                {query.trim()}
-                <button type="button" className="rounded-full p-0.5 text-[var(--admin-fg-muted)] transition hover:bg-[var(--admin-hover)] hover:text-[var(--admin-fg)]" aria-label="Remove search filter" onClick={clearSearch}>
-                  <IconClear />
-                </button>
-              </span>
-            ) : null}
-            <button type="button" onClick={clearAllFilters} className="btn-ghost px-2 py-1 text-xs">
-              Clear all
-            </button>
-          </div>
-        ) : null}
+                onChange={setCategory}
+                options={categoryOptions}
+              />
+              <AdminFilterSelect
+                label="Featured"
+                value={featuredFilter}
+                onChange={setFeaturedFilter}
+                options={FEATURED_FILTERS}
+              />
+              <AdminFilterSelect
+                label="Type"
+                value={typeFilter}
+                onChange={setTypeFilter}
+                options={TYPE_FILTERS}
+              />
+              <AdminFilterSelect
+                label="Badge"
+                value={badgeFilter}
+                onChange={setBadgeFilter}
+                options={BADGE_FILTERS}
+              />
+              <AdminFilterSelect
+                label="Sort by"
+                value={sortValue}
+                onChange={setSortValue}
+                options={SORT_OPTIONS}
+              />
+            </>
+          }
+          chips={filterChips}
+          onClearAll={clearAllFilters}
+        >
+          <AdminFilterSegment
+            label="Status"
+            options={STATUS_FILTERS}
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+          <AdminFilterSegment
+            label="Stock"
+            options={STOCK_FILTERS}
+            value={stockFilter}
+            onChange={setStockFilter}
+          />
+        </AdminFilterDock>
 
         {selectedIds.size > 0 ? (
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface-2)] px-4 py-3">
@@ -1187,13 +1097,6 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
                             <TableIconButton label="Edit product" onClick={() => onEditProduct?.(product)}>
                               <IconEdit />
                             </TableIconButton>
-                            <TableIconButton
-                              label="Duplicate product"
-                              disabled={duplicatingId === product.id}
-                              onClick={() => setDuplicateTarget(product)}
-                            >
-                              {duplicatingId === product.id ? <span className="text-xs">…</span> : <IconDuplicate />}
-                            </TableIconButton>
                             <TableIconButton label="Delete product" danger onClick={() => setDeleteTarget(product)}>
                               {deletingId === product.id ? <span className="text-xs">…</span> : <IconTrash />}
                             </TableIconButton>
@@ -1263,25 +1166,6 @@ export const ProductsListPanel = forwardRef(function ProductsListPanel(
         }}
         onConfirm={() => {
           if (deleteTarget) handleDelete(deleteTarget);
-        }}
-      />
-
-      <ConfirmDialog
-        open={Boolean(duplicateTarget)}
-        title="Duplicate product?"
-        description={
-          duplicateTarget
-            ? `Create a copy of "${duplicateTarget.name}"? The duplicate will be saved as a draft with zero stock.`
-            : ""
-        }
-        confirmLabel="Duplicate product"
-        cancelLabel="Cancel"
-        loading={Boolean(duplicatingId)}
-        onClose={() => {
-          if (!duplicatingId) setDuplicateTarget(null);
-        }}
-        onConfirm={() => {
-          if (duplicateTarget) duplicateProduct(duplicateTarget);
         }}
       />
 

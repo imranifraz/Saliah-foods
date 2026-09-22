@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { apiFetch } from "../lib/api.js";
 
@@ -23,6 +23,7 @@ import { resolveAdminMediaUrl } from "../lib/mediaUrl.js";
 import { generateSecurePassword } from "../lib/password.js";
 
 import { useAuth } from "../context/AuthContext.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 import { AdminAvatarUpload } from "../components/AdminAvatarUpload.jsx";
 
@@ -224,6 +225,8 @@ function emptyForm(admin) {
 
 export function AdminDetailPage() {
 
+  const toast = useAdminToast();
+
   const { id } = useParams();
 
   const navigate = useNavigate();
@@ -410,6 +413,8 @@ export function AdminDetailPage() {
 
       setSaved(true);
 
+      toast.success("Admin updated");
+
       setSearchParams({});
 
       if (currentUser?.id === data.admin.id) {
@@ -421,6 +426,8 @@ export function AdminDetailPage() {
     } catch (err) {
 
       setError(err.message);
+
+      toast.error("Could not update admin", err.message);
 
     } finally {
 
@@ -444,11 +451,15 @@ export function AdminDetailPage() {
 
       await apiFetch(`/api/admin/admins/${id}`, { method: "DELETE" });
 
+      toast.success("Admin deleted");
+
       navigate("/admins");
 
     } catch (err) {
 
       setError(err.message);
+
+      toast.error("Could not delete admin", err.message);
 
       setDeleting(false);
 
@@ -498,9 +509,13 @@ export function AdminDetailPage() {
 
       setPasswordResetDone(true);
 
+      toast.success("Password reset");
+
     } catch (err) {
 
       setError(err.message);
+
+      toast.error("Could not reset password", err.message);
 
       setResetPasswordDialogOpen(false);
 
@@ -541,26 +556,6 @@ export function AdminDetailPage() {
   return (
 
     <div>
-
-      <Link
-
-        to="/admins"
-
-        className="admin-muted mb-5 inline-flex items-center gap-1.5 text-sm font-medium transition hover:text-[var(--admin-link)]"
-
-      >
-
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-
-          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-
-        </svg>
-
-        Back to admins
-
-      </Link>
-
-
 
       <section className="admin-card mb-6 overflow-hidden">
 

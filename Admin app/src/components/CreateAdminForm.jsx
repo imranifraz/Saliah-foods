@@ -9,6 +9,7 @@ import { generateSecurePassword } from "../lib/password.js";
 import { formatPhoneForStorage, validateIndianPhoneLocal } from "../lib/phone.js";
 
 import { AdminAvatarUpload } from "./AdminAvatarUpload.jsx";
+import { useAdminToast } from "../context/AdminToastContext.jsx";
 
 
 
@@ -95,6 +96,8 @@ function PasswordVisibilityToggle({ visible, onToggle }) {
 
 
 export function CreateAdminForm({ onCancel, onSuccess }) {
+
+  const toast = useAdminToast();
 
   const [form, setForm] = useState(emptyForm);
 
@@ -212,11 +215,17 @@ export function CreateAdminForm({ onCancel, onSuccess }) {
 
       setPasswordVisible(false);
 
+      toast.success("Admin created");
+
       onSuccess?.();
 
     } catch (err) {
 
-      setError(err.message ?? "Could not create admin");
+      const message = err.message ?? "Could not create admin";
+
+      setError(message);
+
+      toast.error("Could not create admin", message);
 
     } finally {
 

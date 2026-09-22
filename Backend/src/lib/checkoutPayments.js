@@ -1,6 +1,7 @@
 import { prisma } from "./prisma.js";
 import { getGstSettings } from "./gstSettings.js";
 import { isRazorpayConfigured, isTestPaymentsAllowed } from "./razorpay.js";
+import { normalizeShippingSettings } from "./shippingSettings.js";
 
 export async function getCheckoutPaymentMethods() {
   const [dbMethods, checkoutSetting, shipping, gst] = await Promise.all([
@@ -37,7 +38,7 @@ export async function getCheckoutPaymentMethods() {
 
   return {
     methods,
-    shipping: shipping?.value ?? { freeShippingThreshold: 999, shippingFee: 99 },
+    shipping: normalizeShippingSettings(shipping?.value),
     razorpayConfigured: razorpayActive,
     testPaymentsAllowed,
     codEnabled,

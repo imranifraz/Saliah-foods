@@ -46,6 +46,7 @@ export function WellnessProducts() {
             columns={4}
             maxRows={3}
             showPackSize
+            showTagline
           />
         )}
       </div>

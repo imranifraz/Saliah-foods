@@ -19,10 +19,10 @@ function inferPackaging(packSize) {
   return PACKAGING_MAP[packSize] ?? "Pouch";
 }
 
-function normalizeVariant(rawVariant, fallbackImage) {
+function normalizeVariant(rawVariant, fallbackImage, version = "") {
   const priceFields = buildPriceFields(rawVariant.priceValue, rawVariant.mrpValue ?? undefined);
   const stockQuantity = Number(rawVariant.stockQuantity ?? 0);
-  const variantImage = resolveMediaUrl(rawVariant.img || fallbackImage);
+  const variantImage = withCacheBust(resolveMediaUrl(rawVariant.img || fallbackImage), version);
 
   return {
     ...rawVariant,
@@ -59,10 +59,20 @@ function normalizeApprovedReview(rawReview) {
   };
 }
 
+function withCacheBust(url, version) {
+  if (!url || !version) return url;
+  const stamp = String(version).replace(/[^\w.-]/g, "");
+  if (!stamp) return url;
+  return url.includes("?") ? `${url}&v=${stamp}` : `${url}?v=${stamp}`;
+}
+
 export function normalizeApiProduct(raw) {
-  const images = Array.isArray(raw.images) ? raw.images.map(resolveMediaUrl).filter(Boolean) : [];
+  const version = raw.updatedAt ?? raw.updated_at ?? "";
+  const images = Array.isArray(raw.images)
+    ? raw.images.map((src) => withCacheBust(resolveMediaUrl(src), version)).filter(Boolean)
+    : [];
   const variants = Array.isArray(raw.variants)
-    ? raw.variants.map((variant) => normalizeVariant(variant, raw.img))
+    ? raw.variants.map((variant) => normalizeVariant(variant, raw.img, version))
     : [];
   const defaultVariant = pickDefaultVariant(variants);
   const priceValue = defaultVariant?.priceValue ?? raw.priceValue;
@@ -71,20 +81,21 @@ export function normalizeApiProduct(raw) {
   const packaging =
     defaultVariant?.packaging ?? raw.packaging ?? inferPackaging(defaultVariant?.packSize ?? raw.packSize);
   const benefits = Array.isArray(raw.benefits) ? raw.benefits : [];
+  const cover = withCacheBust(resolveMediaUrl(raw.img), version) || defaultVariant?.img || images[0] || "";
 
   return {
     ...raw,
     ...priceFields,
     catalogId: raw.catalogId,
     slug: raw.slug,
-    img: resolveMediaUrl(raw.img) || defaultVariant?.img || images[0] || "",
-    images: images.length
-      ? images
-      : [resolveMediaUrl(raw.img) || defaultVariant?.img].filter(Boolean),
+    img: cover,
+    images: images.length ? images : [cover].filter(Boolean),
     packSize: defaultVariant?.packSize ?? raw.packSize ?? "",
     packaging,
     benefits,
     badge: raw.badge ?? null,
+    bogoEnabled: Boolean(raw.bogoEnabled),
+    offerLabel: raw.bogoEnabled ? raw.offerLabel || "Buy 1 Get 1 Free" : null,
     inStock: variants.length ? variants.some((variant) => variant.inStock) : raw.inStock !== false,
     featured: Boolean(raw.featured),
     isNew: Boolean(raw.isNew),

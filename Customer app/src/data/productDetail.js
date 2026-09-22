@@ -43,9 +43,19 @@ export function getFixedPackSizeLabel(product) {
   return variant?.packSize ?? product.packSize?.trim() ?? null;
 }
 
+function gallerySrcKey(src) {
+  const value = String(src || "").trim();
+  if (!value) return "";
+  const bare = value.split("#")[0].split("?")[0];
+  return bare || value;
+}
+
 export function getProductGallery(product, selectedVariant = null) {
   const preferredVariant = selectedVariant ?? getPreferredVariant(product);
-  const items = [preferredVariant?.img, ...(Array.isArray(product.images) ? product.images : []), product.img]
+  const preferredSrc = preferredVariant?.img || product.img;
+  const gallerySources = Array.isArray(product.images) ? product.images : [];
+  // Prefer catalog gallery order; keep selected variant cover first when it differs.
+  const items = [preferredSrc, ...gallerySources, product.img]
     .filter(Boolean)
     .map((src, index) => ({
       id: `gallery-${index}`,
@@ -56,8 +66,9 @@ export function getProductGallery(product, selectedVariant = null) {
 
   const seen = new Set();
   return items.filter((item) => {
-    if (seen.has(item.src)) return false;
-    seen.add(item.src);
+    const key = gallerySrcKey(item.src);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
 }

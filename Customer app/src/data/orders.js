@@ -62,6 +62,26 @@ export function isActiveOrder(order) {
   return order.status !== "delivered" && order.status !== "cancelled";
 }
 
+export function isPastOrder(order) {
+  return order.status === "delivered";
+}
+
+export function isCancelledOrder(order) {
+  return order.status === "cancelled";
+}
+
+export function getOrderBucket(order) {
+  if (isCancelledOrder(order)) return "cancelled";
+  if (isPastOrder(order)) return "past";
+  return "active";
+}
+
+export const ORDER_BUCKETS = [
+  { id: "active", label: "Active orders" },
+  { id: "past", label: "Past orders" },
+  { id: "cancelled", label: "Cancelled orders" },
+];
+
 export function getTrackingProgress(status) {
   const index = TRACKING_STEPS.indexOf(status);
   if (status === "cancelled") return -1;

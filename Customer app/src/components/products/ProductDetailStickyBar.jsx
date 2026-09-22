@@ -23,7 +23,7 @@ export function ProductDetailStickyBar({
           animate={reduce ? undefined : { opacity: 1, y: 0 }}
           exit={reduce ? undefined : { opacity: 0, y: 24 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="pdp-sticky-bar fixed inset-x-0 bottom-0 z-50 border-t border-cream-200/80 bg-white/95 px-4 py-3 backdrop-blur-md sm:px-5 md:px-10"
+          className="pdp-sticky-bar fixed inset-x-0 bottom-0 z-50 border-t border-cream-200/80 bg-white/98 px-4 py-3 sm:px-5 md:px-10"
         >
           <div className="mx-auto flex max-w-[1480px] items-center gap-3 sm:gap-4">
             <div className="hidden h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-cream-200/70 bg-cream-50 sm:flex">

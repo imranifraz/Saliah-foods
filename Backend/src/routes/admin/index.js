@@ -16,6 +16,9 @@ import notificationRoutes from "./notifications.js";
 import searchRoutes from "./search.js";
 import contactRoutes from "./contact.js";
 import faqRoutes from "./faq.js";
+import sourcingRoutes from "./sourcing.js";
+import legacyRoutes from "./legacy.js";
+import newsletterRoutes from "./newsletter.js";
 import { requireAdmin } from "../../middleware/admin.js";
 import { toAdminSession } from "../../lib/auth.js";
 
@@ -41,5 +44,8 @@ router.use("/notifications", notificationRoutes);
 router.use("/search", searchRoutes);
 router.use("/contact", contactRoutes);
 router.use("/faq", faqRoutes);
+router.use("/sourcing", sourcingRoutes);
+router.use("/legacy", legacyRoutes);
+router.use("/newsletter", newsletterRoutes);
 
 export default router;

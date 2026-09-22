@@ -38,7 +38,22 @@ export function ContactContentProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    refresh();
+    let idleId = 0;
+    let timeoutId = 0;
+    const run = () => {
+      refresh();
+    };
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(run, { timeout: 2500 });
+    } else {
+      timeoutId = window.setTimeout(run, 1200);
+    }
+    return () => {
+      if (idleId && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
   }, [refresh]);
 
   const value = useMemo(

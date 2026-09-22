@@ -6,11 +6,14 @@ import { getAvailableQuantity } from "../lib/inventoryConstants.js";
 import { reserveVariantStock } from "../lib/inventoryStock.js";
 import { applyOrderCancellation, canCustomerCancel } from "../lib/orderCancel.js";
 import { refundOrderPayment } from "../lib/razorpayRefund.js";
-import { isPaymentMethodAllowed } from "../lib/checkoutPayments.js";
+import { getCheckoutPaymentMethods, isPaymentMethodAllowed } from "../lib/checkoutPayments.js";
 import { isRazorpayConfigured, isTestPaymentsAllowed } from "../lib/razorpay.js";
 import { formatReview } from "../lib/reviews.js";
 import { sendManualPaymentInstructions } from "../lib/orderPaymentMail.js";
 import { notifyNewOrder, notifyOrderCancelled } from "../lib/notifications.js";
+import { isEmailVerificationRequired } from "../lib/emailVerificationPolicy.js";
+import { applyOffersToLines, getShippingFeeFromSettings } from "../lib/offers.js";
+import { getGstSettings } from "../lib/gstSettings.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -23,6 +26,30 @@ const orderInclude = {
   },
 };
 
+function splitGstFromInclusive(inclusiveTotal, rate) {
+  const taxable = inclusiveTotal / (1 + rate);
+  const gst = inclusiveTotal - taxable;
+  return {
+    taxable: Math.round(taxable * 100) / 100,
+    gst: Math.round(gst * 100) / 100,
+  };
+}
+
+function calcServerOrderBreakdown(subtotal, shipping, gstSettings) {
+  const rate = Number(gstSettings.rate ?? 0.05);
+  const label = gstSettings.label ?? "GST (5%)";
+  const itemsGst = splitGstFromInclusive(subtotal, rate);
+  const shippingGst =
+    shipping > 0 ? splitGstFromInclusive(shipping, rate) : { taxable: 0, gst: 0 };
+  return {
+    subtotal,
+    shipping,
+    total: subtotal + shipping,
+    gstAmount: Math.round((itemsGst.gst + shippingGst.gst) * 100) / 100,
+    gstLabel: label,
+  };
+}
+
 function formatOrder(order) {
   return {
     id: order.id,
@@ -31,6 +58,8 @@ function formatOrder(order) {
     subtotal: order.subtotal,
     shipping: order.shipping,
     total: order.total,
+    discountTotal: order.discountTotal ?? 0,
+    appliedOffers: order.appliedOffers ?? null,
     gstAmount: order.gstAmount,
     gstLabel: order.gstLabel,
     paymentMethod: order.paymentMethod,
@@ -51,6 +80,9 @@ function formatOrder(order) {
       priceValue: item.priceValue,
       mrpValue: item.mrpValue,
       quantity: item.quantity,
+      lineDiscount: item.lineDiscount ?? 0,
+      bogoApplied: Boolean(item.bogoApplied),
+      lineTotal: Math.max(0, (item.priceValue ?? 0) * (item.quantity ?? 0) - (item.lineDiscount ?? 0)),
       review: formatReview(item.review),
     })),
   };
@@ -169,7 +201,7 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    if (!req.user.emailVerifiedAt) {
+    if (isEmailVerificationRequired() && !req.user.emailVerifiedAt) {
       return res.status(403).json({
         ok: false,
         error: "Verify your email before placing an order",
@@ -180,11 +212,6 @@ router.post("/", async (req, res, next) => {
     const {
       items,
       customer,
-      subtotal,
-      shipping,
-      total,
-      gstAmount,
-      gstLabel,
       paymentMethod,
       paymentVerificationToken,
     } = req.body;
@@ -205,9 +232,56 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ ok: false, error: "Selected payment method is not available" });
     }
 
+    const [checkout, gstSettings] = await Promise.all([
+      getCheckoutPaymentMethods(),
+      getGstSettings(),
+    ]);
+
+    // Resolve catalog prices first so BOGO / shipping / Razorpay use server totals.
+    const resolvedForPricing = [];
+    for (const item of items) {
+      const variant = await resolveVariant(prisma, item);
+      if (!variant?.product) {
+        return res.status(400).json({
+          ok: false,
+          error: `Variant not found for ${item.name ?? item.slug ?? "product"}`,
+        });
+      }
+
+      const quantity = Number(item.quantity ?? 1);
+      if (!Number.isFinite(quantity) || quantity < 1) {
+        return res.status(400).json({
+          ok: false,
+          error: `Invalid quantity for ${variant.product.name}`,
+        });
+      }
+
+      resolvedForPricing.push({
+        productId: variant.product.id,
+        variantId: variant.id,
+        sku: variant.sku,
+        productSlug: variant.product.slug,
+        name: variant.product.name,
+        img: item.img ?? variant.img ?? variant.product.img,
+        packSize: variant.weight,
+        quantity,
+        unitPrice: Number(variant.priceValue ?? 0),
+        mrpValue: variant.mrpValue ?? null,
+        bogoEnabled: Boolean(variant.product.bogoEnabled),
+      });
+    }
+
+    const priced = applyOffersToLines(resolvedForPricing);
+    const shipping = getShippingFeeFromSettings(priced.subtotal, checkout.shipping);
+    const breakdown = calcServerOrderBreakdown(priced.subtotal, shipping, gstSettings);
+
     let payment;
     if (normalizedPaymentMethod === "razorpay") {
-      payment = await verifyRazorpayPaymentToken(paymentVerificationToken, req.user.id, total);
+      payment = await verifyRazorpayPaymentToken(
+        paymentVerificationToken,
+        req.user.id,
+        breakdown.total
+      );
     } else {
       payment = {
         method: normalizedPaymentMethod,
@@ -217,40 +291,39 @@ router.post("/", async (req, res, next) => {
 
     const createdAt = new Date();
     const order = await prisma.$transaction(async (tx) => {
-      const resolvedItems = [];
       const orderId = generateOrderId();
+      const orderItems = [];
 
-      for (const item of items) {
-        const variant = await resolveVariant(tx, item);
-        if (!variant?.product) {
-          throw new Error(`Variant not found for ${item.name ?? item.slug ?? "product"}`);
-        }
-
-        const quantity = Number(item.quantity ?? 1);
-        if (!Number.isFinite(quantity) || quantity < 1) {
-          throw new Error(`Invalid quantity for ${variant.product.name}`);
+      for (const line of priced.lines) {
+        const variant = await tx.productVariant.findUnique({
+          where: { id: line.variantId },
+        });
+        if (!variant) {
+          throw new Error(`Variant not found for ${line.name}`);
         }
 
         const available = getAvailableQuantity(variant);
-        if (available < quantity) {
-          throw new Error(`${variant.product.name} (${variant.weight}) is out of stock`);
+        if (available < line.quantity) {
+          throw new Error(`${line.name} (${line.packSize}) is out of stock`);
         }
 
-        resolvedItems.push({
-          productId: variant.product.id,
-          variantId: variant.id,
-          sku: variant.sku,
-          productSlug: variant.product.slug,
-          name: variant.product.name,
-          img: item.img ?? variant.img ?? variant.product.img,
-          packSize: variant.weight,
-          priceValue: Number(item.priceValue ?? variant.priceValue),
-          mrpValue: item.mrpValue ?? variant.mrpValue ?? null,
-          quantity,
+        orderItems.push({
+          productId: line.productId,
+          variantId: line.variantId,
+          sku: line.sku,
+          productSlug: line.productSlug,
+          name: line.name,
+          img: line.img,
+          packSize: line.packSize,
+          priceValue: line.unitPrice,
+          mrpValue: line.mrpValue,
+          quantity: line.quantity,
+          lineDiscount: line.lineDiscount,
+          bogoApplied: line.bogoApplied,
         });
       }
 
-      for (const item of resolvedItems) {
+      for (const item of orderItems) {
         await reserveVariantStock(tx, item.variantId, item.quantity, orderId);
       }
 
@@ -259,11 +332,13 @@ router.post("/", async (req, res, next) => {
           id: orderId,
           userId: req.user.id,
           status: "placed",
-          subtotal,
-          shipping,
-          total,
-          gstAmount: gstAmount ?? null,
-          gstLabel: gstLabel ?? null,
+          subtotal: breakdown.subtotal,
+          shipping: breakdown.shipping,
+          total: breakdown.total,
+          discountTotal: priced.discountTotal,
+          appliedOffers: priced.appliedOffers,
+          gstAmount: breakdown.gstAmount ?? null,
+          gstLabel: breakdown.gstLabel ?? null,
           paymentMethod: normalizedPaymentMethod,
           customer: {
             ...customer,
@@ -286,7 +361,7 @@ router.post("/", async (req, res, next) => {
           },
           statusHistory: [{ status: "placed", at: createdAt.toISOString() }],
           items: {
-            create: resolvedItems,
+            create: orderItems,
           },
         },
         include: orderInclude,

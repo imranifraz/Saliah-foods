@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { blogPosts, getBlogPostPath } from "../../data/blog";
+import {
+  BLOG_COVER_IMAGE_HEIGHT,
+  BLOG_COVER_IMAGE_WIDTH,
+} from "../../data/blogImageSpec.js";
 import { OptimizedImage } from "../ui/OptimizedImage";
 import { SectionHeader } from "../ui/SectionHeader";
 import { Reveal } from "../ui/Reveal";
@@ -18,7 +22,7 @@ export function BlogPosts() {
             className="max-w-3xl"
           />
           <Link
-            to="/#blog"
+            to="/blog"
             className="shrink-0 self-start font-body text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-800 underline-offset-4 hover:underline sm:self-auto"
           >
             View all posts
@@ -35,14 +39,19 @@ export function BlogPosts() {
               viewport={{ once: true, margin: "-40px" }}
               transition={{ duration: 0.65, delay: i * 0.08 }}
             >
-              <Link to={getBlogPostPath(post.id)} className="relative block aspect-[16/10] overflow-hidden bg-cream-100">
+              <Link
+                to={getBlogPostPath(post.id)}
+                className="relative block aspect-square overflow-hidden bg-cream-100"
+              >
                 <OptimizedImage
                   src={post.img}
-                  alt=""
-                  className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-                  width={600}
-                  height={375}
+                  alt={post.title}
+                  pictureClassName="absolute inset-0 block h-full w-full"
+                  className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.03]"
+                  width={BLOG_COVER_IMAGE_WIDTH}
+                  height={BLOG_COVER_IMAGE_HEIGHT}
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  priority={i < 3}
                 />
                 <span className="absolute left-3 top-3 rounded-full bg-cream-50/95 px-2.5 py-1 font-body text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-900">
                   {post.category}

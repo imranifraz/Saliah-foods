@@ -1,8 +1,8 @@
-import { sanitizeRichHtml, hasRichHtml } from "../../lib/richText.js";
+import { sanitizeRichHtml, hasRichHtml, richHtmlHasText } from "../../lib/richText.js";
 
 export function RichText({ as: Tag = "div", className = "", html, ...rest }) {
   const content = String(html ?? "").trim();
-  if (!content) return null;
+  if (!richHtmlHasText(content)) return null;
 
   if (!hasRichHtml(content)) {
     return (
